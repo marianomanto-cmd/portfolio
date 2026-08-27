@@ -1,3 +1,4 @@
+import { toIsoDate, toIsoTimestamp } from './dates';
 import { q, q1, tx } from './db';
 import { OWNER } from './owner';
 import type {
@@ -22,7 +23,7 @@ export async function getInstruments(): Promise<Instrument[]> {
     kind: r.kind as Kind,
     platform: r.platform as Platform,
     yahooSymbol: r.yahoo_symbol == null ? null : String(r.yahoo_symbol),
-    maturity: r.maturity == null ? null : String(r.maturity).slice(0, 10),
+    maturity: toIsoDate(r.maturity),
     sortOrder: num(r.sort_order),
     active: Boolean(r.active),
   }));
@@ -42,10 +43,10 @@ export async function getLatestBook(): Promise<Book | null> {
   const snapshot: Snapshot = {
     id: num(snap.id),
     source: snap.source as Source,
-    takenAt: String(snap.taken_at).slice(0, 10),
+    takenAt: toIsoDate(snap.taken_at) ?? '',
     mep: num(snap.mep),
     notes: snap.notes == null ? null : String(snap.notes),
-    createdAt: String(snap.created_at),
+    createdAt: toIsoTimestamp(snap.created_at),
   };
 
   return { snapshot, positions: await getPositions(snapshot.id) };
@@ -85,10 +86,10 @@ export async function listSnapshots(limit = 30): Promise<Snapshot[]> {
   return rows.map((r) => ({
     id: num(r.id),
     source: r.source as Source,
-    takenAt: String(r.taken_at).slice(0, 10),
+    takenAt: toIsoDate(r.taken_at) ?? '',
     mep: num(r.mep),
     notes: r.notes == null ? null : String(r.notes),
-    createdAt: String(r.created_at),
+    createdAt: toIsoTimestamp(r.created_at),
   }));
 }
 
@@ -201,7 +202,7 @@ export async function listMemos(limit = 20): Promise<Memo[]> {
     id: num(r.id),
     snapshotId: numOrNull(r.snapshot_id),
     body: String(r.body),
-    createdAt: String(r.created_at),
+    createdAt: toIsoTimestamp(r.created_at),
   }));
 }
 
@@ -216,6 +217,6 @@ export async function saveMemo(body: string, snapshotId: number | null): Promise
     id: num(row?.id),
     snapshotId: numOrNull(row?.snapshot_id),
     body: String(row?.body ?? ''),
-    createdAt: String(row?.created_at ?? ''),
+    createdAt: toIsoTimestamp(row?.created_at),
   };
 }
