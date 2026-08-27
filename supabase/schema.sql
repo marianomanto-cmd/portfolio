@@ -1,5 +1,5 @@
--- Corte — book tables (run in Supabase SQL editor)
--- Auth tables are managed by Better Auth on the Grok deploy.
+-- Corte — book tables (Supabase SQL editor)
+-- App de un solo usuario. user_id es siempre 'me'. No hay tablas de auth en uso.
 
 create table if not exists snapshots (
   id serial primary key,
