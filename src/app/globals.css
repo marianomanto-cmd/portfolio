@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #0a0b0d;
+  --color-panel: #131519;
+  --color-line: #23262d;
+  --color-mut: #8b93a1;
+  --color-up: #4ade80;
+  --color-down: #f87171;
+  --color-accent: #eab308;
+}
+
+html {
+  color-scheme: dark;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-ink);
+  color: #f2f4f7;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* La nav inferior es fija: que el contenido no quede abajo de ella. */
+  padding-bottom: calc(4.75rem + env(safe-area-inset-bottom));
+}
+
+/* Números alineados en columnas: tabular o las cifras bailan. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
