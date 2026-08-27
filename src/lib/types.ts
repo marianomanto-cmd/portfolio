@@ -67,3 +67,13 @@ export interface Memo {
   body: string;
   createdAt: string;
 }
+
+/** Fila candidata de una carga (foto o CSV), antes de que el dueño confirme. */
+export interface ParsedRow {
+  instrumentId: string | null;
+  rawLabel: string;
+  platform: Platform;
+  arsValue: number;
+  quantity: number | null;
+  confidence: 'alta' | 'media' | 'baja';
+}

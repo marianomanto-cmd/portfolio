@@ -3,7 +3,7 @@ import AsesorClient from './AsesorClient';
 import { Card, Empty, PageTitle, SetupNotice } from '@/components/ui';
 import { hasDb } from '@/lib/db';
 import { getLatestBook, listMemos } from '@/lib/queries';
-import { hasXai } from '@/lib/xai';
+import { hasClaude } from '@/lib/claude';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,10 +25,10 @@ export default async function AsesorPage() {
     <>
       <PageTitle title="Asesor" sub="Lee el libro y los números del motor. No ejecuta nada." />
 
-      {!hasXai() ? (
-        <SetupNotice what="xAI">
+      {!hasClaude() ? (
+        <SetupNotice what="Claude">
           <p>
-            Falta <code className="text-white">XAI_API_KEY</code> en las variables de entorno del
+            Falta <code className="text-white">ANTHROPIC_API_KEY</code> en las variables de entorno del
             servidor. Los memos viejos se siguen viendo.
           </p>
         </SetupNotice>
@@ -45,7 +45,7 @@ export default async function AsesorPage() {
 
       <AsesorClient
         initialMemos={memos}
-        canGenerate={hasXai() && Boolean(book)}
+        canGenerate={hasClaude() && Boolean(book)}
         snapshotDate={book?.snapshot.takenAt ?? null}
       />
     </>

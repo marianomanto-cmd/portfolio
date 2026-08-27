@@ -21,7 +21,7 @@ No es consejo financiero.
 
 - Next.js (App Router) + React + Tailwind v4, deploy en Vercel
 - Postgres: schema `corte` en Supabase, por `pg` con el Transaction pooler
-- IA: `XAI_API_KEY` en servidor (`grok-4.5`) para el parseo de foto y el memo
+- IA: Claude (`claude-opus-5`) en servidor, para el parseo de foto y el memo
 - Mercado: [dolarapi bolsa](https://dolarapi.com/v1/dolares/bolsa) + Yahoo chart
 
 Auth **off**. Filas con `user_id = 'me'` (`src/lib/owner.ts`).
@@ -33,7 +33,7 @@ Las dos van en el proyecto de Vercel. Ninguna se expone al browser.
 | Var | Para qué | Sin ella |
 |---|---|---|
 | `DATABASE_URL` | Postgres del schema `corte` | Las pantallas muestran un aviso de setup, no rompen |
-| `XAI_API_KEY` | Parseo de foto y memo | El CSV y la carga a mano siguen andando; el botón de memo se apaga |
+| `ANTHROPIC_API_KEY` | Parseo de foto y memo | El CSV y la carga a mano siguen andando; el botón de memo se apaga |
 
 `DATABASE_URL` **tiene** que apuntar al Transaction pooler (puerto 6543). No es preferencia: `db.<ref>.supabase.co` resuelve sólo a IPv6 y las funciones de Vercel salen por IPv4, así que la conexión directa al 5432 no conecta desde el deploy. El host exacto del pooler está en el dashboard de Supabase → Connect. `pg` no usa prepared statements con nombre salvo que se los pidas, así que el modo transacción anda sin configuración extra.
 
@@ -67,6 +67,21 @@ Determinístico y puro (`src/lib/engine.ts`). El modelo **no** inventa los USD f
 ## Asesor
 
 Botón explícito, nada corre en loop. El prompt lleva el corte, los supuestos y los tres escenarios ya calculados, más la plantilla fija: supuestos, tesis, escenarios, qué la invalida, acción humana. Si un dato no está en el prompt, tiene que decirlo en vez de estimarlo.
+
+## Skills
+
+`src/skills/*.md` — markdown con frontmatter, no código. Se editan sin tocar la app, y se puede pegar uno traído de afuera y queda cargado.
+
+Cada skill declara en `requires` qué datos necesita. El route del memo informa qué tiene disponible y `src/lib/skills.ts` inyecta **sólo los que aplican**: un skill que pide datos que no están no llega al prompt, así el modelo nunca recibe instrucciones que no puede cumplir con lo que tiene.
+
+| Skill | Requiere | Qué aporta |
+|---|---|---|
+| `composicion` | `book` | Exposición cambiaria, concentración, separación FIMA/broker, solapamiento |
+| `escenarios` | `engine` | Cómo narrar oso/base/toro sin recalcularlos; separar aporte de rendimiento |
+| `falsacion` | `book` | Convierte la tesis en condiciones observables, con umbral y fecha |
+| `fundamental` | `fundamentals` | Análisis de los subyacentes. **Hoy no se activa** — falta la fuente de datos |
+
+`fundamental` está escrito y queda inerte a propósito: sin estados contables en el contexto, activarlo sería pedirle al modelo que invente los inputs. Cuando haya una fuente (por ejemplo `data.sec.gov`), se agrega la capability `fundamentals` y entra solo, sin tocar código.
 
 ## Local
 

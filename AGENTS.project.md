@@ -22,7 +22,8 @@ Libro líquido: FIMA + broker separados. Carga de corte (foto/CSV), libro ARS/US
 
 - `src/lib/engine.ts` — motor. Puro, sin red ni DB. Corre igual en server y browser.
 - `src/lib/queries.ts` — todo el acceso a datos. Los `numeric` de Postgres vuelven como string: se convierten acá y no más adelante.
-- `src/lib/xai.ts` — único lugar que habla con el modelo. `XAI_API_KEY` nunca sale del server.
+- `src/lib/claude.ts` — único lugar que habla con el modelo. La API key nunca sale del server.
+- `src/skills/*.md` — criterios de análisis del asesor, en markdown. Cada uno declara en `requires` qué datos necesita; `src/lib/skills.ts` inyecta sólo los que tienen sus insumos. Un skill nuevo es un archivo, no un cambio de código.
 - `src/lib/csv.ts` — parseo de CSV local, sin modelo: un CSV es tabular y así el resultado es reproducible.
 - `supabase/schema.sql` — bootstrap del schema `corte`, no una migración. Una columna nueva va con su propio `alter table`.
 

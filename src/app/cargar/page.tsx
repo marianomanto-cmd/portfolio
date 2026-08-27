@@ -3,7 +3,7 @@ import { PageTitle, SetupNotice } from '@/components/ui';
 import { hasDb } from '@/lib/db';
 import { getMep } from '@/lib/market';
 import { getInstruments } from '@/lib/queries';
-import { hasXai } from '@/lib/xai';
+import { hasClaude } from '@/lib/claude';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +29,7 @@ export default async function CargarPage() {
         catalog={catalog}
         defaultDate={hoy}
         defaultMep={mep.ok && mep.promedio ? Math.round(mep.promedio) : null}
-        photoEnabled={hasXai()}
+        photoEnabled={hasClaude()}
       />
     </>
   );

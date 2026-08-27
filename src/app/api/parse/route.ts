@@ -1,15 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getInstruments } from '@/lib/queries';
-import { hasXai, parsePhoto } from '@/lib/xai';
+import { hasClaude, parsePhoto } from '@/lib/claude';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 /** Foto -> filas candidatas. No graba: el dueño confirma antes. */
 export async function POST(req: Request) {
-  if (!hasXai()) {
+  if (!hasClaude()) {
     return NextResponse.json(
-      { error: 'Falta XAI_API_KEY en el servidor. Cargá el CSV o las filas a mano.' },
+      { error: 'Falta ANTHROPIC_API_KEY en el servidor. Cargá el CSV o las filas a mano.' },
       { status: 503 },
     );
   }

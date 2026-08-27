@@ -5,8 +5,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Card } from '@/components/ui';
 import { rowsFromCsv } from '@/lib/csv';
 import { fmtArs } from '@/lib/format';
-import type { Instrument, Platform, Source } from '@/lib/types';
-import type { ParsedRow } from '@/lib/xai';
+import type { Instrument, ParsedRow, Platform, Source } from '@/lib/types';
 
 interface Props {
   catalog: Instrument[];
@@ -190,7 +189,7 @@ export default function CargarClient({ catalog, defaultDate, defaultMep, photoEn
         </div>
         {!photoEnabled ? (
           <p className="mt-2 text-xs text-mut">
-            La foto necesita <code className="text-white">XAI_API_KEY</code> en el servidor.
+            La foto necesita <code className="text-white">ANTHROPIC_API_KEY</code> en el servidor.
           </p>
         ) : null}
         <input

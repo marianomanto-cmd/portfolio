@@ -2,7 +2,7 @@
 // un LLM para leerlo — y así el resultado es reproducible.
 
 import type { Instrument, Platform } from './types';
-import type { ParsedRow } from './xai';
+import type { ParsedRow } from './types';
 
 /** Split de CSV que respeta comillas y detecta ; o , como separador. */
 export function parseCsv(text: string): string[][] {

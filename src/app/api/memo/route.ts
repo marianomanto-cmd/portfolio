@@ -3,7 +3,8 @@ import { bucketsFromPositions, runAll, totalOf, weightsOf } from '@/lib/engine';
 import { getMep } from '@/lib/market';
 import { getInstruments, getLatestBook, getSettings, saveMemo } from '@/lib/queries';
 import { KINDS } from '@/lib/types';
-import { hasXai, writeMemo } from '@/lib/xai';
+import { hasClaude, writeMemo } from '@/lib/claude';
+import { type Capability, selectSkills } from '@/lib/skills';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -15,9 +16,9 @@ const round = (n: number) => Math.round(n * 100) / 100;
  * El contexto lleva los números YA calculados por el motor; el modelo narra.
  */
 export async function POST() {
-  if (!hasXai()) {
+  if (!hasClaude()) {
     return NextResponse.json(
-      { error: 'Falta XAI_API_KEY en el servidor.' },
+      { error: 'Falta ANTHROPIC_API_KEY en el servidor.' },
       { status: 503 },
     );
   }
@@ -98,10 +99,15 @@ export async function POST() {
     })),
   };
 
+  // Qué datos hay realmente. Un skill que pide algo que no está no se inyecta,
+  // así el modelo nunca recibe instrucciones sin insumos para cumplirlas.
+  const available: Capability[] = ['book', 'engine'];
+  const skills = selectSkills(available);
+
   try {
-    const body = await writeMemo(JSON.stringify(context, null, 2));
+    const body = await writeMemo(JSON.stringify(context, null, 2), skills);
     const memo = await saveMemo(body, snapshot.id);
-    return NextResponse.json(memo);
+    return NextResponse.json({ ...memo, skills: skills.map((s) => s.name) });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'No se pudo generar el memo.';
     return NextResponse.json({ error: msg }, { status: 502 });
