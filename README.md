@@ -35,7 +35,9 @@ Las dos van en el proyecto de Vercel. Ninguna se expone al browser.
 | `DATABASE_URL` | Postgres del schema `corte` | Las pantallas muestran un aviso de setup, no rompen |
 | `XAI_API_KEY` | Parseo de foto y memo | El CSV y la carga a mano siguen andando; el botón de memo se apaga |
 
-`DATABASE_URL` tiene que apuntar al **Transaction pooler (puerto 6543)**, no al 5432 directo: la app corre serverless y las conexiones directas agotan el límite del proyecto. `pg` no usa prepared statements con nombre salvo que se los pidas, así que el pooler en modo transacción anda sin configuración extra.
+`DATABASE_URL` **tiene** que apuntar al Transaction pooler (puerto 6543). No es preferencia: `db.<ref>.supabase.co` resuelve sólo a IPv6 y las funciones de Vercel salen por IPv4, así que la conexión directa al 5432 no conecta desde el deploy. El host exacto del pooler está en el dashboard de Supabase → Connect. `pg` no usa prepared statements con nombre salvo que se los pidas, así que el modo transacción anda sin configuración extra.
+
+La app se conecta con el rol **`corte_app`**, no con `postgres`. Ese rol existe sólo para esto: alcanza el schema `corte` y nada más — sobre las tablas de `public` no tiene ningún privilegio. Así la credencial del libro es independiente de la de la otra app que vive en el mismo proyecto, y rotarla no rompe nada más.
 
 ## Datos
 
@@ -47,7 +49,7 @@ Las dos van en el proyecto de Vercel. Ninguna se expone al browser.
 - `settings` — aporte, MEP, meses, USA %, tasa en pesos %, rebalance, mix objetivo
 - `memos` — textos del asesor
 
-Vive en el schema `corte` y no en `public` porque el proyecto de Supabase donde está aplicado también hospeda otra app. RLS está prendido en las cinco tablas y **sin políticas a propósito**: eso las deja fuera del alcance de PostgREST, que no usamos, mientras la app entra por Postgres directo con el rol owner, que bypassea RLS.
+Vive en el schema `corte` y no en `public` porque el proyecto de Supabase donde está aplicado también hospeda otra app. RLS está prendido en las cinco tablas, con una única política por tabla dirigida al rol `corte_app`. Anon y authenticated no tienen ninguna, así que nada de esto es alcanzable por PostgREST; `corte_app` no es dueño de las tablas y no tiene `BYPASSRLS`, o sea que el acceso pasa por la política y no por privilegio de owner.
 
 Catálogo inicial: FIMA Premium / PB Acciones / Renta Plus, T30J7, cedears MU GOOGL MELI XOM ANET, USD, pesos en caja.
 
