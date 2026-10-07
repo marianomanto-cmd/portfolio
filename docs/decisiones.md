@@ -48,8 +48,18 @@ Pedido del dueño (2026-10-07), amplía la sección 7 del spec. Toda variable de
 | Deuda | Si se ejerce la opción de compra del leasing y cuándo |
 | General | Horizonte en meses |
 
+**Cómo se ajusta: tres botones por variable** (pedido del dueño, 2026-10-07)
+- Cada variable es un selector `Baja · Igual · Sube`.
+- **Igual** = el nivel no cambia (el CCL queda donde está, el ingreso sigue en el mismo monto, la casa vale lo mismo). No requiere definir nada.
+- **Sube / Baja** muestran un **control deslizante** para elegir cuánto (pedido del dueño: "perillas"), con el valor a la vista (`+3,0%/mes`) y botones −/+ para el ajuste fino. El botón también muestra el número elegido. El valor queda recordado por variable para los próximos escenarios. Si la variable todavía no tiene valor, el deslizante arranca vacío y no se proyecta hasta moverlo. La app no propone magnitudes (D-07).
+- Los rangos de los deslizantes son amplios (ej. devaluación 0–15%/mes). Solo evitan valores absurdos, no sugieren nada.
+- Se usa un deslizante horizontal y no una perilla giratoria: la giratoria es imprecisa con el dedo y no se maneja bien con teclado. Perillas redondas en desktop quedan como opción si el dueño las prefiere.
+- CCL e inflación admiten tramos ("Sube hasta marzo, Igual después"), cada uno con sus tres botones.
+- Volatilidad, grados de libertad, corridas y semilla van en "Avanzado", plegado. Un escenario nuevo copia esos valores del último escenario guardado.
+- En mobile, los tres botones ocupan el ancho de la tarjeta de la variable (D-30).
+
 **Cómo se usa:**
-- Panel de supuestos al lado del gráfico. Cada cambio recalcula en vivo.
+- Panel de supuestos al lado del gráfico (debajo en mobile). Cada cambio recalcula en vivo.
 - Mientras se tantea, los supuestos viven en la URL: refrescar no pierde nada, y el botón Atrás recorre lo que se fue probando.
 - **Guardar con nombre** ("base", "optimista", "se va todo al carajo"), **duplicar** para hacer una variante y **comparar** 2 o 3 superpuestos en el mismo gráfico, con una tabla que muestra solo los supuestos en los que difieren.
 - La semilla queda guardada con el escenario: el mismo escenario da siempre el mismo resultado.
