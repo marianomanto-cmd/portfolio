@@ -140,5 +140,18 @@ Requisito del dueño (2026-10-07), vale para toda la app:
 
 **Cómo se prueba:** un test de Playwright recorre todas las rutas a 360, 390 y 412 px, en claro y en oscuro, y falla si hay scroll horizontal, un elemento fuera del viewport, texto cortado o superpuesto, o un elemento tocable de menos de 44 px. Además, inspección visual con capturas de Chromium en viewport de teléfono, contra el deploy real. Una fase no se da por terminada con este test en rojo.
 
-### D-31 · Stack de UI — P
-El dueño propuso un stack (librerías gratuitas). Se están verificando sus afirmaciones contra las fuentes antes de fijarlo. Esta entrada se completa con el resultado.
+### D-31 · Stack — D
+Se partió de la propuesta del dueño y se verificó cada afirmación (documentación, npm y mediciones propias). Detalle completo en `docs/stack.md`. Lo central:
+- **ECharts 6 como única librería de gráficos**: un solo tema y el mismo color por activo en toda la app. Se elige por sus funciones (zoom, marcas de niveles, treemap, eje log), no por el argumento de rendimiento de la propuesta, que no se sostenía.
+- **Fuera:** Recharts, Lightweight Charts, Tremor (trae Recharts 2 y es de Tailwind v3), jStat (semilla global, sin mantenimiento), TanStack Query (el navegador no habla con Supabase).
+- **Monte Carlo propio, reproducible:** PRNG sfc32 sembrado, t-Student armada como normal/gamma y cuantiles tipo 7 testeados contra numpy. Cada escenario guarda algoritmo y semilla.
+- **decimal.js solo en la contabilidad.** El Monte Carlo corre en float64.
+
+### D-32 · Montos exactos de punta a punta — D
+PostgREST serializa `numeric` como número JSON, y supabase-js lo convierte a `float64` antes de que el código lo vea. Por eso:
+- Toda lectura de montos se hace con `::text`, sin `select('*')`.
+- Las vistas devuelven texto.
+- El parser de plata solo acepta strings y falla si recibe un número.
+- La escritura manda strings de Decimal.
+
+Además, los checks de montos excluyen `NaN` e `Infinity` (`x > 0 and x < 'Infinity'`), que un `check (x > 0)` deja pasar.
