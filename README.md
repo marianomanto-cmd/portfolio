@@ -25,6 +25,7 @@ Un solo usuario. La app no opera ni recomienda: muestra datos y proyecta supuest
 | [`docs/carga-diaria.md`](docs/carga-diaria.md) | Formatos de entrada (IEB, Galicia, Mercado Pago) y reglas de lectura. |
 | [`docs/calidad.md`](docs/calidad.md) | Definición de terminado: los controles que cada fase tiene que pasar. |
 | [`docs/stack.md`](docs/stack.md) | Librerías elegidas, verificadas contra fuentes, y por qué. |
+| [`docs/investigacion-mercado.md`](docs/investigacion-mercado.md) | Lo mejor que existe (comercial, open source, argentino, DIY) y qué tomar. Propone D-35 a D-53, pendientes de aprobación. |
 | [`CHANGELOG.md`](CHANGELOG.md) | Registro de cambios. |
 | [`CLAUDE.md`](CLAUDE.md) | Reglas para trabajar en el repo. |
 

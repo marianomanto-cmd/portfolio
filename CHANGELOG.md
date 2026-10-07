@@ -4,6 +4,9 @@ Todo cambio de la app se registra acá, el más nuevo primero. Cada entrada dice
 
 ## [Sin publicar]
 
+### 2026-10-07 — Investigación de mercado
+- **`docs/investigacion-mercado.md`**: seis relevamientos en paralelo (trackers comerciales, patrimonio y proyecciones, herramientas argentinas, DIY y open source, hábito y carga, visualización), con síntesis, crítica y corrección. Unas 60 ideas con fuente, priorizadas por fase. Propone las decisiones D-35 a D-53 (estado P: esperan aprobación del dueño) y 18 cambios de schema.
+
 ### 2026-10-07 — Schema aplicado en Supabase
 - **Schema revisado y aplicado** en el proyecto Portfolio (D-34). Tres migraciones:
   - `20261007205631_init`: 27 tablas, 3 vistas, auditoría por trigger y bucket privado `cargas`.
