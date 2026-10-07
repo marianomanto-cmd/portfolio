@@ -32,6 +32,30 @@ Una línea de tiempo en ARS y en USD: el pasado real (patrimonio diario, calcula
 ### D-06 · Registrar aportes y movimientos de capital — D
 Sin registrar los aportes, un depósito de US$2.000 se leería como ganancia. Tabla `movimientos_capital`: aporte, retiro y transferencia entre cuentas propias, con el impuesto cobrado. Alimenta el PnL (D-05), la "probabilidad de quedar debajo del capital aportado" (proyecciones) y la rutina de liquidez Mercado Pago ↔ FIMA (rendimientos). En la carga diaria es un campo opcional: solo se usa el día que se mueve plata.
 
+### D-08 · Escenarios con variables ajustables — D
+Pedido del dueño (2026-10-07), amplía la sección 7 del spec. Toda variable de la proyección es un supuesto editable. Ninguna está fija en el código.
+
+**Variables** (todas por escenario; las marcadas "por tramos" admiten valores distintos por período, ej. 2% mensual hasta marzo y 4% después):
+
+| Grupo | Variables |
+|---|---|
+| Macro | Devaluación mensual (por tramos) · inflación mensual (por tramos) |
+| Ingresos | Ingreso USD mensual y su crecimiento · brecha cripto vs. CCL · ingreso fijo en pesos y su ajuste · shock de ingresos (desde el mes N el ingreso pasa a US$X) |
+| Gastos | Ajuste de los gastos fijos (% o atado a inflación) · % del excedente que se invierte |
+| Cartera | Retorno anual esperado y volatilidad por clase (CEDEAR, acción local, bono tasa fija, bono CER como spread real, liquidez remunerada) · TEM por bono · a qué clase se reinvierte cada vencimiento |
+| Riesgo | Grados de libertad de la t-Student (cuánto pesan las colas) · cantidad de corridas · semilla |
+| Bienes | Variación anual en USD de la casa · depreciación anual del auto |
+| Deuda | Si se ejerce la opción de compra del leasing y cuándo |
+| General | Horizonte en meses |
+
+**Cómo se usa:**
+- Panel de supuestos al lado del gráfico. Cada cambio recalcula en vivo.
+- Mientras se tantea, los supuestos viven en la URL: refrescar no pierde nada, y el botón Atrás recorre lo que se fue probando.
+- **Guardar con nombre** ("base", "optimista", "se va todo al carajo"), **duplicar** para hacer una variante y **comparar** 2 o 3 superpuestos en el mismo gráfico, con una tabla que muestra solo los supuestos en los que difieren.
+- La semilla queda guardada con el escenario: el mismo escenario da siempre el mismo resultado.
+- Un escenario nuevo arranca con los datos reales actuales (CCL, ingreso, gastos, cartera, cuota). Los supuestos a futuro (devaluación, retornos, inflación) arrancan **vacíos**, y no se proyecta hasta que los completes. La app no te propone valores: serían recomendaciones.
+- Supuestos validados con un schema versionado (`escenarios.supuestos`). Si se agrega una variable nueva, los escenarios viejos se migran con un valor explícito y no con un default silencioso.
+
 ### D-07 · Sin recomendaciones, sin APIs de precios — D (del spec)
 La app muestra datos y proyecta supuestos del dueño. No recomienda ni trae precios de afuera.
 
