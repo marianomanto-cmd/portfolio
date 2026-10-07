@@ -26,12 +26,12 @@ Lo que no se carga ese día queda con su último valor conocido, marcado como vi
 - Debajo de cada posición va una sub-fila `Disponible` o `Liquidar` (estado de liquidación) que repite cantidad, precio y posición. **No es otra posición:** se usa solo para saber si está pendiente de liquidar.
 - Al final de cada sección hay una fila `Subtotal`, que se usa como control.
 - **Bonos y letras cotizan cada 100 VN:** `Posición = Cantidad × Precio / 100`.
-- Una compra del día viene con `PPP` = `-` y la sub-fila `Liquidar`. El PPP aparece al día siguiente.
-- `DOLARUSA - DOLARES USA ESP 7000` (sección Otros, moneda USD) son **dólares en especie**: se leen como saldo de liquidez en USD, no como activo. Su precio es el dólar del bróker, no el CCL de la app.
+- Una compra del día viene con `PPP` = `-` y la sub-fila `Liquidar`. Se graba como `compra` con el precio pendiente; el PPP del día siguiente lo completa (D-19).
+- `DOLARUSA - DOLARES USA ESP 7000` (sección Otros, moneda USD) son **dólares en especie**: se leen como liquidez en USD, no como activo. Su precio es el dólar del bróker, no el CCL de la app. El saldo USD de IEB que se graba es **`Total` USD de la hoja Saldos + cantidad de DOLARUSA**, en una sola fila. Las dos partes quedan en la lectura cruda y la pantalla de confirmación muestra la suma y sus partes.
 
 **Hoja `Saldos`**
 - Bloques `ARS` y `USD`, con las filas `Hoy | 24h | 48h | 72h | Más de 72h | Garantía de Opciones | Total`.
-- Se toma **`Total`** (neto de lo que falta liquidar), no `Hoy` (D-13). Control: posiciones + saldos Total (USD al dólar del bróker) = `B2`.
+- Se toma **`Total`** (neto de lo que falta liquidar), no `Hoy` (D-13). Puede ser negativo. Control: posiciones + saldos Total (USD al dólar del bróker) = `B2`.
 
 ### Galicia — captura (Claude visión)
 Por instrumento: especie (ticker + nombre), cantidad, precio, variación %, PPC, rendimiento ($ y %) y saldo valorizado.

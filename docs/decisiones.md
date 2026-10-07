@@ -109,6 +109,15 @@ Pedido del dueño (2026-10-07). Dos niveles:
 
 Con esto, la trazabilidad llega hasta el origen: número → fórmula → insumos → carga → archivo.
 
+### D-18 · Valor de un CEDEAR = precio en pesos del bróker — D
+La fórmula del spec (`precio_subyacente_usd × TC ÷ ratio`) necesita el precio del subyacente en USD, y ninguna de las fuentes diarias lo trae (ni el Excel de IEB, ni las capturas, ni los dos campos de tipo de cambio). Aplicada al pie de la letra, todo CEDEAR sería "sin dato". Reconstruirla como `precio_pesos × ratio ÷ CCL` sería guardar un dato derivado como si fuera un hecho.
+- Valor en pesos = `cantidad × precio en pesos` (del bróker).
+- Valor en USD = valor en pesos ÷ CCL del día.
+- Si se carga el precio del subyacente en USD (opcional), se usa para partir el efecto "activo" en dos: lo que se movió el subyacente y lo que se movió el **CCL implícito** del CEDEAR (`precio_pesos × ratio ÷ precio_subyacente`).
+
+### D-19 · Compras del día y costos pendientes — D
+El día de una compra, IEB muestra PPP `-`. La compra se graba como `compra` (no como `apertura`), con el CCL del día y el precio vacío, que significa **pendiente**. La carga del día siguiente lo completa a partir del PPP nuevo, `(PPP₁ × q₁ − PPP₀ × q₀) ÷ Δq`, y la auditoría guarda el cambio. Mientras falte, el PPC de esa posición es "sin dato" pero la cantidad cuenta.
+
 ### D-16 · Precio viejo = más de 2 días hábiles — D
 Con una tabla `feriados` cargada a mano una vez por año. Si se contaran días corridos, todo el portafolio aparecería "viejo" cada lunes.
 
@@ -128,6 +137,12 @@ Además de las posiciones (spec), tampoco se guardan `cuotas_pagadas`, totales d
 
 ### D-24 · Datos reales fuera de git — D
 Excel, capturas y montos del dueño viven en Supabase (base + Storage privado), no en el repo. Los tests usan fixtures con la misma estructura y números inventados.
+
+### D-33 · Permisos mínimos para el servidor — D
+En este proyecto, Supabase le otorga por defecto a `service_role` **todos** los privilegios sobre cada tabla nueva, incluido `TRUNCATE`, que vacía una tabla sin pasar por la auditoría. Se encontró al verificar los permisos reales después de aplicar la primera migración (el test local no lo detectaba porque no imitaba ese default). La migración `permisos_servidor` saca los defaults y otorga solo lectura y escritura fila por fila sobre los datos, y solo lectura sobre la auditoría y las vistas. Toda migración futura otorga sus permisos explícitamente. La base local de tests imita el comportamiento real de Supabase.
+
+### D-34 · Revisión adversarial del schema antes de aplicarlo — D
+Antes de aplicarse, el schema pasó por cuatro revisiones independientes (cobertura del spec, modelado financiero, Postgres/Supabase, flujo de días reales), y cada hallazgo por un verificador que intentó refutarlo. Quedaron 35 hallazgos confirmados (1 bloqueante, 10 importantes) y 19 descartados. Los confirmados se incorporaron: idempotencia y reversión de cargas, compra del día sin precio, saldos negativos, operaciones en USD, capital pendiente del leasing para la fase 1, cuotas con IVA separado, fecha de origen en las aperturas, niveles con unidad y varias órdenes, permisos explícitos, montos sin NaN. Después se ejecutó contra un Postgres local con 40 controles, que quedaron en `supabase/tests/`.
 
 ## UI
 
