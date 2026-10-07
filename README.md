@@ -22,6 +22,7 @@ Un solo usuario. La app no opera ni recomienda: muestra datos y proyecta supuest
 | [`docs/spec.md`](docs/spec.md) | Lo que pidió el dueño. Manda. |
 | [`docs/decisiones.md`](docs/decisiones.md) | Cada decisión que ajusta el spec, con su porqué. |
 | [`docs/carga-diaria.md`](docs/carga-diaria.md) | Formatos de entrada (IEB, Galicia, Mercado Pago) y reglas de lectura. |
+| [`docs/calidad.md`](docs/calidad.md) | Definición de terminado: los controles que cada fase tiene que pasar. |
 | [`CHANGELOG.md`](CHANGELOG.md) | Registro de cambios. |
 | [`CLAUDE.md`](CLAUDE.md) | Reglas para trabajar en el repo. |
 
