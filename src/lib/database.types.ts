@@ -1199,6 +1199,10 @@ export type Database = {
       leer_fecha: { Args: { campo: string; j: Json }; Returns: string }
       leer_id: { Args: { campo: string; j: Json }; Returns: number }
       leer_monto: { Args: { campo: string; j: Json }; Returns: number }
+      revertir_lote: {
+        Args: { p_lote: string; p_motivo: string }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

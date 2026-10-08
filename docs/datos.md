@@ -11,11 +11,11 @@ Base: Supabase, proyecto **Portfolio** (`zcgynhzddfjzwswekcvl`). Schema `public`
 | `20261008142244_carga_confirmar` | `confirmar_carga` (ver "Funciones de escritura") |
 | `20261008151535_carga_manual` | `guardar_manual` |
 | `20261008151942_catalogo_activos` | `alta_activo` y `editar_activo` |
-| `20261008160000_carga_revertir` | `revertir_lote`. **Pendiente de aplicar** (ver abajo) |
+| `20261008160000_carga_revertir` | `revertir_lote`. Aplicada a mano desde el editor SQL (ver abajo) |
 
 La carga transaccional se aplicó en cinco partes y no en una porque el conector de Supabase cortaba a los 60 s con el archivo entero. Cada parte revoca y otorga los permisos de sus propias funciones. El schema final es el mismo: los tests del schema dan los mismos 143 controles y cada función, check e índice aplicados coinciden byte a byte con los archivos (md5 contra una base local armada desde el repo).
 
-**`carga_revertir` está pendiente.** El conector de Supabase pide confirmar cualquier sentencia con `DELETE` (la reversión borra las filas del lote que deshace) y el pedido vence antes de que se pueda aprobar. Hasta aplicarla, Revertir (Registro) y Deshacer (Cargar) muestran "La base no tiene la función public.revertir_lote: falta aplicar la migración 20261008160000_carga_revertir". Para aplicarla: desde una sesión con el conector, aprobando su confirmación; o con la CLI de Supabase (`supabase db push`). Después, renombrar el archivo a la versión que registre Supabase y regenerar los tipos.
+**Migraciones que el conector no puede aplicar (D-116).** El conector de Supabase pide confirmar toda sentencia que contenga `DELETE`, aunque esté dentro del cuerpo de una función (como en `revertir_lote`, que borra las filas del lote que deshace), y ese pedido vence antes de que alguien lo pueda aprobar. Una migración así la aplica el dueño: pega el archivo entero, sin cambios, en el editor SQL del proyecto y toca Run. Después se registra en `supabase_migrations.schema_migrations` con la versión del nombre del archivo (así no hace falta renombrarlo), se verifica contra el repo y se regeneran los tipos. El editor guarda los fines de línea como CRLF: la verificación compara el md5 del cuerpo de cada función normalizando el fin de línea, y en `revertir_lote` no cambia nada porque ninguna cadena del cuerpo ocupa más de una línea. Así se aplicó `carga_revertir` el 08/10.
 
 Los archivos originales (Excel y capturas) viven en el bucket privado `cargas` de Supabase Storage, en `AAAA/MM/<sha256>.<ext>` (D-105).
 

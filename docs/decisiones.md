@@ -311,6 +311,13 @@ Completa D-15.
 - **Un precio inferido del PPP** nunca se propone si no es mayor que cero.
 - **Por qué:** una carga atrasada proponía ventas que no existieron, y un split proponía una compra a precio 0 que la base rechaza.
 
+### D-116 · Una migración que el conector no puede aplicar la aplica el dueño desde el editor SQL — D
+El conector de Supabase pide confirmar toda sentencia que contenga `DELETE`, aunque esté dentro del cuerpo de una función, y en las sesiones de trabajo ese pedido vence sin llegar a nadie.
+- **Quién la aplica:** el dueño. Pega el archivo entero, sin cambios, en el editor SQL del proyecto y toca Run. Sigue siendo la migración del repo, no SQL suelto.
+- **Después:** se registra en `supabase_migrations.schema_migrations` con la versión del nombre del archivo, se verifica contra el repo (md5 del cuerpo de cada función, normalizando el fin de línea, porque el editor guarda CRLF) y se regeneran los tipos (`docs/datos.md`).
+- **Descartado:** reescribir el SQL para que el conector no detecte el `DELETE`. Esa confirmación es un control y le corresponde al dueño.
+- **Primera vez:** `carga_revertir`, el 08/10.
+
 ## Propuestas que la 1a implementa en forma provisoria
 
 Estas propuestas de `docs/investigacion-mercado.md` (D-35 a D-53) y de `docs/vision.md` §6 (D-54 a D-103) siguen esperando tu aprobación. La 1a ya las usa porque el código las necesitaba. Estado de todas: **P (provisoria, a confirmar)**. Si rechazás una, se cambia el código y se anota acá.

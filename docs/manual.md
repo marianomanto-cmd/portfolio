@@ -352,8 +352,6 @@ Las tres son válidas (D-64):
 
 ## 8. Deshacer y revertir
 
-> **Por ahora no anda.** Deshacer y Revertir necesitan una función de la base (`revertir_lote`) que todavía no está aplicada en Supabase (ver `docs/datos.md`). Hasta que se aplique, los dos botones muestran un error que lo dice y no cambian nada. Mientras tanto, si una carga salió mal, volvé a cargar ese día: la carga nueva reemplaza precios y saldos de esa cuenta (las operaciones se suman, así que revisá la bandeja antes del Enter).
-
 **Deshacer**, justo después del Enter: el botón de la pantalla "Guardado" revierte ese lote con el motivo "Deshacer inmediato" y te devuelve todo a la pantalla para corregirlo. La carga siguiente es un lote nuevo.
 
 **Revertir**, más tarde, desde el **Registro**:

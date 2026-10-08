@@ -158,7 +158,7 @@ Están en `src/lib/carga/contratos.ts`. Todo número viaja como **texto decimal 
 - Toda escritura pasa por `src/lib/server/escritura.ts`, que valida antes de mandar (montos como texto con la misma sintaxis que el SQL, fechas, ids, archivo con sha256) y traduce los errores de la base al castellano (`ErrorEscritura`, con `message` y `codigo`). `confirmar_carga` y `guardar_manual` se reintentan una vez ante un corte de red, porque son idempotentes por lote; `revertir_lote`, nunca.
 - Una Server Action atrapa el `ErrorEscritura` y **devuelve** `e.message`: en producción, Next oculta el texto de los errores lanzados.
 
-**Las funciones de la base** (migración `carga_transaccional`): `confirmar_carga`, `revertir_lote`, `guardar_manual`, `alta_activo` y `editar_activo`. Detalle en `docs/datos.md`.
+**Las funciones de la base:** `confirmar_carga` (migración `carga_confirmar`), `revertir_lote` (`carga_revertir`), `guardar_manual` (`carga_manual`), y `alta_activo` y `editar_activo` (`catalogo_activos`). Los lectores de la entrada que usan (`leer_monto`, `leer_fecha`, `leer_id`) están en `carga_transaccional`. Detalle en `docs/datos.md`.
 
 ## 7. Seguridad
 

@@ -4,6 +4,12 @@ Todo cambio de la app se registra acá, el más nuevo primero. Cada entrada dice
 
 ## [Sin publicar]
 
+### 2026-10-08 — Deshacer y Revertir andan
+- **Base:** se aplicó la migración `carga_revertir` (`revertir_lote`). La aplicó el dueño desde el editor SQL, porque el conector de Supabase no puede aplicar sentencias con `DELETE` (D-116). Quedó registrada en el historial de migraciones con su versión, y la función es idéntica al archivo salvo el fin de línea (`docs/datos.md`).
+- **Cargar y Registro:** Deshacer y Revertir ya funcionan; se sacó del manual el aviso "Por ahora no anda" (`docs/manual.md` §8).
+- **Tipos:** `src/lib/database.types.ts` regenerado, con `revertir_lote`.
+- **Documentación:** `docs/arquitectura.md` ubicaba las cinco funciones de escritura en `carga_transaccional`; ahora nombra la migración de cada una.
+
 ### 2026-10-08 — Fase 1a: la primera versión usable
 La app nueva reemplaza a Corte (D-01): carga diaria, Hoy, Cartera, Exposición, Registro, Datos y Ajustes, con todo número en pesos y en dólares y su traza. Cómo se usa: `docs/manual.md`. Cómo está hecha: `docs/arquitectura.md`.
 
