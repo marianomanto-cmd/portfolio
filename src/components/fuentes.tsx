@@ -1,7 +1,7 @@
 import type { EstadoFuente } from '@/lib/vistas/contratos'
 
 // Estado de una fuente (HO-4, visión §4.0): tinta neutra o azul, nunca verde ni
-// rojo. ✓ cerró su control · ≠ diferencia sin resolver · ○ tipeado, sin control
+// rojo. ✓ cargada y al día · ≠ diferencia sin resolver · ○ tipeado, sin control
 // posible · ◷ más de 2 días hábiles sin carga.
 
 export const SIMBOLO_ESTADO: Record<EstadoFuente, string> = {
@@ -13,7 +13,7 @@ export const SIMBOLO_ESTADO: Record<EstadoFuente, string> = {
 }
 
 export const NOMBRE_ESTADO: Record<EstadoFuente, string> = {
-  ok: 'cerró su control',
+  ok: 'cargada y al día',
   diferencia: 'diferencia sin resolver',
   tipeado: 'tipeado, sin control posible',
   viejo: 'más de 2 días hábiles sin carga',

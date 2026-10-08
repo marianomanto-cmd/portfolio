@@ -100,7 +100,7 @@ export async function guardar(e: EntradaGuardar): Promise<ResultadoGuardar> {
       if (v !== null && dec(v)!.lte(0)) return { ok: false, errores: [`El ${campo} tiene que ser mayor que cero.`] }
     }
     for (const f of e.fuentes) {
-      if (!firmaValida(f.lectura, f.archivo, f.firma)) {
+      if (!(await firmaValida(f.lectura, f.archivo, f.firma))) {
         return { ok: false, errores: [`La lectura de ${f.lectura.cuenta} no es la que devolvió el lector: volvé a soltar el archivo.`] }
       }
     }
@@ -189,7 +189,7 @@ export async function ejemploSinBase(fecha: string): Promise<
   const lecturas = [lecturaIEBEjemplo(f), lecturaGaliciaDosLecturasEjemplo(), lecturaMPEjemplo()]
   return {
     ok: true,
-    fuentes: lecturas.map((lectura) => ({ lectura, archivo: null, firma: firmarLectura(lectura, null) })),
+    fuentes: await Promise.all(lecturas.map(async (lectura) => ({ lectura, archivo: null, firma: await firmarLectura(lectura, null) }))),
     catalogo: catalogoEjemplo(),
   }
 }

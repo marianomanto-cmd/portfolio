@@ -95,7 +95,7 @@ export function ChipEstado({
         >
           <p className="text-sm font-medium">{largo}</p>
           <p className="mt-0.5 text-[13px] text-muted">
-            ✓ cerró su control · ≠ diferencia sin resolver · ○ tipeado, sin control posible · ◷ más de 2 días hábiles sin carga
+            ✓ cargada y al día · ≠ diferencia sin resolver · ○ tipeado, sin control posible · ◷ más de 2 días hábiles sin carga
           </p>
           <ul className="mt-2 divide-y divide-border">
             {lista.map((f) => (

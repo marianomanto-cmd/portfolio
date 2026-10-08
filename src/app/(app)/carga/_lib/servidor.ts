@@ -11,7 +11,7 @@ import { hoyCordoba } from '@/lib/domain/fechas'
 import type { Fecha, Hechos } from '@/lib/domain/tipos'
 import type { LecturaCuenta } from '@/lib/carga/contratos'
 import { leerHechos } from '@/lib/server/hechos'
-import { modoDemo } from '@/lib/server/sesion'
+import { claveDerivada, modoDemo } from '@/lib/server/sesion'
 import { FaltaConfiguracion, configurado } from '@/lib/server/supabase'
 import type { ArchivoGuardado } from './confirmacion'
 import { conCompraPendiente, hechosSinBase, type ActivoLocal } from './demo'
@@ -80,18 +80,23 @@ export async function contextoCarga(): Promise<ContextoCarga> {
 
 // ───────────── Firma de las lecturas ─────────────
 
-const efimera = randomBytes(32).toString('hex')
+// La clave es la de propósito "lectura" (src/lib/server/sesion.ts): derivada
+// de APP_PASSWORD con PBKDF2 (o de SESSION_SECRET), distinta de la de la
+// cookie. La firma viaja al navegador: con la clave en crudo, una firma
+// alcanzaría para probar claves offline a toda velocidad.
+const efimera = randomBytes(32)
 
-function claveFirma(): string {
-  return 'lectura:' + (process.env.SESSION_SECRET || process.env.APP_PASSWORD || efimera)
+async function claveFirma(): Promise<Buffer> {
+  const k = await claveDerivada('lectura')
+  return k ? Buffer.from(k) : efimera
 }
 
-export function firmarLectura(lectura: LecturaCuenta, archivo: ArchivoGuardado | null): string {
-  return createHmac('sha256', claveFirma()).update(JSON.stringify({ lectura, archivo })).digest('base64url')
+export async function firmarLectura(lectura: LecturaCuenta, archivo: ArchivoGuardado | null): Promise<string> {
+  return createHmac('sha256', await claveFirma()).update(JSON.stringify({ lectura, archivo })).digest('base64url')
 }
 
-export function firmaValida(lectura: LecturaCuenta, archivo: ArchivoGuardado | null, firma: string): boolean {
-  const esperada = Buffer.from(firmarLectura(lectura, archivo))
+export async function firmaValida(lectura: LecturaCuenta, archivo: ArchivoGuardado | null, firma: string): Promise<boolean> {
+  const esperada = Buffer.from(await firmarLectura(lectura, archivo))
   const dada = Buffer.from(String(firma))
   return esperada.length === dada.length && timingSafeEqual(esperada, dada)
 }

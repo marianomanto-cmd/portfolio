@@ -198,8 +198,8 @@ function LargoCorto({ v, pesosUsd, deudaUsd }: { v: VistaExposicion; pesosUsd: C
       {v.vista === 'total' && v.sin_moneda_de_riesgo.length > 0 ? (
         <Aviso className="mt-3">
           {v.sin_moneda_de_riesgo.length === 1
-            ? `${v.sin_moneda_de_riesgo[0]} no entra en silencio: le falta la moneda de riesgo, que elegís vos en Datos.`
-            : `${v.sin_moneda_de_riesgo.slice(0, -1).join(', ')} y ${v.sin_moneda_de_riesgo.at(-1)} no entran en silencio: les falta la moneda de riesgo, que elegís vos en Datos.`}
+            ? `${v.sin_moneda_de_riesgo[0]} no entra en silencio: le falta la moneda de riesgo, que vas a poder elegir desde la 1b.`
+            : `${v.sin_moneda_de_riesgo.slice(0, -1).join(', ')} y ${v.sin_moneda_de_riesgo.at(-1)} no entran en silencio: les falta la moneda de riesgo, que vas a poder elegir desde la 1b.`}
         </Aviso>
       ) : null}
     </div>

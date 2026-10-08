@@ -9,6 +9,7 @@ import { leerCaptura } from '@/lib/carga/captura'
 import type { NombreCuenta } from '@/lib/carga/contratos'
 import { leerExcelIEB } from '@/lib/carga/ieb'
 import { subirArchivo } from '@/lib/server/escritura'
+import { mismoOrigen } from '@/app/login/_lib/seguridad'
 import { exigirSesion } from '@/lib/server/sesion'
 import { claseDeArchivo, mensajeLectura, mimeDeImagen, type RespuestaLectura } from '../_lib/fuentes'
 import { firmarLectura, modoCarga } from '../_lib/servidor'
@@ -25,6 +26,8 @@ function error(mensaje: string, status: number) {
 const texto = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 export async function POST(request: Request) {
+  // CSRF: el proxy ya rechaza los POST de otro sitio; esto es la segunda barrera.
+  if (!mismoOrigen(request.headers)) return error('Pedido de otro sitio: rechazado.', 403)
   try {
     await exigirSesion()
   } catch {
@@ -66,7 +69,7 @@ export async function POST(request: Request) {
     ok: true,
     lectura: lectura.value,
     archivo: archivoGuardado,
-    firma: firmarLectura(lectura.value, archivoGuardado),
+    firma: await firmarLectura(lectura.value, archivoGuardado),
     ms,
   } satisfies RespuestaLectura)
 }

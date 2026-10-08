@@ -28,8 +28,12 @@ const PANTALLAS: Pantalla[] = [
   { ruta: '/exposicion?vista=total', nombre: 'exposicion-total' },
   { ruta: '/registro', nombre: 'registro' },
   { ruta: '/ajustes', nombre: 'ajustes' },
-  { ruta: '/carga', nombre: 'carga', ajena: true },
-  { ruta: '/datos', nombre: 'datos', ajena: true },
+  { ruta: '/carga', nombre: 'carga' },
+  { ruta: '/datos/catalogo', nombre: 'datos-catalogo' },
+  { ruta: '/datos/cuentas', nombre: 'datos-cuentas' },
+  { ruta: '/datos/bienes', nombre: 'datos-bienes' },
+  { ruta: '/datos/leasing', nombre: 'datos-leasing' },
+  { ruta: '/datos/movimientos', nombre: 'datos-movimientos' },
 ]
 
 const ANCHOS = [360, 390, 412, 768, 1024, 1279, 1280, 1600, 2560]

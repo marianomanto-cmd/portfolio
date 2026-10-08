@@ -338,7 +338,7 @@ function resumenExposicion(f: Foto | null, vistaSel: Vista): ExposicionResumen {
     const parcial =
       netoParcial.valor === null ? 'sin dato' : `${netoParcial.valor.lt(0) ? 'corto' : 'largo'} ${monto(netoParcial.valor.abs(), 'ARS', { decimales: 2 })}`
     neto = sinDato(
-      `${lista}: ${uno ? 'le' : 'les'} falta la moneda de riesgo, que elegís vos en Datos (la app no la asume; D-73). Sin ${uno ? 'esa partida' : 'esas partidas'} no hay neto total. Suma parcial sin ${uno ? 'ella' : 'ellas'}: ${parcial}.`,
+      `${lista}: ${uno ? 'le' : 'les'} falta la moneda de riesgo, que vas a poder elegir desde la 1b (la app no la asume; D-73). Sin ${uno ? 'esa partida' : 'esas partidas'} no hay neto total. Suma parcial sin ${uno ? 'ella' : 'ellas'}: ${parcial}.`,
       [deCalc('Pesos financieros − deuda en pesos (suma parcial)', netoParcial, 'ARS'), ...bienes.map((b) => ({ nombre: `${b.nombre} · moneda de riesgo`, valor: null, unidad: 'texto' as const }))],
       { etiquetas: ['parcial'], explicacion: 'Tu exposición neta al peso contando tus bienes, cada uno en la moneda de riesgo que le elijas.' },
     )
@@ -698,7 +698,7 @@ function filaCartera(i: ItemFoto, f: Foto, totalArs: Decimal | null, hoy: Fecha,
   const pendiente = t.etiquetas.includes('pendiente')
     ? 'Compra con precio pendiente: se completa con el PPP de la próxima carga.'
     : costoU.valor === null && t.apertura_sin_ccl
-      ? 'Falta el CCL de compra de la apertura: declaralo en Datos para ver el PPC y el resultado en dólares.'
+      ? 'Falta el CCL de compra de la apertura: se declara desde la 1b (Pendientes). Hasta entonces, el PPC y el resultado en dólares desde la compra son "sin dato".'
       : null
   return {
     res: { ars: resA, usd: resU },
@@ -756,7 +756,7 @@ function pendientes(h: Hechos, f: Foto | null, hoy: Fecha): Pendiente[] {
     if (i.tenencia?.etiquetas.includes('pendiente'))
       out.push({ id: `pendiente:${i.clave}`, gravedad: 'media', titulo: `${i.ticker}: compra con precio pendiente`, detalle: `Se completa con el PPP de la próxima carga de IEB. Mientras tanto, el día usa el precio de mercado (${EXPLICACION_INFERIDO}).`, accion: null })
     else if (i.tenencia && i.tenencia.costo_usd === null && i.tenencia.apertura_sin_ccl)
-      out.push({ id: `ccl-compra:${i.clave}`, gravedad: 'baja', titulo: `${i.ticker}: declarar CCL de compra`, detalle: 'Sin el CCL de compra de la apertura, el PPC y el resultado en dólares son "sin dato".', accion: { etiqueta: 'Declarar', href: '/datos/movimientos' } })
+      out.push({ id: `ccl-compra:${i.clave}`, gravedad: 'baja', titulo: `${i.ticker}: declarar CCL de compra`, detalle: 'Sin el CCL de compra de la apertura, el PPC y el resultado en dólares desde la compra son "sin dato". Se declara desde la 1b (Pendientes).', accion: null })
   }
   for (const b of f.items.filter((x) => x.clase === 'bien' && x.precio.valor === null))
     out.push({ id: `valuacion:${b.clave}`, gravedad: 'media', titulo: `${b.nombre}: sin valuación`, detalle: 'Cargá una valuación con fecha y fuente.', accion: { etiqueta: 'Cargar valuación', href: '/datos/bienes' } })
