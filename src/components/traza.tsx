@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { CalcVista, InsumoVista } from '@/lib/domain/calc'
 import { monto, numero, porcentaje } from '@/lib/domain/dinero'
 
@@ -35,6 +35,11 @@ function formatearInsumo(i: InsumoVista): string {
   }
 }
 
+/** El símbolo de la moneda no se separa de su número al cortar el renglón. */
+function sinCorte(f: string): string {
+  return f.replace(/(US\$|\$) (?=[\d−-])/g, (_, simbolo: string) => `${simbolo}\u00A0`)
+}
+
 function Insumos({ insumos, nivel }: { insumos: InsumoVista[]; nivel: number }) {
   return (
     <ul className={nivel > 0 ? 'mt-1 border-l border-border pl-3' : 'mt-1'}>
@@ -54,7 +59,7 @@ function InsumoItem({ insumo, nivel }: { insumo: InsumoVista; nivel: number }) {
         <span className="text-muted">{insumo.nombre}</span>
         <span className="num text-text">{formatearInsumo(insumo)}</span>
         {insumo.origen ? (
-          <span className="text-xs text-faint">
+          <span className="text-xs text-muted">
             carga #{insumo.origen.carga_id}
             {insumo.origen.lugar ? ` · ${insumo.origen.lugar}` : ''}
           </span>
@@ -72,7 +77,7 @@ function InsumoItem({ insumo, nivel }: { insumo: InsumoVista; nivel: number }) {
       </div>
       {abierto && insumo.calc ? (
         <div className="mt-1 border-l border-border pl-3">
-          <p className="num break-words text-xs text-text">{insumo.calc.formula}</p>
+          <p className="num break-words text-xs text-text">{sinCorte(insumo.calc.formula)}</p>
           {insumo.calc.insumos.length ? (
             <Insumos insumos={insumo.calc.insumos} nivel={nivel + 1} />
           ) : null}
@@ -101,7 +106,7 @@ export function PanelTraza({
         </p>
       ) : (
         <p className="num break-words text-sm text-text">
-          {calc.formula}
+          {sinCorte(calc.formula)}
           {moneda && !calc.formula.includes('=') ? ` = ${monto(calc.valor, moneda, { decimales: 2 })}` : ''}
         </p>
       )}
@@ -135,7 +140,7 @@ export function PanelTraza({
       {calc.valor !== null ? (
         <button
           type="button"
-          className="tocable text-xs text-faint hover:text-muted"
+          className="tocable text-xs text-muted hover:text-text"
           onClick={() => navigator.clipboard?.writeText(calc.valor ?? '')}
         >
           Copiar valor exacto
@@ -159,7 +164,31 @@ export function Traza({
   const [abierto, setAbierto] = useState(false)
   const [esMovil, setEsMovil] = useState(false)
   const raiz = useRef<HTMLSpanElement>(null)
+  const panel = useRef<HTMLDivElement>(null)
   const id = useId()
+
+  // En desktop el panel se ancla a la cifra, pero nunca se sale de la pantalla:
+  // si no entra a la derecha se corre a la izquierda, y si no entra abajo, se
+  // abre hacia arriba.
+  useLayoutEffect(() => {
+    const el = panel.current
+    if (!abierto || esMovil || !el) return
+    el.style.transform = ''
+    el.style.top = ''
+    el.style.bottom = ''
+    const r = el.getBoundingClientRect()
+    const margen = 8
+    const ancho = document.documentElement.clientWidth
+    let dx = 0
+    if (r.right > ancho - margen) dx = ancho - margen - r.right
+    if (r.left + dx < margen) dx = margen - r.left
+    if (dx) el.style.transform = `translateX(${Math.round(dx)}px)`
+    const alto = window.innerHeight
+    if (r.bottom > alto - margen && r.height < (raiz.current?.getBoundingClientRect().top ?? 0) - margen) {
+      el.style.top = 'auto'
+      el.style.bottom = '100%'
+    }
+  }, [abierto, esMovil])
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)')
@@ -198,12 +227,18 @@ export function Traza({
       </button>
       {abierto ? (
         esMovil ? (
-          <div className="fixed inset-0 z-50 flex items-end bg-black/30" role="presentation">
+          <div
+            className="fixed inset-0 z-50 flex items-end bg-black/30"
+            role="presentation"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setAbierto(false)
+            }}
+          >
             <div
               id={id}
               role="dialog"
               aria-label={titulo}
-              className="max-h-[80svh] w-full overflow-y-auto rounded-t-2xl border-t border-border bg-surface p-4 pb-8 shadow-lg"
+              className="max-h-[80svh] w-full overflow-y-auto rounded-t-2xl border-t border-border bg-surface p-4 pb-[max(2rem,env(safe-area-inset-bottom))] text-left font-sans text-base font-normal normal-case tracking-normal whitespace-normal text-text shadow-lg"
             >
               <div className="mx-auto mb-3 h-1 w-10 rounded bg-border-strong" />
               <PanelTraza calc={calc} titulo={titulo} moneda={moneda} />
@@ -218,10 +253,11 @@ export function Traza({
           </div>
         ) : (
           <div
+            ref={panel}
             id={id}
             role="dialog"
             aria-label={titulo}
-            className="absolute left-0 top-full z-50 mt-1 w-[min(28rem,80vw)] rounded-xl border border-border bg-surface p-3 text-left shadow-lg"
+            className="absolute left-0 top-full z-50 mt-1 w-[min(28rem,80vw)] rounded-xl border border-border bg-surface p-3 text-left font-sans text-base font-normal normal-case tracking-normal whitespace-normal text-text shadow-lg"
           >
             <PanelTraza calc={calc} titulo={titulo} moneda={moneda} />
           </div>

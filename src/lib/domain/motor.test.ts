@@ -95,7 +95,7 @@ describe('dinero', () => {
     expect(leerNumeroAR('1548,20')).toBe('1548.2')
     expect(leerNumeroAR('1548.2')).toBe('1548.2')
     expect(leerNumeroAR('1.548')).toBe('1548')
-    expect(leerNumeroAR('$ 14.625.459,70')).toBe('14625459.7')
+    expect(leerNumeroAR('$ 12.345.678,90')).toBe('12345678.9')
     expect(leerNumeroAR('abc')).toBeNull()
   })
 })

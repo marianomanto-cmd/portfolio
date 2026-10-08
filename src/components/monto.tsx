@@ -10,7 +10,7 @@ type Moneda = 'ARS' | 'USD'
 
 export function SinDato({ motivo }: { motivo?: string }) {
   return (
-    <span className="text-faint italic" title={motivo}>
+    <span className="text-muted italic" title={motivo}>
       sin dato
     </span>
   )
@@ -47,14 +47,14 @@ export function Monto({
   const flecha = color && tono ? (valor.startsWith('-') ? ' ▼' : ' ▲') : ''
   if (moneda === 'USD') {
     return (
-      <span className={`num usd ${tono} ${className}`}>
+      <span className={`num usd monto ${tono} ${className}`}>
         {texto}
         {flecha}
       </span>
     )
   }
   return (
-    <span className={`num ${tono} ${className}`}>
+    <span className={`num monto whitespace-nowrap ${tono} ${className}`}>
       {texto}
       {flecha}
     </span>

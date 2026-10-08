@@ -178,3 +178,132 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ───────────── Agregado para el shell y las pantallas (no cambia lo de arriba) ───────────── */
+
+/* Texto sobre el color de acento (el botón Cargar, los botones primarios). */
+:root {
+  --on-accent: #ffffff;
+  --accent-strong: #2449b8;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --on-accent: #0b1020;
+    --accent-strong: #a9c0ff;
+  }
+}
+:root[data-theme="dark"] {
+  --on-accent: #0b1020;
+  --accent-strong: #a9c0ff;
+}
+
+/* Paleta daltónica en oscuro: la de arriba está pensada para fondo claro. */
+@media (prefers-color-scheme: dark) {
+  :root[data-paleta="daltonica"]:not([data-theme="light"]) {
+    --positive: #6aa8ff;
+    --positive-soft: #14243d;
+    --negative: #f0a04b;
+    --negative-soft: #35230f;
+  }
+}
+:root[data-paleta="daltonica"][data-theme="dark"] {
+  --positive: #6aa8ff;
+  --positive-soft: #14243d;
+  --negative: #f0a04b;
+  --negative-soft: #35230f;
+}
+
+@theme inline {
+  --color-on-accent: var(--on-accent);
+  --color-accent-strong: var(--accent-strong);
+}
+
+/*
+ * Medidas del shell. Barra lateral de 240 px colapsable a 64 px (visión §3.1):
+ * colapsada por defecto entre 768 y 1279 px, expandida desde 1280 px, y lo que
+ * elijas con el botón queda en data-nav. Debajo de 768 px no hay barra lateral:
+ * hay barra inferior de 56 px (visión §3.2).
+ */
+:root {
+  --nav-w: 0px;
+  --barra-sup: 48px;
+  --barra-inf: 56px;
+}
+@media (min-width: 768px) {
+  :root {
+    --nav-w: 64px;
+    --barra-sup: 56px;
+    --barra-inf: 0px;
+  }
+  :root[data-nav="expandida"] {
+    --nav-w: 240px;
+  }
+}
+@media (min-width: 1280px) {
+  :root:not([data-nav="colapsada"]) {
+    --nav-w: 240px;
+  }
+}
+
+.nav-texto {
+  display: none;
+}
+@media (min-width: 768px) {
+  :root[data-nav="expandida"] .nav-texto {
+    display: inline;
+  }
+}
+@media (min-width: 1280px) {
+  :root:not([data-nav="colapsada"]) .nav-texto {
+    display: inline;
+  }
+}
+
+/* Modo privado (visión §4.10): oculta montos y deja porcentajes. */
+:root[data-privado="1"] .monto {
+  filter: blur(0.5em);
+  user-select: none;
+}
+
+/* Tocables de 44 px también debajo de 1024 px (D-100), para lo que lo pida. */
+@media (max-width: 1023px) {
+  .tocable-lg {
+    min-height: 44px;
+  }
+}
+@media (pointer: coarse) {
+  .tocable-lg {
+    min-height: 44px;
+  }
+}
+
+/* Esqueleto de carga. */
+@keyframes pulso {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+.esqueleto {
+  background: var(--surface-3);
+  border-radius: 8px;
+  animation: pulso 1.6s ease-in-out infinite;
+}
+
+/* Diálogos nativos: fondo y entrada. */
+dialog.hoja::backdrop {
+  background: rgb(0 0 0 / 0.35);
+}
+dialog.hoja {
+  max-width: 100vw;
+}
+
+/* Cifras grandes de las tarjetas: un poco más apretadas. */
+.cifra {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
