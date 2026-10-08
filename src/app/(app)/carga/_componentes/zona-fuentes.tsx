@@ -54,7 +54,8 @@ export function ZonaFuentes({
   arrastrando: boolean
   deshabilitado?: boolean
   onArchivos: (archivos: File[]) => void
-  onReintentar: (id: string) => void
+  /** pista: de qué banco es, cuando las lecturas no se pusieron de acuerdo. */
+  onReintentar: (id: string, pista?: NombreCuenta) => void
   onQuitar: (id: string) => void
   onUsar: (id: string) => void
   onEjemplo?: () => void
@@ -149,7 +150,14 @@ export function ZonaFuentes({
                     </span>
                   ) : null}
                   <span className="ml-auto flex shrink-0 gap-1">
-                    {f.estado === 'error' && f.archivo ? (
+                    {f.estado === 'error' && f.archivo && f.elegir?.length
+                      ? f.elegir.map((c) => (
+                          <Boton key={c} variante="primario" onClick={() => onReintentar(f.id, c)}>
+                            Es de {c}
+                          </Boton>
+                        ))
+                      : null}
+                    {f.estado === 'error' && f.archivo && !f.elegir?.length ? (
                       <Boton variante="secundario" onClick={() => onReintentar(f.id)}>
                         <RotateCcw aria-hidden className="size-4" /> Reintentar
                       </Boton>

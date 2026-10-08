@@ -122,3 +122,20 @@ describe('Hoy · el cuadre dice por cuánto cierra o no cierra (D-66)', () => {
     }
   })
 })
+
+describe('Hoy · "Todavía no cargaste hoy" recién después del cierre de BYMA (visión §3.2)', () => {
+  it('a las 8:05 de un día hábil sin carga no lo dice; a las 18:10, sí', async () => {
+    hechos = hechosEjemplo()
+    const v = armarHoy(hechos, HOY_EJEMPLO)
+    expect(v.es_habil_hoy && !v.cargo_hoy).toBe(true)
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      vi.setSystemTime(new Date(`${HOY_EJEMPLO}T08:05:00-03:00`))
+      expect(texto(await pagina())).not.toContain('Todavía no cargaste hoy')
+      vi.setSystemTime(new Date(`${HOY_EJEMPLO}T18:10:00-03:00`))
+      expect(texto(await pagina())).toContain('Todavía no cargaste hoy')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})

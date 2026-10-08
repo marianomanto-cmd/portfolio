@@ -1223,7 +1223,7 @@ export function decidirFuente(
   }
   throw new ErrorCaptura(
     'fuente_dudosa',
-    `las dos lecturas no se ponen de acuerdo en de qué banco es (A: ${NOMBRE_FUENTE[a]} · B: ${NOMBRE_FUENTE[b]}). Pegala en el lugar de su banco.`,
+    `las dos lecturas no se ponen de acuerdo en de qué banco es (A: ${NOMBRE_FUENTE[a]} · B: ${NOMBRE_FUENTE[b]}). Decime de cuál es y la vuelvo a leer.`,
   )
 }
 

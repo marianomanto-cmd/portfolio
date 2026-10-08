@@ -8,6 +8,7 @@ import {
   claveAusente,
   estadoFila,
   problemaRegistroAusente,
+  rotuloPropuesta,
   alternativasSaldo,
   diferenciaDolarIEB,
   enlaceMovimiento,
@@ -368,5 +369,17 @@ describe('"Ya la tenía" en la bandeja', () => {
     expect(estadoFila(d, { resolucion: 'aceptada', motivo: 'ya la tenía', operacion: null, apertura: true, huella: huellaFila(d) })).toBe('aceptada')
     // Aceptar la compra sin CCL sigue en error.
     expect(estadoFila(d, { resolucion: 'aceptada', motivo: 'compra', operacion: null, huella: huellaFila(d) })).toBe('error')
+  })
+})
+
+describe('dos lecturas: "cierra" solo si un control aritmético cerró', () => {
+  it('un saldo de Mercado Pago no tiene control: su propuesta es "propuesta"', () => {
+    expect(rotuloPropuesta({ tipo: 'saldo' })).toBe('propuesta')
+  })
+  it('una fila de captura: "cierra" con el chequeo en verde; si no, "propuesta"', () => {
+    const chequeo = { regla: 'r', esperado: '1', calculado: '1', tolerancia: '0.01', ok: true }
+    expect(rotuloPropuesta({ tipo: 'fila', chequeo })).toBe('cierra')
+    expect(rotuloPropuesta({ tipo: 'fila', chequeo: { ...chequeo, ok: false } })).toBe('propuesta')
+    expect(rotuloPropuesta({ tipo: 'fila', chequeo: null })).toBe('propuesta')
   })
 })

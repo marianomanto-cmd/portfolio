@@ -4,6 +4,8 @@
 
 import type { CalcVista, InsumoVista } from '@/lib/domain/calc'
 import { Decimal, monto, numero, porcentaje } from '@/lib/domain/dinero'
+import { fechaEnCordoba, ZONA } from '@/lib/domain/fechas'
+import type { Fecha } from '@/lib/domain/tipos'
 
 type Unidad = 'ARS' | 'USD' | 'fraccion'
 
@@ -215,6 +217,24 @@ export function decimalesInsumo(v: string | null): number {
   if (v === null) return 2
   const exactos = new Decimal(v).decimalPlaces()
   return Math.min(Math.max(exactos, 2), decimalesPrecio(v))
+}
+
+/** Hora del cierre de BYMA (rueda de 11 a 17), en Córdoba. */
+export const CIERRE_BYMA = { hora: 17, minuto: 0 }
+
+const horaCordoba = new Intl.DateTimeFormat('en-GB', { timeZone: ZONA, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+
+/**
+ * ¿Ya hay algo para cargar hoy? Es día hábil, no cargaste y ya cerró BYMA
+ * (visión §3.2: el punto de Cargar). Antes del cierre, lo del día todavía no
+ * existe: ni el punto ni "Todavía no cargaste hoy". Si la vista es de otro día
+ * que el del reloj (una vista vieja), cuenta como cerrado.
+ */
+export function cargaPendiente(v: { hoy: Fecha; es_habil_hoy: boolean; cargo_hoy: boolean }, ahora: Date): boolean {
+  if (!v.es_habil_hoy || v.cargo_hoy) return false
+  if (fechaEnCordoba(ahora) !== v.hoy) return true
+  const [h, m] = horaCordoba.format(ahora).split(':').map(Number)
+  return h * 60 + m >= CIERRE_BYMA.hora * 60 + CIERRE_BYMA.minuto
 }
 
 /** Decimales para mostrar un precio: los de bonos y letras por 1 VN necesitan más. */

@@ -38,6 +38,7 @@ import {
   type NumeroLeido,
   type SalidaModelo,
 } from './captura-verificacion'
+import { editarFila } from '@/app/(app)/carga/_lib/ediciones'
 import { proponerCarga } from './conciliar'
 import type { LecturaCuenta, NombreCuenta } from './contratos'
 
@@ -1191,5 +1192,31 @@ describe('FIMA: el ticker que sale del nombre se puede dar de alta (revisión fa
     expect(f.ticker.length).toBeGreaterThan(MAX_TICKER)
     expect(f.estado).toBe('error')
     expect(f.motivos[0]).toMatch(/más de 30 caracteres/)
+  })
+})
+
+describe('Galicia: corregir a mano la cantidad vuelve a armar el costo (revisión fase 1a)', () => {
+  // Las dos lecturas ven 500.000 en vez de 5.000.000: la cuenta no cierra y el lector no arma costo.
+  const mal = () => armar(bonos([{ ...S28F7, cantidad: '500.000' }, T15E7]))
+
+  it('con la cantidad corregida, PPC = (valorizado − rendimiento $) ÷ cantidad, como el lector', () => {
+    const f = mal().filas.find((x) => x.ticker === 'S28F7')!
+    expect(f).toMatchObject({ estado: 'error', ppc_unitario: null, costo_total: null, rendimiento: '63512.35' })
+    const e = editarFila(f, { cantidad: '5000000', precio_unitario: '1.04375' })
+    expect(e).toMatchObject({ estado: 'verificada', ppc_unitario: '1.03104753', costo_total: '5155237.65' })
+    expect(e.motivos[1]).toMatch(/^Costo con la cantidad corregida/)
+  })
+
+  it('si el costo armado no redondea al PPC que muestra la fuente, queda en advertencia', () => {
+    const f = mal().filas.find((x) => x.ticker === 'S28F7')!
+    const e = editarFila({ ...f, ppc_mostrado: '1.10' }, { cantidad: '5000000', precio_unitario: '1.04375' })
+    expect(e.estado).toBe('advertencia')
+    expect(e.motivos.at(-1)).toMatch(/No redondea al PPC que muestra la fuente/)
+  })
+
+  it('sin el rendimiento $ no se puede armar: costo sin dato, nunca verificada en silencio', () => {
+    const f = { ...mal().filas.find((x) => x.ticker === 'S28F7')!, rendimiento: null }
+    const e = editarFila(f, { cantidad: '5000000', precio_unitario: '1.04375' })
+    expect(e).toMatchObject({ estado: 'advertencia', ppc_unitario: null, costo_total: null })
   })
 })

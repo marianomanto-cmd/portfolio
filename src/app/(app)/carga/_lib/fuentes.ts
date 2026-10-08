@@ -9,7 +9,18 @@ import type { ArchivoGuardado } from './confirmacion'
 /** Lo que devuelve POST /carga/leer. */
 export type RespuestaLectura =
   | { ok: true; lectura: LecturaCuenta; archivo: ArchivoGuardado | null; firma: string; ms: number }
-  | { ok: false; error: string }
+  /** elegir: las lecturas no se ponen de acuerdo en el banco; el dueño dice cuál y se vuelve a leer con esa pista. */
+  | { ok: false; error: string; elegir?: NombreCuenta[] }
+
+/**
+ * Una captura que las dos lecturas atribuyen a bancos distintos no se resuelve
+ * sola: se le pregunta al dueño de cuál es (y se vuelve a leer con esa pista).
+ */
+export function cuentasParaElegir(motivo: unknown): NombreCuenta[] | null {
+  return typeof motivo === 'object' && motivo !== null && (motivo as { codigo?: unknown }).codigo === 'fuente_dudosa'
+    ? ['Galicia', 'Mercado Pago']
+    : null
+}
 
 export type ClaseArchivo = 'excel' | 'imagen'
 

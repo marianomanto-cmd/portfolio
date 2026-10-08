@@ -1,4 +1,5 @@
 import { modoDemo } from '@/lib/server/sesion'
+import { cargaPendiente } from '@/components/calculos'
 import { FaltaConfiguracion } from '@/lib/server/supabase'
 import { ejemploHoyVariante } from '@/lib/vistas/ejemplo'
 import { ChipEstado, type EstadoChip } from './chip-estado'
@@ -23,11 +24,13 @@ export async function EstadoDatos() {
   }
 }
 
-/** Punto gris en Cargar: es día hábil y todavía no cargaste hoy (visión §3.2). */
+/** Punto gris en Cargar: es día hábil, ya cerró BYMA y todavía no cargaste hoy (visión §3.2). */
 export async function PuntoCarga() {
   try {
     const v = await hoyDelPedido()
-    if (!v.es_habil_hoy || v.cargo_hoy) return null
+    // El ejemplo del modo demo no tiene hora: el punto vale siempre que falte la carga.
+    const falta = modoDemo() ? v.es_habil_hoy && !v.cargo_hoy : cargaPendiente(v, new Date())
+    if (!falta) return null
     return <span aria-hidden className="block size-2 rounded-full bg-surface ring-2 ring-accent" />
   } catch {
     return null

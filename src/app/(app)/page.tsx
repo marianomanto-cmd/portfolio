@@ -9,7 +9,7 @@ import type { FraseDelDia, Pendiente, TarjetaPatrimonio, VistaHoy } from '@/lib/
 import { ErrorVista } from '@/components/error-vista'
 import { Frase, type FilaDetalle, type ParteMostrada } from '@/components/hoy/frase'
 import { Mostrar } from '@/components/hoy/redondeo-frase'
-import { parcialDeTotal } from '@/components/calculos'
+import { cargaPendiente, parcialDeTotal } from '@/components/calculos'
 import { Monto, MontoTrazado, Porcentaje, SinDato } from '@/components/monto'
 import { hoyDelPedido } from '@/components/shell/datos'
 import { Traza } from '@/components/traza'
@@ -35,7 +35,8 @@ export default async function PaginaHoy({ searchParams }: { searchParams: Promis
   if (!v.hay_datos) return <DiaCero v={v} />
 
   const m = new Mostrar(v.frase, [v.financiero, v.total])
-  const pendienteCarga = v.es_habil_hoy && !v.cargo_hoy
+  // Después del cierre de BYMA (el ejemplo del modo demo no tiene hora: vale siempre).
+  const pendienteCarga = modoDemo() ? v.es_habil_hoy && !v.cargo_hoy : cargaPendiente(v, new Date())
 
   return (
     <div className="flex flex-col gap-2 md:gap-4">

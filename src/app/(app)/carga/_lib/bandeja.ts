@@ -146,6 +146,16 @@ export function estadoSaldo(d: DecisionSaldo, e: EleccionSaldo | null): EstadoIt
 export const seGraba = (e: EstadoItem) => e === 'verificada' || e === 'aceptada'
 export const aRevisar = (e: EstadoItem) => e === 'advertencia' || e === 'sin_alta' || e === 'error'
 
+/**
+ * Rótulo de la lectura propuesta cuando las dos lecturas no coinciden: "cierra"
+ * solo si la propuesta salió de un control aritmético que cerró (una fila de
+ * captura). Un saldo de Mercado Pago no tiene control (manual §12): ahí la
+ * propuesta es solo eso, una propuesta.
+ */
+export function rotuloPropuesta(x: { tipo: 'fila'; chequeo: FilaLeida['chequeo'] } | { tipo: 'saldo' }): 'cierra' | 'propuesta' {
+  return x.tipo === 'fila' && x.chequeo?.ok === true ? 'cierra' : 'propuesta'
+}
+
 export function claveAusente(a: Pick<AusentePropuesto, 'cuenta' | 'ticker'>): string {
   return `${a.cuenta}:ausente:${a.ticker}`
 }

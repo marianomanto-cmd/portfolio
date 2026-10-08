@@ -20,6 +20,7 @@ import {
   enlaceMovimiento,
   precioACompletar,
   problemaRegistroAusente,
+  rotuloPropuesta,
   saltoDeSaldo,
   type EleccionAusente,
   type EleccionFila,
@@ -541,7 +542,7 @@ function ItemFila({
   const lecturas = alternativasFila(fuente, edicion).map((a) => ({
     etiqueta: a.etiqueta,
     monto: !['cantidad', 'rendimiento_porcentaje', 'ticker'].includes(a.campo),
-    rotulo: (fuente.chequeo?.ok ? 'cierra' : 'propuesta') as 'cierra' | 'propuesta',
+    rotulo: rotuloPropuesta({ tipo: 'fila', chequeo: fuente.chequeo }),
     opciones: a.opciones.map((o) => {
       const decimal = /^-?\d+(\.\d+)?$/.test(o.valor)
       const texto = !decimal
@@ -892,7 +893,7 @@ function ItemSaldo({
               etiqueta: 'Saldo',
               monto: true,
               // Un saldo no tiene control aritmético (manual §12): la propuesta no "cierra" nada.
-              rotulo: 'propuesta',
+              rotulo: rotuloPropuesta({ tipo: 'saldo' }),
               opciones: alternativas.slice(0, 2).map((a, i) => ({
                 lectura: i === 0 ? ('A' as const) : ('B' as const),
                 texto: montoMoneda(a.monto, moneda),

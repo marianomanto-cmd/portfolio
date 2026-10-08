@@ -11,7 +11,7 @@ import { leerExcelIEB } from '@/lib/carga/ieb'
 import { subirArchivo } from '@/lib/server/escritura'
 import { mismoOrigen } from '@/app/login/_lib/seguridad'
 import { exigirSesion } from '@/lib/server/sesion'
-import { claseDeArchivo, mensajeLectura, mimeDeImagen, type RespuestaLectura } from '../_lib/fuentes'
+import { claseDeArchivo, cuentasParaElegir, mensajeLectura, mimeDeImagen, type RespuestaLectura } from '../_lib/fuentes'
 import { firmarLectura, modoCarga } from '../_lib/servidor'
 
 export const maxDuration = 60
@@ -19,8 +19,8 @@ export const maxDuration = 60
 const CUENTAS: NombreCuenta[] = ['IEB', 'Galicia', 'Mercado Pago']
 const MAX_BYTES = 4 * 1024 * 1024
 
-function error(mensaje: string, status: number) {
-  return Response.json({ ok: false, error: mensaje } satisfies RespuestaLectura, { status })
+function error(mensaje: string, status: number, elegir?: NombreCuenta[] | null) {
+  return Response.json({ ok: false, error: mensaje, ...(elegir ? { elegir } : {}) } satisfies RespuestaLectura, { status })
 }
 
 const texto = (e: unknown) => (e instanceof Error ? e.message : String(e))
@@ -59,7 +59,8 @@ export async function POST(request: Request) {
   const ms = Math.round(performance.now() - inicio)
 
   if (lectura.status === 'rejected') {
-    return error(mensajeLectura(clase, pista, lectura.reason), 422)
+    // Si las lecturas no se ponen de acuerdo en el banco, la pantalla pregunta de cuál es.
+    return error(mensajeLectura(clase, pista, lectura.reason), 422, pista ? null : cuentasParaElegir(lectura.reason))
   }
   if (guardado.status === 'rejected') {
     return error(`Leí ${lectura.value.cuenta}, pero no pude guardar el archivo: ${texto(guardado.reason)}`, 502)

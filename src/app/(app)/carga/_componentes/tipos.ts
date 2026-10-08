@@ -13,4 +13,6 @@ export interface FuenteCarga {
   cuenta: NombreCuenta | null
   respuesta: Extract<RespuestaLectura, { ok: true }> | null
   error: string | null
+  /** Las lecturas no se pusieron de acuerdo en el banco: de cuál puede ser (se vuelve a leer con esa pista). */
+  elegir?: NombreCuenta[] | null
 }

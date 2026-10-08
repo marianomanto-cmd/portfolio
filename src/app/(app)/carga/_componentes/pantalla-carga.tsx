@@ -156,19 +156,22 @@ export function PantallaCarga({ contexto }: { contexto: ContextoCarga }) {
   }, [])
 
   const leer = useCallback(
-    async (id: string, archivo: File) => {
+    async (id: string, archivo: File, pista?: NombreCuenta) => {
       const fd = new FormData()
       fd.append('archivo', archivo, archivo.name || 'captura.png')
+      // La pista solo desempata cuando las dos lecturas no se ponen de acuerdo en el banco.
+      if (pista) fd.append('pista', pista)
       try {
         const res = await fetch('/carga/leer', { method: 'POST', body: fd })
         const json = (await res.json().catch(() => null)) as RespuestaLectura | { error?: string } | null
         if (json && 'ok' in json && json.ok) {
-          actualizarFuente(id, { estado: 'leida', cuenta: json.lectura.cuenta, respuesta: json, error: null })
+          actualizarFuente(id, { estado: 'leida', cuenta: json.lectura.cuenta, respuesta: json, error: null, elegir: null })
           return
         }
         const motivo =
           (json && 'error' in json && json.error) || (res.status === 401 ? 'Sesión vencida: volvé a entrar.' : `el servidor respondió ${res.status}.`)
-        actualizarFuente(id, { estado: 'error', error: motivo })
+        const elegir = json && 'elegir' in json && Array.isArray(json.elegir) ? json.elegir : null
+        actualizarFuente(id, { estado: 'error', error: motivo, elegir })
       } catch (e) {
         actualizarFuente(id, {
           estado: 'error',
@@ -643,11 +646,11 @@ export function PantallaCarga({ contexto }: { contexto: ContextoCarga }) {
             repetidas={repetidas}
             arrastrando={arrastrando}
             onArchivos={agregarArchivos}
-            onReintentar={(id) => {
+            onReintentar={(id, pista) => {
               const f = fuentes.find((x) => x.id === id)
               if (!f?.archivo) return
-              actualizarFuente(id, { estado: 'leyendo', error: null })
-              void leer(id, f.archivo)
+              actualizarFuente(id, { estado: 'leyendo', error: null, elegir: null })
+              void leer(id, f.archivo, pista)
             }}
             onQuitar={(id) => setFuentes((fs) => fs.filter((f) => f.id !== id))}
             onUsar={(id) => {

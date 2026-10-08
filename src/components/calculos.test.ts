@@ -2,7 +2,7 @@ import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import type { CalcVista } from '@/lib/domain/calc'
 import { Decimal } from '@/lib/domain/dinero'
-import { aDolares, compararCifras, decimalesInsumo, decimalesPrecio, diasEnPosicion, fraccionDe, parcialDeTotal, porSubaDeCcl, restoMayor, sumaColumna } from './calculos'
+import { aDolares, cargaPendiente, compararCifras, decimalesInsumo, decimalesPrecio, diasEnPosicion, fraccionDe, parcialDeTotal, porSubaDeCcl, restoMayor, sumaColumna } from './calculos'
 
 const c = (valor: string | null, motivo?: string): CalcVista => ({ valor, motivo, formula: valor ?? 'sin dato', insumos: [], etiquetas: [] })
 
@@ -142,5 +142,24 @@ describe('decimalesInsumo (traza)', () => {
     expect(decimalesInsumo('52345.678901234')).toBe(2)
     expect(decimalesInsumo('23.456789123')).toBe(4)
     expect(decimalesInsumo(null)).toBe(2)
+  })
+})
+
+describe('cargaPendiente (el punto de Cargar y "Todavía no cargaste hoy")', () => {
+  const v = { hoy: '2026-10-15', es_habil_hoy: true, cargo_hoy: false }
+  // Córdoba es UTC−3 todo el año.
+  const a = (hhmm: string) => new Date(`2026-10-15T${hhmm}:00-03:00`)
+  it('un día hábil sin carga: recién después del cierre de BYMA (17 h)', () => {
+    expect(cargaPendiente(v, a('08:05'))).toBe(false)
+    expect(cargaPendiente(v, a('16:59'))).toBe(false)
+    expect(cargaPendiente(v, a('17:00'))).toBe(true)
+    expect(cargaPendiente(v, a('23:59'))).toBe(true)
+  })
+  it('con la carga hecha, o un día no hábil, nunca', () => {
+    expect(cargaPendiente({ ...v, cargo_hoy: true }, a('18:10'))).toBe(false)
+    expect(cargaPendiente({ ...v, es_habil_hoy: false }, a('18:10'))).toBe(false)
+  })
+  it('una vista de otro día que el del reloj cuenta como cerrado', () => {
+    expect(cargaPendiente(v, new Date('2026-10-16T08:00:00-03:00'))).toBe(true)
   })
 })
