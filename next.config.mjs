@@ -1,9 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverExternalPackages: ['pg'],
-  // Los skills se leen del disco en runtime: sin esto el lambda no los lleva.
-  outputFileTracingIncludes: {
-    '/api/memo': ['./src/skills/**/*.md'],
+  // exceljs y el SDK de Anthropic corren en Node (no Edge).
+  serverExternalPackages: ['exceljs'],
+  experimental: {
+    // Las capturas y el Excel viajan en Server Actions (límite por defecto: 1 MB).
+    serverActions: { bodySizeLimit: '8mb' },
   },
 };
 
