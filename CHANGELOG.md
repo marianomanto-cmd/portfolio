@@ -83,7 +83,7 @@ La app nueva reemplaza a Corte (D-01): carga diaria, Hoy, Cartera, Exposición, 
   - compra pendiente valuada "inferida" (D-110);
   - etiquetas viejo, declarado, inferido, pendiente y parcial;
   - traza en cada cifra (D-67).
-- **Base:** migración `carga_transaccional` (`supabase/migrations/`):
+- **Base:** carga transaccional en cinco migraciones (`supabase/migrations/`; aplicadas el 08/10 salvo `carga_revertir`, pendiente porque el conector de Supabase no deja aprobar su `DELETE`; ver `docs/datos.md`):
   - `cargas` con lote, lector, `archivo_sha256`, `tiempo_activo_ms` y `motivo_reversion`;
   - `tipo_cambio` con la referencia del CCL;
   - `operaciones` con la carga que completó el precio de una compra pendiente;

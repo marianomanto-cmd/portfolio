@@ -7,7 +7,15 @@ Base: Supabase, proyecto **Portfolio** (`zcgynhzddfjzwswekcvl`). Schema `public`
 | `…_init` | 27 tablas, 3 vistas, auditoría por trigger y bucket privado `cargas` |
 | `…_permisos_servidor` | Permisos mínimos para el servidor (D-33) |
 | `…_cuentas_iniciales` | IEB, Galicia y Mercado Pago |
-| `…_carga_transaccional` (fase 1a) | Columnas de `cargas`, la nota del día en `eventos`, el precio completado de una compra, la referencia del CCL, índices de la auditoría y las funciones de escritura (ver "Funciones de escritura") |
+| `20261008133914_carga_transaccional` (fase 1a) | Columnas de `cargas`, la nota del día en `eventos`, el precio completado de una compra, la referencia del CCL, índices de la auditoría y los lectores de la entrada `leer_monto`, `leer_fecha`, `leer_id` |
+| `20261008142244_carga_confirmar` | `confirmar_carga` (ver "Funciones de escritura") |
+| `20261008151535_carga_manual` | `guardar_manual` |
+| `20261008151942_catalogo_activos` | `alta_activo` y `editar_activo` |
+| `20261008160000_carga_revertir` | `revertir_lote`. **Pendiente de aplicar** (ver abajo) |
+
+La carga transaccional se aplicó en cinco partes y no en una porque el conector de Supabase cortaba a los 60 s con el archivo entero. Cada parte revoca y otorga los permisos de sus propias funciones. El schema final es el mismo: los tests del schema dan los mismos 143 controles y cada función, check e índice aplicados coinciden byte a byte con los archivos (md5 contra una base local armada desde el repo).
+
+**`carga_revertir` está pendiente.** El conector de Supabase pide confirmar cualquier sentencia con `DELETE` (la reversión borra las filas del lote que deshace) y el pedido vence antes de que se pueda aprobar. Hasta aplicarla, Revertir (Registro) y Deshacer (Cargar) muestran "La base no tiene la función public.revertir_lote: falta aplicar la migración 20261008160000_carga_revertir". Para aplicarla: desde una sesión con el conector, aprobando su confirmación; o con la CLI de Supabase (`supabase db push`). Después, renombrar el archivo a la versión que registre Supabase y regenerar los tipos.
 
 Los archivos originales (Excel y capturas) viven en el bucket privado `cargas` de Supabase Storage, en `AAAA/MM/<sha256>.<ext>` (D-105).
 
