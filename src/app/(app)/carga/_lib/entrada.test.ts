@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import fc from 'fast-check'
-import { interpretarTC, leerMonto, textoReferencia, variacionContra } from './entrada'
+import { erroresSueltos, interpretarTC, leerMonto, textoReferencia, variacionContra } from './entrada'
 import { registrarGesto, relojNuevo, puntaAPuntaMs, textoDuracion, CORTE_MS } from './tiempo'
 
 describe('interpretarTC', () => {
@@ -108,5 +108,16 @@ describe('tiempo activo', () => {
   it('se lee en segundos o minutos', () => {
     expect(textoDuracion(41_400)).toBe('41 s')
     expect(textoDuracion(65_000)).toBe('1 min 05 s')
+  })
+})
+
+describe('erroresSueltos (alta de un activo desde Cargar)', () => {
+  it('el error de un campo sin caja (el ticker sale de la fuente) va al aviso general, con su nombre; nunca se pierde', () => {
+    const conCampo = ['nombre', 'tipo', 'moneda_riesgo']
+    expect(erroresSueltos({ ticker: 'Solo letras, números, punto y guion.', nombre: 'Falta el nombre.' }, conCampo)).toEqual([
+      'Ticker: Solo letras, números, punto y guion.',
+    ])
+    expect(erroresSueltos({ _: 'No pude dar de alta el activo: sin conexión.' }, conCampo)).toEqual(['No pude dar de alta el activo: sin conexión.'])
+    expect(erroresSueltos({ nombre: 'Falta el nombre.' }, conCampo)).toEqual([])
   })
 })

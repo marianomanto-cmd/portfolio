@@ -240,7 +240,7 @@ describe('leerExcelIEB · Portafolio de ejemplo', async () => {
 })
 
 describe('leerExcelIEB · el set del Apéndice B (docs/vision.md)', () => {
-  it('cuadra contra B2: $74.547.000 + DOLARUSA − $185.000 + US$ 4.182,20 × 1.540 = $80.830.000,00', async () => {
+  it('cuadra contra B2: $74.547.000 + DOLARUSA − $185.000 + US$ 4.176,60 × 1.540 = $80.830.000,00', async () => {
     const l = await leer(portafolioApendiceB())
     expect(b2(l)).toMatchObject({ informado: '80830000', calculado: '80830000', ok: true })
     expect(saldo(l, 'USD')?.monto).toBe('4200')
@@ -846,5 +846,47 @@ describe('leerExcelIEB → proponerCarga (src/lib/carga/conciliar.ts)', async ()
   it('si la carga es de otro día que el Excel, la conciliación lo avisa', () => {
     const otra = proponerCarga([lectura], hechos, '2026-10-08', { ccl: new Decimal('1548.2') })
     expect(otra.advertencias).toEqual(['IEB: la fuente es del mié 07/10 y la carga es del jue 08/10.'])
+  })
+})
+
+// ───────────── Revisión de la fase 1a (números inventados) ─────────────
+
+describe('leerExcelIEB · un PPP de 0 es "sin dato" (D-107)', () => {
+  it('PPP 0: el costo queda sin dato, con aviso; la primera carga propone la apertura sin costo, nunca a $ 0', async () => {
+    const l = await leer(conPosicion(portafolioEjemplo(), 'YPFD', { ppp: '0' }))
+    const f = fila(l, 'YPFD')
+    expect(f).toMatchObject({ ppc_mostrado: null, ppc_unitario: null, estado: 'advertencia' })
+    expect(f.motivos.join(' ')).toMatch(/PPP en .*0,00: el costo queda sin dato/)
+    const cuentas: Cuenta[] = [{ id: 1, nombre: 'IEB', tipo: 'broker', formato_carga: 'excel_ieb', activa: true }]
+    const hechos: Hechos = {
+      cuentas,
+      activos: [{ id: 2, ticker: 'YPFD', nombre: 'YPF', tipo: 'accion_local', moneda_riesgo: 'ARS', geografia: 'AR', indexacion: null, ticker_subyacente: null, fecha_vencimiento: null, color: null, activo_bool: true }],
+      operaciones: [], cotizaciones: [], tipos_cambio: [], saldos: [], movimientos: [], pasivos: [], pasivo_saldos: [], bienes: [], valuaciones: [], feriados: [], cargas: [],
+    }
+    const d = proponerCarga([l], hechos, '2026-10-07', { ccl: new Decimal('1500') }).filas.find((x) => x.ticker === 'YPFD')!
+    expect(d.operacion).toMatchObject({ tipo: 'apertura', cantidad: '300', precio: null })
+    expect(d.estado).toBe('advertencia')
+  })
+})
+
+describe('leerExcelIEB · un control que no cierra no deja nada verificado (D-11)', () => {
+  it('B2 no cierra: aviso arriba y todas las filas y saldos de la cuenta en advertencia', async () => {
+    const p = portafolioEjemplo()
+    const l = await leer({ ...p, patrimonioTotal: patrimonioIEB(p).plus(1_000_000).toFixed() })
+    expect(b2(l).ok).toBe(false)
+    expect(l.advertencias[0]).toMatch(/^El Patrimonio total \(B2\) no cierra con lo leído/)
+    expect(l.filas.every((f) => f.estado !== 'verificada')).toBe(true)
+    expect(l.saldos.every((s) => s.estado !== 'verificada')).toBe(true)
+    expect(fila(l, 'SPY').motivos).toContain('El Patrimonio total (B2) no cierra con lo leído: ¿falta una posición o hay un número mal leído?')
+  })
+
+  it('un Subtotal que no cierra: solo esa sección baja a advertencia, con el aviso arriba', async () => {
+    const p = portafolioEjemplo()
+    const l = await leer({ ...p, secciones: p.secciones.map((s) => (s.titulo === 'Bonos' ? { ...s, subtotal: '17000000' } : s)) })
+    expect(subtotal(l, 'Bonos').ok).toBe(false)
+    expect(l.advertencias.some((a) => a.startsWith('El Subtotal de Bonos no cierra'))).toBe(true)
+    expect(['T30J7', 'TXMJ0', 'S29Y7'].map((t) => fila(l, t).estado)).toEqual(['advertencia', 'advertencia', 'advertencia'])
+    expect(fila(l, 'SPY').estado).toBe('verificada')
+    expect(b2(l).ok).toBe(true)
   })
 })

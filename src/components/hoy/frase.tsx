@@ -3,6 +3,7 @@
 import { ChevronRight, X } from 'lucide-react'
 import { useRef } from 'react'
 import type { CalcVista } from '@/lib/domain/calc'
+import { TextoConMontos } from '@/components/monto'
 import { useMedia } from '@/components/preferencias'
 import { Traza } from '@/components/traza'
 
@@ -49,7 +50,10 @@ export function Frase({ partes, detalle, recortar = false }: { partes: ParteMost
     ) : p.calc ? (
       <Texto key={i} p={p} />
     ) : (
-      <span key={i}>{p.texto}</span>
+      // Un pedazo sin traza puede traer un monto ("de tus US$ 4.200"): igual se oculta en modo privado.
+      <span key={i}>
+        <TextoConMontos texto={p.texto} />
+      </span>
     ),
   )
 
@@ -79,7 +83,15 @@ export function Frase({ partes, detalle, recortar = false }: { partes: ParteMost
             <div className="px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
               <div aria-hidden className="mx-auto mb-3 h-1 w-10 rounded bg-border-strong" />
               <div className="flex items-start justify-between gap-2">
-                <p className="text-[15px] leading-6">{partes.map((p, i) => (p.calc ? <Texto key={i} p={p} /> : <span key={i}>{p.texto}</span>))}</p>
+                <p className="text-[15px] leading-6">{partes.map((p, i) =>
+                    p.calc ? (
+                      <Texto key={i} p={p} />
+                    ) : (
+                      <span key={i}>
+                        <TextoConMontos texto={p.texto} />
+                      </span>
+                    ),
+                  )}</p>
                 <button
                   type="button"
                   onClick={() => hoja.current?.close()}

@@ -257,6 +257,15 @@ describe('normalizarConfirmacion', () => {
     ])
   })
 
+  it('la huella del pedido viaja normalizada (sha256 en hex) y se valida', () => {
+    const h = 'AB'.repeat(32)
+    expect(normalizarConfirmacion(confirmacion({ huella: h })).huella).toBe('ab'.repeat(32))
+    expect(normalizarConfirmacion(confirmacion())).not.toHaveProperty('huella')
+    expect(normalizarConfirmacion(confirmacion({ huella: null }))).not.toHaveProperty('huella')
+    expect(mensaje(() => normalizarConfirmacion(confirmacion({ huella: 'abc' })))).toMatch(/huella de la carga no es válida/)
+    expect(mensaje(() => normalizarConfirmacion(confirmacion({ huella: 7 as unknown as string })))).toMatch(/huella de la carga no es válida/)
+  })
+
   it('un tipo de cambio sin valores no se manda', () => {
     const p = normalizarConfirmacion(confirmacion({ tipo_cambio: { ccl: null, cripto_venta: '', mep: null, oficial: null } }))
     expect(p.tipo_cambio).toBeNull()

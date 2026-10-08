@@ -9,7 +9,7 @@ import { Decimal } from '@/lib/domain/dinero'
 import { financieros, foto } from '@/lib/domain/foto'
 import type { Activo, Ausente, Cuenta, Fecha, Hechos, Operacion, Saldo, TipoCambio } from '@/lib/domain/tipos'
 import { cuadre, variacion } from '@/lib/domain/variacion'
-import { armarCartera, armarExposicion, armarHoy } from '@/lib/vistas/armar'
+import { armarCartera, armarExposicion, armarHoy, armarRegistro } from '@/lib/vistas/armar'
 import { ejemploHoy } from '@/lib/vistas/ejemplo'
 
 // ───────────── Fábrica de hechos ─────────────
@@ -197,6 +197,7 @@ describe('ausentes: la fuente ya no lista una tenencia y la venta no está regis
     // La concentración dice por qué no se puede calcular.
     expect(e.concentracion.top1.valor).toBeNull()
     expect(e.concentracion.top1.motivo).toContain('SPY')
+    expect(e.concentracion.top1_nombre).toBeNull()
   })
 
   it('con la venta registrada, la ausencia no cambia nada: el día suma $0 y el cuadre cierra', () => {
@@ -551,3 +552,171 @@ function hechosDeCaso(c: CasoRef): Hechos {
     tipos_cambio: Object.entries(c.ccl).map(([fecha, v]) => ({ fecha, ccl: Dn(v), mep: null, cripto_venta: null, oficial: null, carga_id: 1 })),
   })
 }
+
+// ═════════════════════════════════════════════════════════════════════════
+// Sin el leasing o sin los bienes cargados: "sin dato", nunca $ 0 (D-03, D-65)
+// ═════════════════════════════════════════════════════════════════════════
+
+describe('día cero sin el leasing ni los bienes: la deuda y el total son "sin dato", no $ 0', () => {
+  // LECAP por $ 1.100.000 y $ 500.000 en IEB, CCL 1.000; todavía no cargaste
+  // el leasing ni la casa (Datos).
+  const diaCero = (p: Partial<Hechos> = {}) =>
+    hechos({
+      operaciones: [op({ fecha: '2026-10-05', activo_id: S28F7.id, tipo: 'apertura', cantidad: D(1000000), precio: D('1.08') })],
+      tipos_cambio: [tc('2026-10-05', 1000), tc('2026-10-06', 1000)],
+      cotizaciones: [cot('2026-10-05', S28F7.id, '1.1'), cot('2026-10-06', S28F7.id, '1.1')],
+      saldos: [saldo('2026-10-05', IEB, 'ARS', 500000), saldo('2026-10-06', IEB, 'ARS', 500000)],
+      ...p,
+    })
+
+  it('Exposición: la deuda del leasing es "sin dato" y el neto, "sin dato · parcial" con la suma parcial (antes: deuda $ 0 y neto largo $ 1.600.000)', () => {
+    const e = armarExposicion(diaCero(), '2026-10-06', 'financiero')
+    expect(e.resumen.deuda_pesos.ars.valor).toBeNull()
+    expect(e.resumen.deuda_pesos.ars.motivo).toContain('Todavía no cargaste el leasing')
+    expect(e.resumen.deuda_pesos.usd.valor).toBeNull()
+    expect(e.resumen.neto_ars.valor).toBeNull()
+    expect(e.resumen.neto_ars.etiquetas).toContain('parcial')
+    expect(e.resumen.neto_ars.motivo).toContain('$ 1.600.000,00')
+    expect(e.resumen.neto_usd.valor).toBeNull()
+    expect(e.resumen.neto_usd.etiquetas).toContain('parcial')
+    expect(e.resumen.sensibilidad_usd_1pct.valor).toBeNull()
+    expect(e.neto_pct.valor).toBeNull()
+    // Lo que sí se sabe sigue ahí.
+    expect(e.resumen.pesos_financieros.ars.valor).toBe('1600000')
+  })
+
+  it('Hoy: el patrimonio total es "sin dato · parcial" con la suma de lo cargado, y su variación también (antes: igual al financiero)', () => {
+    const v = armarHoy(diaCero(), '2026-10-06')
+    expect(v.financiero.valor.ars.valor).toBe('1600000')
+    expect(v.total.valor.ars.valor).toBeNull()
+    expect(v.total.valor.ars.etiquetas).toContain('parcial')
+    expect(v.total.valor.ars.motivo).toContain('Suma parcial')
+    expect(v.total.valor.ars.motivo).toContain('$ 1.600.000,00')
+    expect(v.total.valor.ars.insumos.map((i) => i.nombre)).toEqual(expect.arrayContaining(['Tus bienes (casa, auto)', 'Capital pendiente del leasing']))
+    expect(v.total.valor.usd.valor).toBeNull()
+    expect(v.total.variacion?.ars.valor).toBeNull()
+    expect(v.total.variacion?.ars.etiquetas).toContain('parcial')
+    expect(v.exposicion.deuda_pesos.ars.valor).toBeNull()
+  })
+
+  it('con el leasing y la casa cargados, todo tiene valor', () => {
+    const h = diaCero({
+      pasivos: [{ id: 1, nombre: 'Leasing', tipo: 'leasing', moneda: 'ARS', fecha_inicio: '2026-01-01', cuotas_totales: 48, opcion_compra_fecha: null }],
+      pasivo_saldos: [{ pasivo_id: 1, fecha: '2026-10-05', capital_pendiente: D(300000), carga_id: 1 }],
+      bienes: [{ id: 1, nombre: 'Casa', tipo: 'inmueble', moneda_valuacion: 'USD', geografia: 'AR', pasivo_id: null, activo_bool: true }],
+      valuaciones: [{ bien_id: 1, fecha: '2026-10-05', valor: D(200000), fuente: 'tasación', carga_id: 1 }],
+    })
+    const e = armarExposicion(h, '2026-10-06', 'financiero')
+    expect(e.resumen.deuda_pesos.ars.valor).toBe('300000')
+    expect(e.resumen.neto_ars.valor).toBe('1300000')
+    const v = armarHoy(h, '2026-10-06')
+    expect(v.total.valor.ars.valor).toBe(D(1600000).plus(200000000).minus(300000).toFixed())
+    expect(v.total.variacion?.ars.valor).not.toBeNull()
+  })
+
+  it('una deuda solo en dólares no es "sin dato" en pesos: la deuda en pesos es $ 0 porque se sabe', () => {
+    const h = diaCero({
+      pasivos: [{ id: 1, nombre: 'Préstamo', tipo: 'prestamo', moneda: 'USD', fecha_inicio: '2026-01-01', cuotas_totales: 12, opcion_compra_fecha: null }],
+      pasivo_saldos: [{ pasivo_id: 1, fecha: '2026-10-05', capital_pendiente: D(100), carga_id: 1 }],
+    })
+    expect(armarExposicion(h, '2026-10-06', 'financiero').resumen.deuda_pesos.ars.valor).toBe('0')
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════
+// "Quién movió tu financiero": cada aporte con su fórmula e insumos
+// ═════════════════════════════════════════════════════════════════════════
+
+describe('Quién movió: la traza de cada aporte tiene fórmula con valores e insumos, no el valor repetido', () => {
+  it('Apéndice B: cada partida muestra V0, V1, los CCL y su fórmula de D-35', () => {
+    const movs = ejemploHoy().movimientos
+    expect(movs.length).toBeGreaterThan(0)
+    for (const m of movs) {
+      for (const c of [m.aporte.ars, m.aporte.usd]) {
+        expect(c.formula, m.nombre).not.toMatch(/^activos de /)
+        expect(c.insumos.length, m.nombre).toBeGreaterThanOrEqual(4)
+        expect(c.explicacion).toContain(`Lo que se movió ${m.nombre} en sí`)
+      }
+    }
+    // Una posición que arriesga dólares: resultado en dólares × CCL.
+    const conCcl = movs.find((m) => m.aporte.ars.formula.startsWith('resultado en dólares'))
+    expect(conCcl).toBeDefined()
+    expect(conCcl!.aporte.ars.insumos.map((i) => i.nombre)).toEqual(expect.arrayContaining(['CCL del mar 13/10', 'CCL del mié 14/10']))
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════
+// Atención: el saldo viejo dice de qué cuenta es
+// ═════════════════════════════════════════════════════════════════════════
+
+describe('Atención: un saldo viejo se nombra con su cuenta', () => {
+  it('"Pesos en Mercado Pago: dato viejo", no "ARS: dato viejo" (que no distingue IEB de Mercado Pago)', () => {
+    const h = hechos({
+      operaciones: [op({ fecha: '2026-10-05', activo_id: SPY.id, tipo: 'apertura', cantidad: D(10), precio: D(9000), ccl_del_dia: D(1000) })],
+      tipos_cambio: [tc('2026-10-05', 1000), tc('2026-10-09', 1000)],
+      cotizaciones: [cot('2026-10-05', SPY.id, 10000), cot('2026-10-09', SPY.id, 10000)],
+      // IEB al día; Mercado Pago quedó en el lunes.
+      saldos: [saldo('2026-10-05', IEB, 'ARS', 1000), saldo('2026-10-09', IEB, 'ARS', 1000), saldo('2026-10-05', MP, 'ARS', 5000)],
+    })
+    const at = armarHoy(h, '2026-10-09').atencion
+    const viejos = at.filter((p) => p.id.startsWith('viejo:'))
+    expect(viejos.map((p) => p.titulo)).toEqual(['Pesos en Mercado Pago: dato viejo'])
+    expect(at.some((p) => p.titulo.startsWith('ARS:'))).toBe(false)
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════
+// Registro: un guardado de Datos no es "Tipo de cambio · CCL y cripto"
+// ═════════════════════════════════════════════════════════════════════════
+
+describe('Registro: cada guardado de Datos se nombra por lo que grabó', () => {
+  const carga = (id: number, cuenta_id: number | null, origen: string, lector: string | null, creado_en: string) => ({
+    id,
+    lote: `lote-${id}`,
+    fecha: '2026-10-05',
+    cuenta_id,
+    origen,
+    archivo_path: origen === 'manual' ? null : `cargas/${id}.xlsx`,
+    estado: 'vigente',
+    creado_en,
+    lector,
+    tiempo_activo_ms: null,
+  })
+  const tablas = {
+    cargas: [
+      carga(1, null, 'manual', 'tipeado', '2026-10-05T21:00:00Z'), // CCL y cripto
+      carga(2, null, 'manual', 'manual', '2026-10-05T21:01:00Z'), // capital del leasing
+      carga(3, null, 'manual', 'manual', '2026-10-05T21:02:00Z'), // casa y camioneta
+      carga(4, null, 'manual', 'manual', '2026-10-05T21:03:00Z'), // aporte
+      carga(5, IEB, 'excel', 'ieb-excel@1', '2026-10-05T21:04:00Z'),
+    ],
+    cuentas: CUENTAS.map((c) => ({ id: c.id, nombre: c.nombre })),
+    cotizaciones: [{ carga_id: 5 }, { carga_id: 5 }],
+    saldos: [{ carga_id: 5 }],
+    operaciones: [{ carga_id: 5 }],
+    valuaciones: [
+      { carga_id: 3, bien_id: 1 },
+      { carga_id: 3, bien_id: 2 },
+    ],
+    capitales: [{ carga_id: 2, pasivo_id: 1 }],
+    movimientos: [{ carga_id: 4, tipo: 'aporte', cuenta_origen_id: null, cuenta_destino_id: MP }],
+    bienes: [
+      { id: 1, nombre: 'Casa' },
+      { id: 2, nombre: 'Camioneta' },
+    ],
+    pasivos: [{ id: 1, nombre: 'Leasing' }],
+  }
+
+  it('la carga del CCL es "Tipo de cambio"; las de Datos son "Datos" y dicen qué grabaron (antes: las cuatro "Tipo de cambio")', () => {
+    const f = new Map(armarRegistro(tablas).filas.map((x) => [x.carga_id, x]))
+    expect(f.get(1)).toMatchObject({ cuenta: 'Tipo de cambio', detalle: null })
+    expect(f.get(2)).toMatchObject({ cuenta: 'Datos', capitales: 1, detalle: 'capital pendiente de Leasing' })
+    expect(f.get(3)).toMatchObject({ cuenta: 'Datos', valuaciones: 2, detalle: 'valuación de Casa · valuación de Camioneta' })
+    expect(f.get(4)).toMatchObject({ cuenta: 'Datos', movimientos: 1, detalle: 'aporte a Mercado Pago' })
+    expect(f.get(5)).toMatchObject({ cuenta: 'IEB', cotizaciones: 2, saldos: 1, operaciones: 1, valuaciones: 0, detalle: null })
+  })
+
+  it('ordena de la más nueva a la más vieja, como antes', () => {
+    expect(armarRegistro(tablas).filas.map((x) => x.carga_id)).toEqual([5, 4, 3, 2, 1])
+  })
+})

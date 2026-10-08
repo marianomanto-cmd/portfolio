@@ -5,15 +5,17 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import type { Hechos } from '@/lib/domain/tipos'
 import { armarHoy } from '@/lib/vistas/armar'
+import type { VistaHoy } from '@/lib/vistas/contratos'
 import { hechosEjemplo, HOY_EJEMPLO } from '@/lib/vistas/ejemplo'
 
 let hechos: Hechos = hechosEjemplo()
 let demo = false
+let ajustar: (v: VistaHoy) => VistaHoy = (v) => v
 vi.mock('next/link', () => ({
   default: (p: { href: string; children: unknown; className?: string }) => h('a', { href: p.href, className: p.className }, p.children as never),
 }))
 vi.mock('@/lib/server/sesion', () => ({ modoDemo: () => demo }))
-vi.mock('@/components/shell/datos', () => ({ hoyDelPedido: async () => armarHoy(hechos, HOY_EJEMPLO) }))
+vi.mock('@/components/shell/datos', () => ({ hoyDelPedido: async () => ajustar(armarHoy(hechos, HOY_EJEMPLO)) }))
 
 const texto = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 
@@ -75,6 +77,48 @@ describe('Hoy en el teléfono: la hoja de la frase tiene cada cifra en su rengl�
       }
     } finally {
       demo = false
+    }
+  })
+})
+
+describe('Hoy · el cuadre dice por cuánto cierra o no cierra (D-66)', () => {
+  const cuadre = (html: string) => {
+    const i = html.indexOf('Cuadre ')
+    return html.slice(html.lastIndexOf('<p', i), html.indexOf('</p>', i))
+  }
+  const calc = (valor: string) => ({ valor, formula: valor, insumos: [], etiquetas: [] })
+  // Todo en línea: sin tags, sin espacios agregados.
+  const plano = (html: string) => html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+
+  it('si cierra: "cierra (diferencia $ 0,00 · US$ 0,00)", cada cifra con su traza', async () => {
+    hechos = hechosEjemplo()
+    ajustar = (v) => ({ ...v, cuadre: { ars_ok: true, usd_ok: true, detalle: 'Cierra en las dos monedas.', diferencia: { ars: calc('0'), usd: calc('0') } } })
+    try {
+      const p = cuadre(await pagina())
+      expect(plano(p)).toBe('Cuadre ✓ cierra (diferencia $ 0,00 · US$ 0,00). Cierra en las dos monedas.')
+      expect([...p.matchAll(/<button[^>]*aria-controls/g)]).toHaveLength(2)
+    } finally {
+      ajustar = (v) => v
+    }
+  })
+
+  it('si no cierra: "no cierra por" el monto, con signo, en pesos y en dólares', async () => {
+    hechos = hechosEjemplo()
+    ajustar = (v) => ({ ...v, cuadre: { ars_ok: false, usd_ok: true, detalle: 'Revisar.', diferencia: { ars: calc('1050000'), usd: calc('0') } } })
+    try {
+      expect(plano(cuadre(await pagina()))).toBe('Cuadre ≠ no cierra por +$ 1.050.000,00 · US$ 0,00. Revisar.')
+    } finally {
+      ajustar = (v) => v
+    }
+  })
+
+  it('sin diferencia (no verificable) no inventa un cero: solo el detalle', async () => {
+    hechos = hechosEjemplo()
+    ajustar = (v) => ({ ...v, cuadre: { ars_ok: null, usd_ok: null, detalle: 'No verificable: falta un valor.', diferencia: null } })
+    try {
+      expect(plano(cuadre(await pagina()))).toBe('Cuadre ○ No verificable: falta un valor.')
+    } finally {
+      ajustar = (v) => v
     }
   })
 })

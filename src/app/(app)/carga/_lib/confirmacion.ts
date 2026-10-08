@@ -122,6 +122,72 @@ export function cotizacionesDeExcel(hechos: Pick<Hechos, 'cotizaciones' | 'carga
   return out
 }
 
+/** JSON con las claves ordenadas: el mismo contenido da el mismo texto, venga en el orden que venga. */
+function canonico(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(canonico).join(',')}]`
+  if (v !== null && typeof v === 'object') {
+    const o = v as Record<string, unknown>
+    return `{${Object.keys(o)
+      .filter((k) => o[k] !== undefined)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${canonico(o[k])}`)
+      .join(',')}}`
+  }
+  return JSON.stringify(v ?? null)
+}
+
+/**
+ * Lo que identifica un Enter: lo que mandó el dueño (no lo que se arma contra
+ * la base, que en un reintento ya tiene lo grabado). Su sha256 es la huella
+ * que la base guarda con el lote: un reintento trae la misma; el mismo lote
+ * con otra elección, otra fuente u otro tipo de cambio, otra.
+ */
+export function textoHuella(x: {
+  fecha: Fecha
+  ccl: string | null
+  cripto: string | null
+  referencia: string | null
+  nota: string | null
+  fuentes: readonly { cuenta: NombreCuenta; firma: string }[]
+  ediciones: unknown
+  elecciones: unknown
+}): string {
+  return canonico({ v: 1, ...x, fuentes: [...x.fuentes].sort((a, b) => (a.cuenta < b.cuenta ? -1 : a.cuenta > b.cuenta ? 1 : 0)) })
+}
+
+/**
+ * "Ya estaba guardado": lo que de verdad quedó en la base para las cargas de
+ * un lote (no lo que se volvería a armar ahora). Cuenta los hechos que siguen
+ * siendo de cada carga.
+ */
+export function resumenDeLote(
+  hechos: Pick<Hechos, 'cuentas' | 'cotizaciones' | 'saldos' | 'operaciones' | 'tipos_cambio'>,
+  cargas: readonly { id: number; cuenta_id: number | null; listado_completo: boolean }[],
+): ResumenGuardado {
+  const cuentas: ResumenCuenta[] = []
+  const tipo_cambio = { ccl: false, cripto: false }
+  let total = 0
+  for (const c of cargas) {
+    if (c.cuenta_id === null) {
+      const tc = hechos.tipos_cambio.find((t) => t.carga_id === c.id)
+      tipo_cambio.ccl ||= Boolean(tc?.ccl)
+      tipo_cambio.cripto ||= Boolean(tc?.cripto_venta)
+      continue
+    }
+    const nombre = hechos.cuentas.find((x) => x.id === c.cuenta_id)?.nombre
+    if (!nombre) continue
+    const n = {
+      cotizaciones: hechos.cotizaciones.filter((x) => x.carga_id === c.id).length,
+      saldos: hechos.saldos.filter((x) => x.carga_id === c.id).length,
+      operaciones: hechos.operaciones.filter((x) => x.carga_id === c.id).length,
+    }
+    cuentas.push({ cuenta: nombre as NombreCuenta, ...n, precios_completados: 0, pendientes: 0, listado_completo: c.listado_completo })
+    total += n.cotizaciones + n.saldos + n.operaciones
+  }
+  total += Number(tipo_cambio.ccl) + Number(tipo_cambio.cripto)
+  return { cuentas, tipo_cambio, total, pendientes: 0 }
+}
+
 export function armarConfirmacion(e: EntradaConfirmacion): ResultadoArmado {
   const errores: string[] = []
   const referencia = e.tc.referencia?.trim() ? e.tc.referencia.trim().slice(0, 200) : null

@@ -7,7 +7,7 @@ import { vistaExposicion } from '@/lib/vistas'
 import type { Segmento, VistaExposicion } from '@/lib/vistas/contratos'
 import { porSubaDeCcl } from '@/components/calculos'
 import { ErrorVista } from '@/components/error-vista'
-import { Monto, MontoTrazado, Porcentaje } from '@/components/monto'
+import { Monto, MontoTrazado, Porcentaje, TextoConMontos } from '@/components/monto'
 import { Traza } from '@/components/traza'
 import { Aviso, ParMonto, Rotulo, Tarjeta } from '@/components/ui'
 
@@ -128,7 +128,12 @@ function FraseExposicion({ v, pesosUsd, sensPesos }: { v: VistaExposicion; pesos
         <p className="text-[15px] leading-7 md:text-base">
           <span className="font-semibold">{v.vista === 'total' ? 'Total' : 'Neto'}: </span>
           <MontoTrazado calc={r.neto_ars} moneda="ARS" titulo="Exposición neta al peso" />
-          {r.neto_ars.motivo ? <span className="text-muted"> · {r.neto_ars.motivo}</span> : null}
+          {r.neto_ars.motivo ? (
+            <span className="text-muted">
+              {' · '}
+              <TextoConMontos texto={r.neto_ars.motivo} />
+            </span>
+          ) : null}
         </p>
       </div>
     )

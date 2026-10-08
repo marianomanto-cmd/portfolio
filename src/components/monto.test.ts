@@ -37,4 +37,8 @@ describe('TextoConMontos: los montos de un texto armado se ocultan en modo priva
   it('un texto sin montos queda igual', () => {
     expect(renderToStaticMarkup(h(TextoConMontos, { texto: 'Falta la valuación de la camioneta.' }))).toBe('Falta la valuación de la camioneta.')
   })
+  it('el punto que cierra la oración no es parte del monto', () => {
+    const html = renderToStaticMarkup(h(TextoConMontos, { texto: 'Suma parcial sin ellas: $ 32.783.100,00. Y de tus US$ 4.200.' }))
+    expect([...html.matchAll(/<span[^>]*>([^<]*)<\/span>/g)].map((m) => m[1])).toEqual(['$ 32.783.100,00', 'US$ 4.200'])
+  })
 })

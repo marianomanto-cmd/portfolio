@@ -359,10 +359,10 @@ export function portafolioApendiceB(): PortafolioIEB {
       {
         titulo: 'Otros',
         escala: '1',
-        posiciones: [{ especie: 'DOLARUSA - DOLARES USA ESP 7000', moneda: 'USD', cantidad: '17.8', precio: '1540', ppp: null }],
+        posiciones: [{ especie: 'DOLARUSA - DOLARES USA ESP 7000', moneda: 'USD', cantidad: '23.4', precio: '1540', ppp: null }],
       },
     ],
-    // US$ 4.200 = 4.182,20 de saldo + 17,80 de DOLARUSA; pesos: −185.000.
-    saldos: { ars: { hoy: '-185000' }, usd: { hoy: '4182.2' } },
+    // US$ 4.200 = 4.176,60 de saldo + 23,40 de DOLARUSA; pesos: −185.000 (inventados, D-24).
+    saldos: { ars: { hoy: '-185000' }, usd: { hoy: '4176.6' } },
   }
 }

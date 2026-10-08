@@ -897,6 +897,7 @@ function armarFilaGalicia(
     precio_unitario: precioUnit ? precioUnit.toFixed() : null,
     valorizado: valorDe(v.valorizado),
     ppc_mostrado: valorDe(v.ppc),
+    rendimiento: valorDe(v.rendimiento_monto),
     ppc_unitario: !aritFallo && ev.ppc?.ppc.valor ? ev.ppc.ppc.valor.toFixed() : null,
     costo_total: !aritFallo && ev.ppc?.costo.valor ? ev.ppc.costo.valor.toFixed() : null,
     liquidacion: null,

@@ -2,7 +2,7 @@ import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import type { CalcVista } from '@/lib/domain/calc'
 import { Decimal } from '@/lib/domain/dinero'
-import { aDolares, compararCifras, decimalesPrecio, diasEnPosicion, fraccionDe, parcialDeTotal, porSubaDeCcl, restoMayor, sumaColumna } from './calculos'
+import { aDolares, compararCifras, decimalesInsumo, decimalesPrecio, diasEnPosicion, fraccionDe, parcialDeTotal, porSubaDeCcl, restoMayor, sumaColumna } from './calculos'
 
 const c = (valor: string | null, motivo?: string): CalcVista => ({ valor, motivo, formula: valor ?? 'sin dato', insumos: [], etiquetas: [] })
 
@@ -126,5 +126,21 @@ describe('diasEnPosicion (Cartera)', () => {
   it('sin fecha de inicio, sin dato (nunca cero)', () => {
     expect(diasEnPosicion(null, null).valor).toBeNull()
     expect(diasEnPosicion(3, null).valor).toBeNull()
+  })
+})
+
+describe('decimalesInsumo (traza)', () => {
+  it('un precio se ve con sus decimales, como en la fórmula', () => {
+    expect(decimalesInsumo('1.124')).toBe(3)
+    expect(decimalesInsumo('1.0852')).toBe(4)
+    expect(decimalesInsumo('0.000694')).toBe(6)
+    expect(decimalesInsumo('4.62')).toBe(2)
+  })
+  it('un monto, al centavo; nunca menos de 2', () => {
+    expect(decimalesInsumo('10116000')).toBe(2)
+    expect(decimalesInsumo('10116000.5')).toBe(2)
+    expect(decimalesInsumo('52345.678901234')).toBe(2)
+    expect(decimalesInsumo('23.456789123')).toBe(4)
+    expect(decimalesInsumo(null)).toBe(2)
   })
 })

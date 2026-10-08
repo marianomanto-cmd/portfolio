@@ -143,8 +143,10 @@ export interface FilaCartera {
    * (decisión E, D-35): suma de los intervalos entre cargas desde la primera
    * observación fresca, más un intervalo por lote antes de ella al CCL de
    * compra. sin_atribuir es lo pendiente hoy (partida sin precio o CCL nuevo).
-   * activo + tc + sin_atribuir = resultado, salvo que haya habido ventas desde
-   * la primera observación: entonces incluye lo realizado (la traza lo dice).
+   * Es el de la tenencia vigente: cada venta deja lo acumulado × cantidad
+   * después ÷ cantidad antes (como el costo) y las rentas no entran (D-114),
+   * así que activo + tc + sin_atribuir = resultado. Si el resultado es "sin
+   * dato", sus partes también, con el mismo motivo.
    */
   desglose: { moneda: Moneda; activo: CalcVista; tc: CalcVista; sin_atribuir: CalcVista } | null
   peso: CalcVista
@@ -222,6 +224,19 @@ export interface FilaRegistro {
   cotizaciones: number
   saldos: number
   operaciones: number
+  /**
+   * Lo que grabó un guardado de Datos (D-111, D-04): valuaciones de bienes,
+   * capitales pendientes y movimientos de capital. 0 en las demás cargas.
+   */
+  valuaciones?: number
+  capitales?: number
+  movimientos?: number
+  /**
+   * Qué grabó un guardado de Datos, en palabras: "valuación de Casa · aporte a
+   * Mercado Pago". null en las demás cargas. Su `cuenta` es "Datos" (no "Tipo
+   * de cambio": esa es la carga del CCL y el cripto, lector "tipeado").
+   */
+  detalle?: string | null
   tiempo_activo_ms: number | null
 }
 

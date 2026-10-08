@@ -3,16 +3,24 @@
 // Server Actions de Cargar. Cada una verifica la sesión primero: el proxy es
 // solo la primera barrera (D-21).
 
+import { createHash } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { cclDelDia, proponerCarga } from '@/lib/carga/conciliar'
 import type { LecturaCuenta, PropuestaCarga, ResultadoConfirmacion } from '@/lib/carga/contratos'
 import { dec } from '@/lib/domain/dinero'
-import { confirmarCarga, crearActivo, revertirLote } from '@/lib/server/escritura'
+import { confirmarCarga, crearActivo, leerLote, revertirLote } from '@/lib/server/escritura'
 import { exigirSesion } from '@/lib/server/sesion'
 import { esquemaActivo, leerFormulario } from '../datos/_lib/esquemas'
 import type { Elecciones } from './_lib/bandeja'
-import { armarConfirmacion, cotizacionesDeExcel, type ArchivoGuardado, type ResumenGuardado } from './_lib/confirmacion'
+import {
+  armarConfirmacion,
+  cotizacionesDeExcel,
+  resumenDeLote,
+  textoHuella,
+  type ArchivoGuardado,
+  type ResumenGuardado,
+} from './_lib/confirmacion'
 import type { ActivoLocal } from './_lib/demo'
 import { aplicarEdiciones, sinCruda, type Ediciones } from './_lib/ediciones'
 import { catalogoEjemplo, lecturaGaliciaDosLecturasEjemplo, lecturaIEBEjemplo, lecturaMPEjemplo } from './_lib/ejemplos'
@@ -105,6 +113,39 @@ export async function guardar(e: EntradaGuardar): Promise<ResultadoGuardar> {
       }
     }
     const { hechos, modo } = await hechosParaCarga(e.activosLocales ?? [])
+    // Huella de este Enter: lo que mandaste, no lo que se arma contra la base.
+    const huella = createHash('sha256')
+      .update(
+        textoHuella({
+          fecha: e.fecha,
+          ccl: e.ccl,
+          cripto: e.cripto,
+          referencia: base.data.referencia,
+          nota: e.nota,
+          fuentes: e.fuentes.map((f) => ({ cuenta: f.lectura.cuenta, firma: f.firma })),
+          ediciones: e.ediciones ?? {},
+          elecciones: e.elecciones,
+        }),
+      )
+      .digest('hex')
+    if (modo === 'real' && hechos.cargas.some((c) => c.lote === e.lote)) {
+      // Este lote ya está en la base: el Enter anterior grabó y su respuesta se
+      // perdió. No se vuelve a armar (la base ya tiene lo grabado): se muestra lo
+      // que de verdad quedó. Si cambiaste algo después, no se dice "guardado".
+      const previo = await leerLote(e.lote)
+      if (previo.huella !== null && previo.huella !== huella) {
+        return {
+          ok: false,
+          errores: ['Ese lote ya se guardó con otro contenido: lo que cambiaste después no se grabó. Tocá «Nueva carga» y volvé a armarla.'],
+        }
+      }
+      return {
+        ok: true,
+        modo,
+        resumen: resumenDeLote(hechos, previo.cargas),
+        resultado: { lote: e.lote, cargas: previo.cargas.map((c) => ({ carga_id: c.id, cuenta_id: c.cuenta_id })), repetido: true },
+      }
+    }
     const lecturas = e.fuentes.map((f) => f.lectura)
     // La propuesta se vuelve a armar acá, contra la base de este momento.
     const propuesta = proponerCarga(aplicarEdiciones(lecturas, e.ediciones ?? {}), hechos, e.fecha, { ccl: dec(e.ccl) })
@@ -128,7 +169,7 @@ export async function guardar(e: EntradaGuardar): Promise<ResultadoGuardar> {
     })
     if (!armado.ok) return { ok: false, errores: armado.errores }
     if (modo !== 'real') return { ok: true, modo, resumen: armado.resumen, resultado: null }
-    const resultado = await confirmarCarga(armado.confirmacion)
+    const resultado = await confirmarCarga({ ...armado.confirmacion, huella })
     revalidatePath('/', 'layout')
     return { ok: true, modo, resumen: armado.resumen, resultado }
   } catch (err) {

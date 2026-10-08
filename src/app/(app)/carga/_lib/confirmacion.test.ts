@@ -3,7 +3,7 @@ import { Decimal } from '@/lib/domain/dinero'
 import { proponerCarga } from '@/lib/carga/conciliar'
 import type { LecturaCuenta } from '@/lib/carga/contratos'
 import { SIN_ELECCIONES, claveAusente, huellaFila, huellaSaldo, type Elecciones, type RegistroAusente } from './bandeja'
-import { armarConfirmacion, cotizacionesDeExcel, type EntradaConfirmacion } from './confirmacion'
+import { armarConfirmacion, cotizacionesDeExcel, resumenDeLote, textoHuella, type EntradaConfirmacion } from './confirmacion'
 import { aplicarEdiciones, type Ediciones } from './ediciones'
 import { CUENTAS_SIN_BASE, hechosSinBase } from './demo'
 import { catalogoEjemplo, lecturaGaliciaEjemplo, lecturaIEBEjemplo, lecturaMPEjemplo } from './ejemplos'
@@ -435,5 +435,65 @@ describe('un precio por activo y por día, también entre lotes: una captura no 
     const l = lecturaIEBEjemplo(FECHA)
     const r = armarConfirmacion({ ...entrada([l]), cotizaciones_excel: [{ activo_id: -3, precio_pesos: '1.12', cuenta: 'IEB' }] })
     expect(r.ok && r.confirmacion.cuentas[0].cotizaciones).toContainEqual({ activo_id: -3, precio_pesos: '1.124' })
+  })
+})
+
+describe('reintento del mismo Enter: huella y lo que de verdad quedó grabado', () => {
+  const pedido = (cambios: Partial<Parameters<typeof textoHuella>[0]> = {}) =>
+    textoHuella({
+      fecha: FECHA,
+      ccl: '1548.2',
+      cripto: '1541',
+      referencia: null,
+      nota: null,
+      fuentes: [
+        { cuenta: 'IEB', firma: 'f1' },
+        { cuenta: 'Mercado Pago', firma: 'f2' },
+      ],
+      ediciones: {},
+      elecciones: { filas: {}, saldos: { 'Mercado Pago:saldo:ARS': { resolucion: 'aceptada', monto: '4912300', motivo: 'm', huella: 'h' } }, ausentes: {} },
+      ...cambios,
+    })
+
+  it('la huella no depende del orden de las claves ni de las fuentes; cambia si cambia una elección', () => {
+    const otroOrden = pedido({
+      fuentes: [
+        { cuenta: 'Mercado Pago', firma: 'f2' },
+        { cuenta: 'IEB', firma: 'f1' },
+      ],
+      elecciones: { ausentes: {}, saldos: { 'Mercado Pago:saldo:ARS': { huella: 'h', motivo: 'm', monto: '4912300', resolucion: 'aceptada' } }, filas: {} },
+    })
+    expect(otroOrden).toBe(pedido())
+    expect(pedido({ elecciones: { filas: {}, saldos: { 'Mercado Pago:saldo:ARS': { resolucion: 'aceptada', monto: '4912800', motivo: 'm', huella: 'h' } }, ausentes: {} } })).not.toBe(pedido())
+    expect(pedido({ ccl: '1549' })).not.toBe(pedido())
+    expect(pedido({ fuentes: [{ cuenta: 'IEB', firma: 'f1' }] })).not.toBe(pedido())
+  })
+
+  it('resumenDeLote cuenta los hechos que la base tiene de cada carga del lote (no lo que se volvería a armar)', () => {
+    const hechos = hechosSinBase(catalogoEjemplo())
+    const D = (x: string) => new Decimal(x)
+    hechos.tipos_cambio.push({ fecha: FECHA, ccl: D('1548.2'), mep: null, cripto_venta: null, oficial: null, carga_id: 10 })
+    hechos.cotizaciones.push(
+      { fecha: FECHA, activo_id: -1, precio_pesos: D('35150'), precio_usd_subyacente: null, carga_id: 11 },
+      { fecha: FECHA, activo_id: -2, precio_pesos: D('52300'), precio_usd_subyacente: null, carga_id: 11 },
+      { fecha: FECHA, activo_id: -3, precio_pesos: D('1.124'), precio_usd_subyacente: null, carga_id: 99 },
+    )
+    hechos.saldos.push({ fecha: FECHA, cuenta_id: 1, moneda: 'ARS', monto: D('-185000'), carga_id: 11 })
+    const op = { fecha: FECHA, fecha_origen: null, cuenta_id: 1, moneda: 'ARS' as const, importe: null, comisiones: D('0'), ccl_del_dia: null, carga_id: 11, notas: null }
+    hechos.operaciones.push(
+      { ...op, id: 1, activo_id: -1, tipo: 'apertura', cantidad: D('1240'), precio: D('30145.16') },
+      { ...op, id: 2, activo_id: -2, tipo: 'apertura', cantidad: D('300'), precio: D('48200') },
+      { ...op, id: 3, activo_id: -3, tipo: 'apertura', cantidad: D('9000000'), precio: D('1.0976') },
+    )
+    const r = resumenDeLote(hechos, [
+      { id: 10, cuenta_id: null, listado_completo: true },
+      { id: 11, cuenta_id: 1, listado_completo: false },
+    ])
+    expect(r).toEqual({
+      cuentas: [{ cuenta: 'IEB', cotizaciones: 2, saldos: 1, operaciones: 3, precios_completados: 0, pendientes: 0, listado_completo: false }],
+      tipo_cambio: { ccl: true, cripto: false },
+      total: 7,
+      pendientes: 0,
+    })
   })
 })

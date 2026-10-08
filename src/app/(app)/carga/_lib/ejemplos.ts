@@ -68,7 +68,7 @@ export function lecturaGaliciaEjemplo(): LecturaCuenta {
     fecha_reporte: null,
     filas: [
       fila({ clave: 'Galicia:S13N6', ticker: 'S13N6', nombre: 'LECAP S13N6', tipo_sugerido: 'lecap', cantidad: '11500000', precio_unitario: '1.0852', valorizado: '12479800', ppc_mostrado: '1.04', ppc_unitario: '1.0426', costo_total: '11989900' }),
-      fila({ clave: 'Galicia:FIMA', ticker: 'FIMA', nombre: 'FIMA Premium clase A', tipo_sugerido: 'fci', cantidad: '1250000', precio_unitario: '4.812', valorizado: '6015000', ppc_mostrado: '4.62', ppc_unitario: '4.62', costo_total: '5775000' }),
+      fila({ clave: 'Galicia:FIMA-PREMIUM-CLASE-A', ticker: 'FIMA-PREMIUM-CLASE-A', nombre: 'FIMA Premium clase A', tipo_sugerido: 'fci', cantidad: '1250000', precio_unitario: '4.812', valorizado: '6015000', ppc_mostrado: '4.62', ppc_unitario: '4.62', costo_total: '5775000' }),
     ],
     saldos: [],
     controles: [{ tipo: 'galicia_total', seccion: null, informado: '18494800', calculado: '18494800', ok: true, detalle: null }],

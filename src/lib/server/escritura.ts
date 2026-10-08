@@ -118,6 +118,36 @@ export async function confirmarCarga(c: ConfirmacionCarga): Promise<ResultadoCon
 }
 
 /**
+ * Las cargas (no revertidas) de un lote y la huella con la que se confirmó: para
+ * reconocer un reintento del mismo Enter (la respuesta anterior se perdió) sin
+ * volver a armarlo contra una base que ya lo tiene.
+ */
+export async function leerLote(lote: string): Promise<{ huella: string | null; cargas: { id: number; cuenta_id: number | null; listado_completo: boolean }[] }> {
+  const l = loteValido(lote)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase() as any
+  const { data, error } = await db
+    .from('cargas')
+    .select('id,cuenta_id,listado_completo,huella:grabado->>huella')
+    .eq('lote', l)
+    .neq('estado', 'revertida')
+    .order('id', { ascending: true })
+  if (error) throw traducirErrorBase(error, 'leer el lote')
+  const filas: unknown[] = Array.isArray(data) ? data : []
+  let huella: string | null = null
+  const cargas: { id: number; cuenta_id: number | null; listado_completo: boolean }[] = []
+  for (const f of filas) {
+    if (!esObjeto(f)) throw respuestaInesperada('leer el lote', 'una carga sin forma')
+    const id = enteroPositivo(f.id)
+    if (id === null) throw respuestaInesperada('leer el lote', 'una carga sin id')
+    const cuenta_id = f.cuenta_id === null ? null : enteroPositivo(f.cuenta_id)
+    cargas.push({ id, cuenta_id, listado_completo: f.listado_completo !== false })
+    if (huella === null && typeof f.huella === 'string' && RE_SHA256.test(f.huella)) huella = f.huella
+  }
+  return { huella, cargas }
+}
+
+/**
  * Revierte todas las cargas de un lote: borra sus hechos, restaura desde la
  * auditoría lo que habían pisado y las deja en el registro como revertidas.
  * Se niega si alguna cuenta del lote tiene una carga posterior.
@@ -902,6 +932,8 @@ export function normalizarConfirmacion(c: ConfirmacionCarga): ConfirmacionCarga 
   if (tipo_cambio === null && cuentas.length === 0) {
     throw new ErrorEscritura('No hay nada para grabar: falta el tipo de cambio y no hay ninguna cuenta.')
   }
+  const huella = c.huella === null || c.huella === undefined ? null : typeof c.huella === 'string' ? c.huella.trim().toLowerCase() : ''
+  if (huella !== null && !RE_SHA256.test(huella)) throw new ErrorEscritura('La huella de la carga no es válida.')
   return {
     lote,
     fecha,
@@ -909,6 +941,7 @@ export function normalizarConfirmacion(c: ConfirmacionCarga): ConfirmacionCarga 
     cuentas,
     tiempo_activo_ms: tiempoActivo(c.tiempo_activo_ms),
     nota: textoOpcional(c.nota, 'la nota del día'),
+    ...(huella ? { huella } : {}),
   }
 }
 

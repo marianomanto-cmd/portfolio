@@ -15,6 +15,8 @@ import { carpetaCapturas, esperarHidratacion, revisarAxe, revisarLayout, sinIndi
 interface Pantalla {
   ruta: string
   nombre: string
+  /** El código que tiene que responder, si no es 200 (la página de "no encontrada"). */
+  estado?: number
 }
 
 const PANTALLAS: Pantalla[] = [
@@ -34,6 +36,7 @@ const PANTALLAS: Pantalla[] = [
   { ruta: '/datos/bienes', nombre: 'datos-bienes' },
   { ruta: '/datos/leasing', nombre: 'datos-leasing' },
   { ruta: '/datos/movimientos', nombre: 'datos-movimientos' },
+  { ruta: '/no-existe', nombre: 'no-encontrada', estado: 404 },
 ]
 
 const ANCHOS = [360, 390, 412, 768, 1024, 1279, 1280, 1600, 2560]
@@ -51,7 +54,7 @@ function alto(ancho: number): number {
 async function abrir(page: Page, p: Pantalla): Promise<{ status: number; hidrato: boolean }> {
   const r = await page.goto(p.ruta, { waitUntil: 'load' })
   const status = r?.status() ?? 0
-  if (status >= 400) return { status, hidrato: false }
+  if (status >= 400 && status !== p.estado) return { status, hidrato: false }
   const hidrato = await esperarHidratacion(page)
   await sinIndicadorDev(page)
   return { status, hidrato }
@@ -76,8 +79,8 @@ async function recorrer(browser: Browser, ancho: number, tema: 'light' | 'dark',
   for (const p of PANTALLAS) {
     errores.length = 0
     const { status, hidrato } = await abrir(page, p)
-    if (status === 404 || status >= 500) {
-      problemas.push(`${p.ruta} respondió ${status}`)
+    if (p.estado ? status !== p.estado : status === 404 || status >= 500) {
+      problemas.push(`${p.ruta} respondió ${status}${p.estado ? ` y tenía que responder ${p.estado}` : ''}`)
       continue
     }
     // En desarrollo, un cambio de otro archivo puede recargar la página a
@@ -87,6 +90,9 @@ async function recorrer(browser: Browser, ancho: number, tema: 'light' | 'dark',
       if (!hidrato) r.push('no hidrató (¿error de JavaScript?)')
       r.push(...errores)
       r.push(...(await revisarLayout(page, grueso)))
+      // Un h1 por pantalla (aunque sea solo para el lector de pantalla).
+      const h1 = await page.locator('h1').count()
+      if (h1 !== 1) r.push(`tiene ${h1} h1 y tiene que tener uno`)
       if (revision) r.push(...(await revisarAxe(page)))
       return r
     }

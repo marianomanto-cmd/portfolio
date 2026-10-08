@@ -273,6 +273,21 @@ test.describe('desktop (1280 × 900)', () => {
     await expect(page.getByRole('status').first()).toContainText('Modo demo')
   })
 
+  test('una dirección que no existe: 404 en español, dentro del marco de la app y con salida', async ({ page }) => {
+    for (const ruta of ['/no-existe', '/cartera/no-existe']) {
+      const r = await page.goto(ruta)
+      expect(r?.status(), ruta).toBe(404)
+      expect(await esperarHidratacion(page), ruta).toBe(true)
+      await expect(page).toHaveTitle('No encontré esa página · Portfolio')
+      await expect(page.getByRole('heading', { level: 1, name: 'No encontré esa página' })).toBeVisible()
+      await expect(page.getByText(/could not be found/i)).toHaveCount(0)
+      // El marco: la barra lateral con sus secciones y la barra superior.
+      await expect(page.getByRole('link', { name: 'Cartera', exact: true }).first()).toBeVisible()
+      await expect(page.getByRole('button', { name: /Ocultar los montos/ })).toBeVisible()
+      await expect(page.getByRole('link', { name: 'Ir a Hoy' })).toHaveAttribute('href', '/')
+    }
+  })
+
   test('Día cero: dice qué hacer y lleva a Cargar y a Datos', async ({ page }) => {
     await page.goto('/?demo=vacio')
     expect(await esperarHidratacion(page)).toBe(true)

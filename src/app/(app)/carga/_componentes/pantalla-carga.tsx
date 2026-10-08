@@ -507,6 +507,15 @@ export function PantallaCarga({ contexto }: { contexto: ContextoCarga }) {
                   ))}
                 </ul>
               ) : null}
+              {r.sin_grabar?.length ? (
+                <ul className="text-sm text-muted">
+                  {r.sin_grabar.map((c) => (
+                    <li key={c.cuenta}>
+                      {c.cuenta}: no se grabó nada ({plural(c.pendientes, 'pendiente', 'pendientes')}). Lo que ya tenía del día sigue como estaba.
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
               {guardado.error ? (
                 <p role="alert" className="text-sm text-negative">
                   {guardado.error}
@@ -685,6 +694,18 @@ export function PantallaCarga({ contexto }: { contexto: ContextoCarga }) {
               {erroresGuardar.map((e) => (
                 <p key={e}>{e}</p>
               ))}
+              {/* Si no sabés si se guardó (se cortó la conexión) o el lote ya se usó: mirá el Registro o empezá de nuevo. */}
+              <div className="flex flex-wrap gap-2 pt-1 [&>*]:max-sm:flex-1">
+                <Link
+                  href="/registro"
+                  className="tocable inline-flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface px-3 text-sm font-medium text-text lg:min-h-9"
+                >
+                  Ver Registro
+                </Link>
+                <Boton variante="fantasma" onClick={nuevaCarga}>
+                  Nueva carga
+                </Boton>
+              </div>
             </div>
           ) : null}
         </div>

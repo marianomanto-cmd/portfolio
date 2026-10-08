@@ -2,7 +2,7 @@
 // se testean sin base de datos. src/lib/vistas/index.ts las llama con los
 // hechos leídos de Supabase.
 
-import { calc, deCalc, sinDato, vista, type Calc, type CalcVista, type Etiqueta, type Insumo } from '@/lib/domain/calc'
+import { calc, deCalc, sinDato, vista, type Calc, type CalcVista, type Insumo } from '@/lib/domain/calc'
 import { CERO, Decimal, monto, numero, porcentaje } from '@/lib/domain/dinero'
 import { conjuntoFeriados, diaSemana, diasEntre, diasHabilesEntre, esHabil, esViejo, fechaCorta } from '@/lib/domain/fechas'
 import { financieros, foto, indexar, sumaCalc, type Foto, type ItemFoto } from '@/lib/domain/foto'
@@ -12,6 +12,7 @@ import {
   EXPLICACION_INFERIDO,
   cuadre,
   desgloseDesdeCompra,
+  detalleContribucion,
   faltantesEnVista,
   fechasDeCarga,
   parteCalc,
@@ -24,6 +25,7 @@ import {
 import type {
   ExposicionResumen,
   FilaCartera,
+  FilaRegistro,
   FraseDelDia,
   Fuente,
   MovimientoActivo,
@@ -36,6 +38,7 @@ import type {
   VistaCartera,
   VistaExposicion,
   VistaHoy,
+  VistaRegistro,
 } from './contratos'
 
 export { fechasDeCarga }
@@ -74,6 +77,22 @@ const EXPL_FIN = {
 const EXPL_TOT = {
   ARS: 'Patrimonio financiero + bienes (casa, auto) − deudas (capital pendiente del leasing), en pesos.',
   USD: 'Patrimonio financiero + bienes (casa, auto) − deudas (capital pendiente del leasing), en dólares.',
+}
+
+const SIN_LEASING = 'Todavía no cargaste el leasing: lo cargás en Datos › Leasing.'
+
+/**
+ * Lo que el patrimonio total necesita y todavía no cargaste (D-03): sin eso,
+ * el total es "sin dato" con la suma parcial a la vista (D-65), nunca el
+ * financiero presentado como total ni una deuda de $ 0.
+ */
+function faltanParaElTotal(h: Hechos): { nombre: string; calc: Calc }[] {
+  const out: { nombre: string; calc: Calc }[] = []
+  // Un bien dado de baja (activo_bool = false) se cargó: sin bienes activos, el total es el financiero − deudas.
+  if (h.bienes.length === 0)
+    out.push({ nombre: 'Tus bienes (casa, auto)', calc: sinDato('Todavía no cargaste tus bienes (casa, auto): los cargás en Datos › Bienes.') })
+  if (h.pasivos.length === 0) out.push({ nombre: 'Capital pendiente del leasing', calc: sinDato(SIN_LEASING) })
+  return out
 }
 
 // ───────────── Hoy ─────────────
@@ -129,9 +148,33 @@ function tarjeta(titulo: string, f1: Foto | null, v: Variacion | null, h: Hechos
   if (!f1) return { titulo, valor: par(vacio, vacio), variacion: null, variacion_pct: null, desglose: null, notas: [] }
   const items = itemsVista(f1, vistaSel)
   const expl = vistaSel === 'financiero' ? EXPL_FIN : EXPL_TOT
-  const valorArs = sumaItems(items, 'ARS', expl.ARS)
-  const valorUsd = sumaItems(items, 'USD', expl.USD)
+  const faltan = vistaSel === 'total' ? faltanParaElTotal(h) : []
+  const suma = (m: Moneda) => sumaCalc([...items.map((i) => ({ nombre: i.nombre, calc: m === 'ARS' ? i.valor_ars : i.valor_usd })), ...faltan], m, expl[m])
+  const valorArs = suma('ARS')
+  const valorUsd = suma('USD')
   if (!v) return { titulo, valor: par(valorArs, valorUsd), variacion: null, variacion_pct: null, desglose: null, notas: [] }
+  if (faltan.length) {
+    // Sin los bienes o el leasing no hay total, y tampoco su variación: la de
+    // lo que sí cargaste queda a la vista como suma parcial.
+    const parcial = (m: Moneda): Calc => {
+      const c = parteCalc(v, h, vistaSel, 'resultado', m)
+      return sinDato(
+        `${faltan.map((x) => x.calc.motivo).join(' ')} Sin eso no hay variación del patrimonio total.${c.valor === null ? '' : ` La de lo que sí cargaste: ${monto(c.valor, m, { decimales: 2, signo: true })}.`}`,
+        [deCalc('Variación de lo que cargaste', c, m), ...faltan.map((x) => deCalc(x.nombre, x.calc, m))],
+        { etiquetas: ['parcial'], explicacion: c.explicacion },
+      )
+    }
+    const pa = parcial('ARS')
+    const pu = parcial('USD')
+    return {
+      titulo,
+      valor: par(valorArs, valorUsd),
+      variacion: par(pa, pu),
+      variacion_pct: { ars: vista(porcentajeCalc(pa, valorArs, 'ARS')), usd: vista(porcentajeCalc(pu, valorUsd, 'USD')) },
+      desglose: null,
+      notas: [],
+    }
+  }
   const resArs = parteCalc(v, h, vistaSel, 'resultado', 'ARS')
   const resUsd = parteCalc(v, h, vistaSel, 'resultado', 'USD')
   const base0 = foto(h, v.desde, { hoy })
@@ -319,17 +362,16 @@ function movimientos(v: Variacion): MovimientoActivo[] {
   return v.contribuciones
     .filter((c) => c.clase === 'posicion' || c.clase === 'saldo')
     .map((c) => {
-      const etiquetas: Etiqueta[] = c.inferido ? ['inferido'] : []
       const explicacion = `Lo que se movió ${c.nombre} en sí (sin el tipo de cambio${c.arrastrado ? '; sin precio o saldo nuevo no se atribuye' : ''}).${c.inferido ? ` Incluye una compra con ${EXPLICACION_INFERIDO}.` : ''}`
+      // La misma traza que la parte de esta partida en la frase: fórmula con
+      // valores e insumos (V0, V1, CCL, flujos), no solo el valor repetido.
+      const aporte = (m: Moneda): Calc => ({ ...detalleContribucion(c, 'activo', m, v), explicacion })
       return {
         orden: c.activo.ars.abs(),
         m: {
           clave: c.clave,
           nombre: c.nombre,
-          aporte: par(
-            calc(c.activo.ars, `activos de ${c.nombre} = ${monto(c.activo.ars, 'ARS', { decimales: 2, signo: true })}`, [], { etiquetas, explicacion }),
-            calc(c.activo.usd, `activos de ${c.nombre} = ${monto(c.activo.usd, 'USD', { decimales: 2, signo: true })}`, [], { etiquetas, explicacion }),
-          ),
+          aporte: par(aporte('ARS'), aporte('USD')),
           sin_precio_nuevo: c.arrastrado,
         },
       }
@@ -358,8 +400,12 @@ function resumenExposicion(f: Foto | null, vistaSel: Vista): ExposicionResumen {
   const deudas = f.items.filter((i) => i.clase === 'pasivo' && i.moneda_riesgo === 'ARS')
   const pesosC = sumaItems(pesos, 'ARS', 'Lo que arriesga pesos: bonos y letras en pesos, FCI y pesos en tus cuentas.')
   const deudaNeg = sumaItems(deudas, 'ARS', 'Deuda en pesos (capital pendiente informado), con signo negativo.')
-  const deudaC =
-    deudaNeg.valor === null
+  // Sin ningún pasivo cargado la deuda no es $ 0: es "sin dato" (D-03: hay un
+  // leasing). Con pasivos cargados pero ninguno en pesos, sí es $ 0.
+  const hayPasivos = f.items.some((i) => i.clase === 'pasivo')
+  const deudaC = !hayPasivos
+    ? sinDato(`${SIN_LEASING} Sin él no se sabe cuánto debés en pesos.`, [], { explicacion: 'Deuda en pesos a cuota fija: es una posición corta en pesos (spec §3).' })
+    : deudaNeg.valor === null
       ? deudaNeg
       : calc(deudaNeg.valor.negated(), `capital pendiente = ${monto(deudaNeg.valor.negated(), 'ARS', { decimales: 2 })}`, [deCalc('Deudas', deudaNeg, 'ARS')], {
           explicacion: 'Deuda en pesos a cuota fija: es una posición corta en pesos (spec §3).',
@@ -369,7 +415,13 @@ function resumenExposicion(f: Foto | null, vistaSel: Vista): ExposicionResumen {
   const deudaUsd = aDolares(deudaC, ccl, 'Deuda en pesos', 'Lo que debés en pesos, en dólares al CCL de la carga. Si el CCL sube, en dólares se achica (se licúa).')
   const netoParcial =
     pesosC.valor === null || deudaC.valor === null
-      ? sinDato('Falta un dato de pesos o de deuda.', [deCalc('Pesos', pesosC, 'ARS'), deCalc('Deuda', deudaC, 'ARS')])
+      ? sinDato(
+          pesosC.valor === null
+            ? (pesosC.motivo ?? 'Falta un dato de tus pesos.')
+            : `${deudaC.motivo ?? 'Falta la deuda en pesos.'} Suma parcial, sin la deuda: ${pesosC.valor.lt(0) ? 'corto' : 'largo'} ${monto(pesosC.valor.abs(), 'ARS', { decimales: 2 })}.`,
+          [deCalc('Pesos financieros', pesosC, 'ARS'), deCalc('Deuda en pesos', deudaC, 'ARS')],
+          { etiquetas: ['parcial'], explicacion: 'Tu exposición neta al peso: lo que tenés en pesos menos lo que debés en pesos. Positivo = largo en pesos.' },
+        )
       : calc(
           pesosC.valor.minus(deudaC.valor),
           `${monto(pesosC.valor, 'ARS', { decimales: 2 })} − ${monto(deudaC.valor, 'ARS', { decimales: 2 })} = ${monto(pesosC.valor.minus(deudaC.valor), 'ARS', { decimales: 2, signo: true })}`,
@@ -555,7 +607,8 @@ export function armarExposicion(h: Hechos, hoy: Fecha, modo: Vista): VistaExposi
     por_clase: segmentos(items, (i) => i.tipo, (k) => NOMBRE_CLASE[k] ?? k, (k) => COLOR_CLASE[k] ?? '#888', total),
     por_moneda: porMoneda,
     por_geografia: segmentos(items, (i) => i.geografia, (k) => NOMBRE_GEO[k] ?? k, (k) => COLOR_GEO[k] ?? '#888', total),
-    concentracion: { top1: vista(top(1)), top1_nombre: posiciones[0]?.nombre ?? null, top3: vista(top(3)) },
+    // Sin el total, la más grande de las conocidas puede no ser la más grande.
+    concentracion: { top1: vista(top(1)), top1_nombre: totalFin === null ? null : (posiciones[0]?.nombre ?? null), top3: vista(top(3)) },
     serie: serieExposicion(h, fechas.slice(-120), ix, hoy, modo),
   }
 }
@@ -655,8 +708,7 @@ function desgloseFila(i: ItemFoto, f: Foto, costoA: Calc, costoU: Calc, resA: Ca
     if (res.valor === null) return null
     const realizado = dc.resultado[k].minus(res.valor)
     const notaRealizado = realizado.abs().gt('1e-9') ? ` (incluye ${fm(realizado)} que no son de la tenencia vigente)` : ''
-    const conVentas = dc.tramos.some((t) => t.descripcion.includes('(venta del '))
-    const notaVigente = conVentas ? ' (solo la tenencia vigente: cada venta deja lo acumulado × cantidad después ÷ cantidad antes, como el costo)' : ''
+    const notaVigente = dc.ventas > 0 ? ' (solo la tenencia vigente: cada venta deja lo acumulado × cantidad después ÷ cantidad antes, como el costo)' : ''
     const parte = (sel: 'activo' | 'tc' | 'sin_atribuir', explicacion: string): CalcVista => {
       const tramos = dc.tramos.filter((t) => !t[sel][k].isZero())
       const pre = dc.tramos.filter((t) => t.tipo === 'compra').reduce((a, t) => a.plus(t[sel][k]), CERO)
@@ -840,7 +892,7 @@ function pendientes(h: Hechos, f: Foto | null, hoy: Fecha): Pendiente[] {
     if (i.clase === 'posicion' && i.precio.valor === null)
       out.push({ id: `sin-precio:${i.clave}`, gravedad: 'alta', titulo: `${i.ticker}: sin precio`, detalle: i.valor_ars.motivo ?? 'No hay un precio cargado para valuarlo.', accion: { etiqueta: 'Cargar', href: '/carga' } })
     else if (i.viejo && i.clase !== 'pasivo')
-      out.push({ id: `viejo:${i.clave}`, gravedad: 'media', titulo: `${i.ticker}: dato viejo`, detalle: `El último dato es del ${i.fecha_dato ? fechaCorta(i.fecha_dato) : '—'} (más de 2 días hábiles).`, accion: { etiqueta: 'Cargar', href: '/carga' } })
+      out.push({ id: `viejo:${i.clave}`, gravedad: 'media', titulo: `${i.clase === 'saldo' ? i.nombre : i.ticker}: dato viejo`, detalle: `El último dato es del ${i.fecha_dato ? fechaCorta(i.fecha_dato) : '—'} (más de 2 días hábiles).`, accion: { etiqueta: 'Cargar', href: '/carga' } })
     if (i.tenencia?.etiquetas.includes('pendiente'))
       out.push({ id: `pendiente:${i.clave}`, gravedad: 'media', titulo: `${i.ticker}: compra con precio pendiente`, detalle: `Se completa con el PPP de la próxima carga de IEB. Mientras tanto, el día usa el precio de mercado (${EXPLICACION_INFERIDO}).`, accion: null })
     else if (i.tenencia && i.tenencia.costo_usd === null && i.tenencia.apertura_sin_ccl)
@@ -878,6 +930,94 @@ function fuentes(h: Hechos, d1: Fecha | null, hoy: Fecha, feriados: Set<Fecha>):
   out.push({ nombre: 'Cripto', estado: !ultCri ? 'sin_carga' : esViejo(ultCri.fecha, hoy, feriados) ? 'viejo' : 'tipeado', fecha: ultCri?.fecha ?? null, carga_id: ultCri?.carga_id ?? null, detalle: ultCri ? `Tipeado el ${fechaCorta(ultCri.fecha)}` : null })
   void d1
   return out
+}
+
+// ───────────── Registro ─────────────
+
+type FilaDb = Record<string, string | number | boolean | null>
+
+/** Las filas que el Registro lee de la base (solo las columnas que usa). */
+export interface TablasRegistro {
+  /** id, lote, fecha, cuenta_id, origen, archivo_path, estado, creado_en, lector, tiempo_activo_ms */
+  cargas: FilaDb[]
+  /** id, nombre */
+  cuentas: FilaDb[]
+  /** carga_id de cotizaciones, saldos_liquidez y operaciones */
+  cotizaciones: FilaDb[]
+  saldos: FilaDb[]
+  operaciones: FilaDb[]
+  /** bienes_valuaciones: carga_id, bien_id */
+  valuaciones: FilaDb[]
+  /** pasivo_saldos: carga_id, pasivo_id */
+  capitales: FilaDb[]
+  /** movimientos_capital: carga_id, tipo, cuenta_origen_id, cuenta_destino_id */
+  movimientos: FilaDb[]
+  /** id, nombre de bienes y de pasivos */
+  bienes: FilaDb[]
+  pasivos: FilaDb[]
+}
+
+/**
+ * El Registro (manual §4.5): una fila por carga, con lo que grabó. Una carga
+ * sin cuenta es la del tipo de cambio (lector "tipeado") o un guardado de
+ * Datos (lector "manual"): este dice qué grabó (valuación, capital,
+ * movimiento), para no confundirlo con el CCL al revertir.
+ */
+export function armarRegistro(t: TablasRegistro): VistaRegistro {
+  const id = (x: string | number | boolean | null) => Number(x)
+  const nombre = new Map(t.cuentas.map((c) => [id(c.id), String(c.nombre)]))
+  const nombreBien = new Map(t.bienes.map((b) => [id(b.id), String(b.nombre)]))
+  const nombrePasivo = new Map(t.pasivos.map((p) => [id(p.id), String(p.nombre)]))
+  const cuenta = (x: string | number | boolean | null) => nombre.get(id(x)) ?? `la cuenta ${x}`
+  const contar = (filas: FilaDb[]) => {
+    const m = new Map<number, number>()
+    for (const f of filas) m.set(id(f.carga_id), (m.get(id(f.carga_id)) ?? 0) + 1)
+    return m
+  }
+  const [nCot, nSal, nOps, nVal, nCap, nMov] = [t.cotizaciones, t.saldos, t.operaciones, t.valuaciones, t.capitales, t.movimientos].map(contar)
+  const que = new Map<number, string[]>()
+  const anotar = (carga: number, texto: string) => {
+    const l = que.get(carga) ?? []
+    if (!l.includes(texto)) l.push(texto)
+    que.set(carga, l)
+  }
+  for (const v of t.valuaciones) anotar(id(v.carga_id), `valuación de ${nombreBien.get(id(v.bien_id)) ?? `el bien ${v.bien_id}`}`)
+  for (const c of t.capitales) anotar(id(c.carga_id), `capital pendiente de ${nombrePasivo.get(id(c.pasivo_id)) ?? `la deuda ${c.pasivo_id}`}`)
+  for (const m of t.movimientos)
+    anotar(
+      id(m.carga_id),
+      m.tipo === 'aporte'
+        ? `aporte a ${cuenta(m.cuenta_destino_id)}`
+        : m.tipo === 'retiro'
+          ? `retiro de ${cuenta(m.cuenta_origen_id)}`
+          : `transferencia de ${cuenta(m.cuenta_origen_id)} a ${cuenta(m.cuenta_destino_id)}`,
+    )
+  const filas: FilaRegistro[] = t.cargas
+    .map((c) => {
+      const cid = id(c.id)
+      const datos = c.cuenta_id === null && c.lector === 'manual'
+      return {
+        carga_id: cid,
+        lote: c.lote === null ? null : String(c.lote),
+        fecha: String(c.fecha),
+        creado_en: String(c.creado_en),
+        cuenta: c.cuenta_id === null ? (datos ? 'Datos' : 'Tipo de cambio') : (nombre.get(id(c.cuenta_id)) ?? `cuenta ${c.cuenta_id}`),
+        origen: c.origen as FilaRegistro['origen'],
+        estado: c.estado as FilaRegistro['estado'],
+        archivo_path: c.archivo_path === null ? null : String(c.archivo_path),
+        lector: c.lector === null ? null : String(c.lector),
+        cotizaciones: nCot.get(cid) ?? 0,
+        saldos: nSal.get(cid) ?? 0,
+        operaciones: nOps.get(cid) ?? 0,
+        valuaciones: nVal.get(cid) ?? 0,
+        capitales: nCap.get(cid) ?? 0,
+        movimientos: nMov.get(cid) ?? 0,
+        detalle: datos ? (que.get(cid)?.join(' · ') || null) : null,
+        tiempo_activo_ms: c.tiempo_activo_ms === null ? null : Number(c.tiempo_activo_ms),
+      }
+    })
+    .sort((a, b) => (a.creado_en < b.creado_en ? 1 : -1))
+  return { filas }
 }
 
 export type { CalcVista }

@@ -75,6 +75,13 @@ export interface FilaLeida {
   /** Campos en los que las dos lecturas de una captura no coinciden. */
   alternativas?: Alternativa[]
   /**
+   * Captura: el rendimiento $ leído, con su signo y en la moneda de la fuente
+   * (null si fue ilegible). Con él, una cantidad corregida a mano vuelve a dar
+   * el costo como lo arma el lector: (valorizado − rendimiento $) ÷ cantidad.
+   * Ausente en el Excel (el PPP del bróker no depende de la cantidad).
+   */
+  rendimiento?: string | null
+  /**
    * Moneda en la que la fuente muestra precio, valorizado y PPC. Ausente o
    * 'ARS': pesos. Galicia muestra en U$D la sección "Bonos en dólares"; la 1a
    * guarda precios en pesos, así que esa fila no se graba (queda en error).
@@ -209,6 +216,13 @@ export interface ConfirmacionCarga {
   tiempo_activo_ms: number | null
   /** Nota del día, si la hay (va a eventos tipo nota). */
   nota: string | null
+  /**
+   * Huella del pedido: sha256 (hex) de lo que el dueño mandó con el Enter
+   * (fuentes, elecciones, ediciones, tipos de cambio y nota). Un reintento del
+   * mismo Enter trae la misma; el mismo lote con otro contenido, otra, y la
+   * base lo rechaza en vez de decir "ya estaba guardado".
+   */
+  huella?: string | null
 }
 
 export interface ResultadoConfirmacion {

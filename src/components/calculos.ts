@@ -205,6 +205,18 @@ export function diasEnPosicion(dias: number | null, desde: 'compra' | 'declarada
   }
 }
 
+/**
+ * Decimales para mostrar un insumo en pesos o en dólares en la traza: los
+ * suyos (un precio de $ 1,124 por VN se ve entero, como en la fórmula), con
+ * un mínimo de 2 y el máximo de un precio de esa magnitud (decimalesPrecio).
+ * Un monto calculado de muchos decimales se ve al centavo.
+ */
+export function decimalesInsumo(v: string | null): number {
+  if (v === null) return 2
+  const exactos = new Decimal(v).decimalPlaces()
+  return Math.min(Math.max(exactos, 2), decimalesPrecio(v))
+}
+
 /** Decimales para mostrar un precio: los de bonos y letras por 1 VN necesitan más. */
 export function decimalesPrecio(v: string | null): number {
   if (v === null) return 2

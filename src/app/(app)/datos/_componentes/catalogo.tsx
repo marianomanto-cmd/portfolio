@@ -44,6 +44,7 @@ function FormActivo({ activo, ratios, hoy, onListo }: { activo: Activo | null; r
   return (
     <form key={activo ? 'editar' : estado.vez} onSubmit={accion} noValidate className="space-y-3" aria-label={activo ? `Editar ${activo.ticker}` : 'Nuevo activo'}>
       {activo ? <input type="hidden" name="id" value={activo.id} /> : null}
+      {activo ? <input type="hidden" name="tiene_ratio" value={historia.length ? '1' : ''} /> : null}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {activo ? (
           <div className="min-w-0 space-y-1">

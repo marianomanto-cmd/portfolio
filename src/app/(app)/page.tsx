@@ -461,11 +461,25 @@ function Excedente({ hoy }: { hoy: string }) {
 }
 
 function Cuadre({ v }: { v: VistaHoy }) {
-  const ok = v.cuadre.ars_ok && v.cuadre.usd_ok
-  const simbolo = v.cuadre.ars_ok === null ? '○' : ok ? '✓' : '≠'
+  const c = v.cuadre
+  const ok = Boolean(c.ars_ok && c.usd_ok)
+  const simbolo = c.ars_ok === null ? '○' : ok ? '✓' : '≠'
+  // Por cuánto cierra o no cierra, en las dos monedas y con su traza (D-66,
+  // visión §4.1: "Cuadre ✓ 0,00 en $ y en US$"). Sin diferencia (no
+  // verificable), solo el detalle: no se inventa un cero.
+  const d = c.diferencia
+  const cifras = d ? (
+    <>
+      <MontoTrazado calc={d.ars} moneda="ARS" titulo="Cuadre: diferencia en pesos" decimales={2} signo={!ok} />
+      {' · '}
+      <MontoTrazado calc={d.usd} moneda="USD" titulo="Cuadre: diferencia en dólares" decimales={2} signo={!ok} />
+    </>
+  ) : null
   return (
     <p className="px-1 text-[13px] text-muted">
-      <span className="font-medium text-text">Cuadre {simbolo}</span> {v.cuadre.detalle}
+      <span className="font-medium text-text">Cuadre {simbolo}</span>{' '}
+      {cifras ? ok ? <>cierra (diferencia {cifras}). </> : <>no cierra por {cifras}. </> : null}
+      {c.detalle}
     </p>
   )
 }

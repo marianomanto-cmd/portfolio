@@ -16,7 +16,11 @@ import {
 } from '../../datos/_lib/catalogo'
 import { altaActivo } from '../acciones'
 import type { ActivoLocal } from '../_lib/demo'
+import { erroresSueltos } from '../_lib/entrada'
 import { Boton, Campo, Entrada, Selector } from './ui'
+
+/** Los campos que muestran su propio error; el resto (el ticker, por ejemplo) va al aviso general. */
+const CON_CAMPO = ['nombre', 'tipo', 'moneda_riesgo', 'geografia', 'indexacion', 'ticker_subyacente', 'ratio', 'color']
 
 export function AltaActivo({
   sugerido,
@@ -148,10 +152,14 @@ export function AltaActivo({
           </div>
         </Campo>
       </div>
-      {errores._ ? (
-        <p role="alert" className="text-sm text-negative">
-          {errores._}
-        </p>
+      {erroresSueltos(errores, CON_CAMPO).length ? (
+        <div role="alert" className="space-y-0.5 text-sm text-negative">
+          {erroresSueltos(errores, CON_CAMPO).map((m) => (
+            <p key={m} className="break-words">
+              {m}
+            </p>
+          ))}
+        </div>
       ) : null}
       <div className="flex flex-wrap gap-2">
         <Boton type="submit" variante="primario" disabled={pendiente} className="max-sm:w-full">

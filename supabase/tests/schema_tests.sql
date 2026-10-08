@@ -36,7 +36,7 @@ select pg_temp.espera_ok($$insert into cotizaciones (fecha, activo_id, precio_pe
 -- Operaciones
 select pg_temp.espera_ok($$insert into operaciones (fecha, cuenta_id, activo_id, tipo, cantidad, precio, carga_id) values ('2026-10-07',1,2,'apertura',1000000,1.25,1)$$, 'apertura con PPP y sin CCL');
 select pg_temp.espera_error($$insert into operaciones (fecha, cuenta_id, activo_id, tipo, cantidad, precio, carga_id) values ('2026-10-07',1,2,'apertura',5,1.2,1)$$, 'segunda apertura de la misma tenencia');
-select pg_temp.espera_ok($$insert into operaciones (fecha, cuenta_id, activo_id, tipo, cantidad, ccl_del_dia, carga_id) values ('2026-10-07',1,1,'compra',191,1500,1)$$, 'compra del día sin precio (PPP -)');
+select pg_temp.espera_ok($$insert into operaciones (fecha, cuenta_id, activo_id, tipo, cantidad, ccl_del_dia, carga_id) values ('2026-10-07',1,1,'compra',37,1500,1)$$, 'compra del día sin precio (PPP -)');
 select pg_temp.espera_error($$insert into operaciones (fecha, cuenta_id, activo_id, tipo, cantidad, precio, carga_id) values ('2026-10-07',1,1,'compra',10,20000,1)$$, 'compra sin CCL');
 select pg_temp.espera_error($$insert into operaciones (fecha, cuenta_id, activo_id, tipo, cantidad, ccl_del_dia, carga_id) values ('2026-10-07',1,1,'venta',10,1500,1)$$, 'venta sin precio ni importe');
 select pg_temp.espera_error($$insert into operaciones (fecha, cuenta_id, activo_id, tipo, cantidad, ccl_del_dia, carga_id) values ('2026-10-07',1,2,'renta',0,1500,1)$$, 'renta sin importe');
@@ -508,6 +508,111 @@ select pg_temp.espera((select precio is null and precio_carga_id is null from op
 select pg_temp.espera_ok($$select revertir_lote('a1900000-0000-4000-8000-000000000001', 'prueba')$$, 'revertir_lote: la compra pendiente');
 select pg_temp.espera(pg_temp.huella() = :'huella_inicial', 'D-19: después de revertir todo, la huella inicial');
 
+-- ═════════════ Revisión de la fase 1a: 20261008190000_confirmar_carga_recarga (números inventados) ═════════════
+
+-- ── Recargar el mismo día con un solo tipo de cambio no borra el otro ──
+-- R1, a la mañana: CCL con su referencia y cripto.
+select pg_temp.espera_ok($$select confirmar_carga(pg_temp.j($j${"lote": "a1910000-0000-4000-8000-000000000001", "fecha": "2026-12-01",
+  "tipo_cambio": {"ccl": "1548.20", "cripto_venta": "1600", "mep": null, "oficial": null, "referencia": "promedio"}, "cuentas": []}$j$))$$,
+  'recarga del TC: la mañana (CCL, referencia y cripto)');
+-- R2, a la tarde: solo el cripto.
+select pg_temp.espera_ok($$select confirmar_carga(pg_temp.j($j${"lote": "a1910000-0000-4000-8000-000000000002", "fecha": "2026-12-01",
+  "tipo_cambio": {"ccl": null, "cripto_venta": "1605", "mep": null, "oficial": null}, "cuentas": []}$j$))$$,
+  'recarga del TC: a la tarde, solo el cripto');
+select pg_temp.espera(ccl::text = '1548.20' and cripto_venta::text = '1605' and referencia = 'promedio'
+                      and carga_id = (select id from cargas where lote = 'a1910000-0000-4000-8000-000000000002'),
+                      'recarga del TC: lo que no se tipeó conserva lo del día (el CCL y su referencia)')
+from tipo_cambio where fecha = '2026-12-01';
+-- R3: un CCL nuevo, sin referencia y sin cripto.
+select pg_temp.espera_ok($$select confirmar_carga(pg_temp.j($j${"lote": "a1910000-0000-4000-8000-000000000003", "fecha": "2026-12-01",
+  "tipo_cambio": {"ccl": "1550", "cripto_venta": null, "mep": null, "oficial": null}, "cuentas": []}$j$))$$,
+  'recarga del TC: un CCL nuevo, solo');
+select pg_temp.espera(ccl::text = '1550' and cripto_venta::text = '1605' and referencia is null,
+                      'recarga del TC: el cripto queda; la referencia va con su CCL (la del anterior no se pega al nuevo)')
+from tipo_cambio where fecha = '2026-12-01';
+select pg_temp.espera_ok($$select revertir_lote('a1910000-0000-4000-8000-000000000003', 'prueba')$$, 'revertir_lote: recarga del TC (R3)');
+select pg_temp.espera(ccl::text = '1548.20' and cripto_venta::text = '1605' and referencia = 'promedio',
+                      'revertir_lote: deshacer R3 vuelve a lo de R2')
+from tipo_cambio where fecha = '2026-12-01';
+select pg_temp.espera_ok($$select revertir_lote('a1910000-0000-4000-8000-000000000002', 'prueba')$$, 'revertir_lote: recarga del TC (R2)');
+select pg_temp.espera(ccl::text = '1548.20' and cripto_venta::text = '1600' and referencia = 'promedio',
+                      'revertir_lote: deshacer R2 vuelve a la mañana')
+from tipo_cambio where fecha = '2026-12-01';
+select pg_temp.espera_ok($$select revertir_lote('a1910000-0000-4000-8000-000000000001', 'prueba')$$, 'revertir_lote: el TC de la mañana (R1)');
+
+-- ── Un precio por activo y por día, también entre lotes: vale el del Excel (D-106) ──
+-- P1, a la mañana: el Excel de IEB.
+select pg_temp.espera_ok($$select confirmar_carga(pg_temp.j($j${"lote": "a1920000-0000-4000-8000-000000000001", "fecha": "2026-12-02",
+  "tipo_cambio": null, "cuentas": [{"cuenta_id": "@IEB", "origen": "excel",
+     "archivo_path": "2026/12/4444444444444444444444444444444444444444444444444444444444444444.xlsx",
+     "archivo_sha256": "4444444444444444444444444444444444444444444444444444444444444444", "lector": "ieb-excel@1",
+     "cotizaciones": [{"activo_id": "@XBON", "precio_pesos": "1.0437"}]}]}$j$))$$, 'precio del Excel: P1 (IEB)');
+select id as p1_ieb from cargas where lote = 'a1920000-0000-4000-8000-000000000001' and cuenta_id = 1 \gset
+-- P2, a la tarde: la captura de Galicia trae el mismo activo con otro precio.
+select pg_temp.espera_ok($$select confirmar_carga(pg_temp.j($j${"lote": "a1920000-0000-4000-8000-000000000002", "fecha": "2026-12-02",
+  "tipo_cambio": null, "cuentas": [{"cuenta_id": "@Galicia", "origen": "captura",
+     "archivo_path": "2026/12/5555555555555555555555555555555555555555555555555555555555555555.png",
+     "archivo_sha256": "5555555555555555555555555555555555555555555555555555555555555555", "lector": "captura-claude@1",
+     "cotizaciones": [{"activo_id": "@XBON", "precio_pesos": "1.0490"}]}]}$j$))$$, 'precio del Excel: P2 (captura de Galicia)');
+select pg_temp.espera(precio_pesos::text = '1.0437' and carga_id = :p1_ieb,
+                      'precio del Excel: una captura posterior del mismo día no lo pisa')
+from cotizaciones where fecha = '2026-12-02' and activo_id = (select id from activos where ticker = 'XBON');
+-- P3: otro Excel el mismo día sí lo reemplaza.
+select pg_temp.espera_ok($$select confirmar_carga(pg_temp.j($j${"lote": "a1920000-0000-4000-8000-000000000003", "fecha": "2026-12-02",
+  "tipo_cambio": null, "cuentas": [{"cuenta_id": "@IEB", "origen": "excel",
+     "archivo_path": "2026/12/6666666666666666666666666666666666666666666666666666666666666666.xlsx",
+     "archivo_sha256": "6666666666666666666666666666666666666666666666666666666666666666", "lector": "ieb-excel@1",
+     "cotizaciones": [{"activo_id": "@XBON", "precio_pesos": "1.0440"}]}]}$j$))$$, 'precio del Excel: P3 (otro Excel)');
+select pg_temp.espera(precio_pesos::text = '1.0440' and carga_id = (select id from cargas where lote = 'a1920000-0000-4000-8000-000000000003' and cuenta_id = 1),
+                      'precio del Excel: un Excel posterior sí lo reemplaza')
+from cotizaciones where fecha = '2026-12-02' and activo_id = (select id from activos where ticker = 'XBON');
+-- P4 y P5, otro día: primero la captura, después el Excel; el Excel reemplaza.
+select pg_temp.espera_ok($$select confirmar_carga(pg_temp.j($j${"lote": "a1920000-0000-4000-8000-000000000004", "fecha": "2026-12-03",
+  "tipo_cambio": null, "cuentas": [{"cuenta_id": "@Galicia", "origen": "captura",
+     "archivo_path": "2026/12/7777777777777777777777777777777777777777777777777777777777777777.png",
+     "archivo_sha256": "7777777777777777777777777777777777777777777777777777777777777777", "lector": "captura-claude@1",
+     "cotizaciones": [{"activo_id": "@XBON", "precio_pesos": "1.05"}]}]}$j$))$$, 'precio del Excel: P4 (captura primero)');
+select pg_temp.espera_ok($$select confirmar_carga(pg_temp.j($j${"lote": "a1920000-0000-4000-8000-000000000005", "fecha": "2026-12-03",
+  "tipo_cambio": null, "cuentas": [{"cuenta_id": "@IEB", "origen": "excel",
+     "archivo_path": "2026/12/8888888888888888888888888888888888888888888888888888888888888888.xlsx",
+     "archivo_sha256": "8888888888888888888888888888888888888888888888888888888888888888", "lector": "ieb-excel@1",
+     "cotizaciones": [{"activo_id": "@XBON", "precio_pesos": "1.049"}]}]}$j$))$$, 'precio del Excel: P5 (el Excel después)');
+select pg_temp.espera(precio_pesos::text = '1.049', 'precio del Excel: después de una captura, el Excel del mismo día la reemplaza')
+from cotizaciones where fecha = '2026-12-03' and activo_id = (select id from activos where ticker = 'XBON');
+select pg_temp.espera_ok($$select revertir_lote('a1920000-0000-4000-8000-000000000005', 'prueba')$$, 'revertir_lote: P5');
+select pg_temp.espera_ok($$select revertir_lote('a1920000-0000-4000-8000-000000000004', 'prueba')$$, 'revertir_lote: P4');
+select pg_temp.espera_ok($$select revertir_lote('a1920000-0000-4000-8000-000000000003', 'prueba')$$, 'revertir_lote: P3');
+select pg_temp.espera((select precio_pesos::text from cotizaciones where fecha = '2026-12-02'
+                         and activo_id = (select id from activos where ticker = 'XBON')) = '1.0437',
+                      'revertir_lote: deshacer el segundo Excel vuelve al primero (la captura nunca lo pisó)');
+select pg_temp.espera_ok($$select revertir_lote('a1920000-0000-4000-8000-000000000002', 'prueba')$$, 'revertir_lote: P2');
+select pg_temp.espera_ok($$select revertir_lote('a1920000-0000-4000-8000-000000000001', 'prueba')$$, 'revertir_lote: P1');
+
+-- ── Huella del pedido: un reintento es "ya estaba guardado"; otro contenido con el mismo lote, no ──
+select pg_temp.espera_ok($$select confirmar_carga(pg_temp.j($j${"lote": "a1930000-0000-4000-8000-000000000001", "fecha": "2026-12-04",
+  "huella": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "tipo_cambio": {"ccl": "1551", "cripto_venta": null, "mep": null, "oficial": null},
+  "cuentas": [{"cuenta_id": "@Mercado Pago", "origen": "manual", "grabado": {"saldos": []}, "saldos": [{"moneda": "ARS", "monto": "1000"}]}]}$j$))$$,
+  'huella: primera confirmación');
+select pg_temp.espera(count(*) = 2 and bool_and(grabado ->> 'huella' = repeat('a', 64)), 'huella: queda en lo grabado de cada carga del lote')
+from cargas where lote = 'a1930000-0000-4000-8000-000000000001';
+select pg_temp.huella() as huella_h1 \gset
+select pg_temp.espera((confirmar_carga(pg_temp.j($j${"lote": "a1930000-0000-4000-8000-000000000001", "fecha": "2026-12-04",
+  "huella": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "tipo_cambio": {"ccl": "1551"}, "cuentas": [{"cuenta_id": "@Mercado Pago", "origen": "manual"}]}$j$)) ->> 'repetido')::boolean,
+  'huella: el mismo Enter otra vez es "ya estaba guardado"');
+select pg_temp.espera_error_por($$select confirmar_carga(pg_temp.j($j${"lote": "a1930000-0000-4000-8000-000000000001", "fecha": "2026-12-04",
+  "huella": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "tipo_cambio": {"ccl": "1551"}, "cuentas": [{"cuenta_id": "@Mercado Pago", "origen": "manual", "saldos": [{"moneda": "ARS", "monto": "2000"}]}]}$j$))$$,
+  'otro contenido', 'huella: el mismo lote con otro contenido se rechaza');
+select pg_temp.espera_error_por($$select confirmar_carga(pg_temp.j($j${"lote": "a1930000-0000-4000-8000-000000000002", "fecha": "2026-12-04",
+  "huella": "no-es-un-sha256", "tipo_cambio": {"ccl": "1551"}, "cuentas": []}$j$))$$,
+  'huella de la carga no es válida', 'huella: una que no es un sha256 en hex');
+select pg_temp.espera(pg_temp.huella() = :'huella_h1' and not exists (select 1 from cargas where lote = 'a1930000-0000-4000-8000-000000000002'),
+                      'huella: los rechazos no dejan rastro');
+select pg_temp.espera_ok($$select revertir_lote('a1930000-0000-4000-8000-000000000001', 'prueba')$$, 'revertir_lote: el lote con huella');
+select pg_temp.espera(pg_temp.huella() = :'huella_inicial', 'revisión 1a: después de revertir todo, la huella inicial');
+
 -- ── Catálogo: alta_activo y editar_activo ──
 select pg_temp.espera_ok($$select alta_activo('{"ticker": "XNEW", "nombre": "CEDEAR nuevo", "tipo": "cedear", "moneda_riesgo": "USD",
   "geografia": "US", "indexacion": null, "ticker_subyacente": "XNEW", "ratio": "20", "color": "#123abc"}')$$, 'alta_activo: CEDEAR con ratio');
@@ -527,6 +632,20 @@ select pg_temp.espera((select nombre = 'CEDEAR renombrado' and color is null and
                       and (select count(*) from ratios_cedear r join activos a on a.id = r.activo_id where a.ticker = 'XNEW') = 2,
                       'editar_activo: cambia solo lo pedido y suma el ratio con su vigencia');
 select pg_temp.espera_error_por($$select editar_activo(32000, '{"nombre": "x"}')$$, 'No existe el activo', 'editar_activo: activo inexistente');
+-- D-104 (20261008190100_catalogo_cedear_ratio): nunca queda un CEDEAR sin ratio.
+select pg_temp.espera_error_por($$select alta_activo('{"ticker": "XSIN", "nombre": "CEDEAR sin ratio", "tipo": "cedear", "moneda_riesgo": "USD",
+  "geografia": "US", "ticker_subyacente": "XSIN"}')$$, 'necesita su ratio', 'alta_activo: CEDEAR sin ratio');
+select pg_temp.espera_ok($$select alta_activo('{"ticker": "XLOC", "nombre": "Acción local", "tipo": "accion_local", "moneda_riesgo": "ARS", "geografia": "AR"}')$$,
+  'alta_activo: una acción local, sin ratio');
+select pg_temp.espera_error_por($$select editar_activo((select id from activos where ticker = 'XLOC'),
+  '{"tipo": "cedear", "ticker_subyacente": "XLOC", "moneda_riesgo": "USD", "geografia": "US"}')$$, 'necesita su ratio',
+  'editar_activo: pasar a CEDEAR sin ratio');
+select pg_temp.espera((select tipo from activos where ticker = 'XLOC') = 'accion_local', 'editar_activo: el rechazo no deja el tipo cambiado');
+select pg_temp.espera_ok($$select editar_activo((select id from activos where ticker = 'XLOC'),
+  '{"tipo": "cedear", "ticker_subyacente": "XLOC", "moneda_riesgo": "USD", "geografia": "US", "ratio": {"ratio": "10", "vigente_desde": "2026-12-01"}}')$$,
+  'editar_activo: pasar a CEDEAR con su ratio');
+select pg_temp.espera_ok($$select editar_activo((select id from activos where ticker = 'XLOC'), '{"color": "#00aa00"}')$$,
+  'editar_activo: un CEDEAR que ya tiene ratio se edita sin volver a mandarlo');
 
 -- ── Esquema nuevo ──
 select pg_temp.espera_error_por($$insert into eventos (fecha, tipo, titulo) values ('2026-11-02', 'nota', 'sin carga')$$, 'eventos_nota',

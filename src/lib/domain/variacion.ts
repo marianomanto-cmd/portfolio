@@ -704,7 +704,17 @@ export interface TramoDesdeCompra {
 const escalar = (d: Doble, k: Decimal): Doble => ({ ars: d.ars.times(k), usd: d.usd.times(k) })
 
 export type DesdeCompra =
-  | { tipo: 'ok'; primera: Fecha; activo: Doble; tc: Doble; sin_atribuir: Doble; resultado: Doble; tramos: TramoDesdeCompra[] }
+  | {
+      tipo: 'ok'
+      primera: Fecha
+      activo: Doble
+      tc: Doble
+      sin_atribuir: Doble
+      resultado: Doble
+      tramos: TramoDesdeCompra[]
+      /** Ventas o vencimientos desde la primera observación: lo acumulado se escaló a la tenencia vigente (E'). */
+      ventas: number
+    }
   | { tipo: 'sin_dato'; motivo: string }
   /** Caso que la suma de intervalos no cubre (una baja o un cambio de ratio antes de la primera observación fresca). */
   | { tipo: 'no_aplica'; motivo: string }
@@ -777,6 +787,7 @@ export function desgloseDesdeCompra(h: Hechos, clave: string, hasta: Fecha, opci
   // activo + TC + sin atribuir = resultado de la fila (valor − costo vigente).
   const cargas = ctx.cargas.filter((d) => d >= primera && d <= hasta)
   const esBaja = (t?: Operacion['tipo']) => t === 'venta' || t === 'vencimiento'
+  let nVentas = 0
   for (let i = 1; i < cargas.length; i++) {
     const a = cargas[i - 1]
     const b = cargas[i]
@@ -838,6 +849,7 @@ export function desgloseDesdeCompra(h: Hechos, clave: string, hasta: Fecha, opci
       resultado,
     })
     if (ventas.length) {
+      nVentas += ventas.length
       const despues = cantidadEn(ctx, k, b)
       const antes = ventas.reduce((x, o) => x.plus(o.cantidad), despues)
       const factor = despues.div(antes)
@@ -859,6 +871,7 @@ export function desgloseDesdeCompra(h: Hechos, clave: string, hasta: Fecha, opci
     sin_atribuir: total((t) => t.sin_atribuir),
     resultado: total((t) => t.resultado),
     tramos,
+    ventas: nVentas,
   }
 }
 
@@ -1050,7 +1063,8 @@ export function parteCalc(v: Variacion, h: Hechos, vista: Vista, parte: Parte, m
   return calc(total, formula, insumos, { explicacion })
 }
 
-function detalleContribucion(c: Contribucion, parte: Parte, moneda: Moneda, v: Variacion): Calc {
+/** Una parte de una partida en el intervalo, con su fórmula e insumos (V0, V1, CCL, flujos, anclaje). */
+export function detalleContribucion(c: Contribucion, parte: Parte, moneda: Moneda, v: Variacion): Calc {
   const k = moneda === 'ARS' ? 'ars' : 'usd'
   const fm = (d: Decimal, m: Moneda = moneda) => monto(d, m, { decimales: 2, signo: true })
   const V0 = c.v0 ?? CERO2

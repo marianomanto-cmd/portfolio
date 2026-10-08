@@ -3,6 +3,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { CalcVista, InsumoVista } from '@/lib/domain/calc'
 import { monto, numero, porcentaje } from '@/lib/domain/dinero'
+import { decimalesInsumo } from './calculos'
 
 // Traza (spec, "requisito no negociable"; CO-1). Tocar cualquier cifra abre un
 // panel: la fórmula con los valores reales, los insumos de a un nivel hasta la
@@ -17,13 +18,14 @@ const NOMBRE_ETIQUETA: Record<string, string> = {
   parcial: 'suma parcial',
 }
 
-function formatearInsumo(i: InsumoVista): string {
+export function formatearInsumo(i: InsumoVista): string {
   if (i.valor === null) return 'sin dato'
   switch (i.unidad) {
+    // Con sus decimales: un precio de $ 1,124 por VN no se ve como $ 1,12.
     case 'ARS':
-      return monto(i.valor, 'ARS', { decimales: 2 })
+      return monto(i.valor, 'ARS', { decimales: decimalesInsumo(i.valor) })
     case 'USD':
-      return monto(i.valor, 'USD', { decimales: 2 })
+      return monto(i.valor, 'USD', { decimales: decimalesInsumo(i.valor) })
     case 'cantidad':
       return numero(i.valor, 4, { min: 0 })
     case 'ratio':
