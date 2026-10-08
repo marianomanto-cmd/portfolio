@@ -166,6 +166,19 @@ export interface CargaResumen {
   tiempo_activo_ms: number | null
 }
 
+/**
+ * Tenencia que la carga vigente más reciente de su cuenta no trajo (la fuente
+ * ya no la lista: venta total o vencimiento) y que el dueño dejó pendiente, sin
+ * registrar la venta ni el vencimiento. Desde esa fecha su valor es "sin dato".
+ */
+export interface Ausente {
+  cuenta_id: number
+  activo_id: number
+  /** Fecha de la carga que la declaró ausente. */
+  fecha: Fecha
+  carga_id: number
+}
+
 /** Todo lo que el motor necesita para calcular. Se lee entero desde la base. */
 export interface Hechos {
   cuentas: Cuenta[]
@@ -182,4 +195,6 @@ export interface Hechos {
   feriados: Feriado[]
   /** Solo cargas vigentes (las revertidas no aportan hechos). */
   cargas: CargaResumen[]
+  /** Tenencias declaradas ausentes y sin resolver (ver Ausente). Opcional: vacío si falta. */
+  ausentes?: Ausente[]
 }
