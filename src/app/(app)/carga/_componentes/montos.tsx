@@ -4,9 +4,9 @@ import type { ReactNode } from 'react'
 // `monto`. Cargar y Datos arman muchos montos como texto (motivos, controles,
 // fórmulas); estas piezas los marcan para que el ojo también los tape.
 
-/** Un monto ya formateado. En dólares, con la pastilla `usd` (D-68). */
+/** Un monto ya formateado (no se corta entre el signo y el número). En dólares, con la pastilla `usd` (D-68). */
 export function M({ children, usd = false }: { children: ReactNode; usd?: boolean }) {
-  return <span className={usd ? 'monto usd' : 'monto'}>{children}</span>
+  return <span className={`whitespace-nowrap ${usd ? 'monto usd' : 'monto'}`}>{children}</span>
 }
 
 /** "$ 1.234,56", "US$ 620,00", "−$ 3,5", "+$ 1.000": lo que en un texto es plata (con su signo). */

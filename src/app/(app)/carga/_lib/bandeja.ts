@@ -178,7 +178,7 @@ export function problemaRegistroAusente(a: AusentePropuesto, r: RegistroAusente)
   if (r.tipo === 'vencimiento' && r.importe === null) return 'el vencimiento necesita el importe cobrado'
   if (r.tipo === 'vencimiento' && r.precio !== null) return 'un vencimiento lleva el importe cobrado, no el precio'
   if (r.tipo === 'venta' && r.precio === null && r.importe === null) return 'la venta necesita el precio o el importe'
-  if (a.ccl_del_dia === null) return `la ${r.tipo} necesita el CCL del día: tipealo arriba`
+  if (a.ccl_del_dia === null) return `${r.tipo === 'venta' ? 'la venta' : 'el vencimiento'} necesita el CCL del día: tipealo arriba`
   return null
 }
 
