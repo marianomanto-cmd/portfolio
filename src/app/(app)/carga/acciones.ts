@@ -5,14 +5,14 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
-import { proponerCarga } from '@/lib/carga/conciliar'
+import { cclDelDia, proponerCarga } from '@/lib/carga/conciliar'
 import type { LecturaCuenta, PropuestaCarga, ResultadoConfirmacion } from '@/lib/carga/contratos'
 import { dec } from '@/lib/domain/dinero'
 import { confirmarCarga, crearActivo, revertirLote } from '@/lib/server/escritura'
 import { exigirSesion } from '@/lib/server/sesion'
 import { esquemaActivo, leerFormulario } from '../datos/_lib/esquemas'
 import type { Elecciones } from './_lib/bandeja'
-import { armarConfirmacion, type ArchivoGuardado, type ResumenGuardado } from './_lib/confirmacion'
+import { armarConfirmacion, cotizacionesDeExcel, type ArchivoGuardado, type ResumenGuardado } from './_lib/confirmacion'
 import type { ActivoLocal } from './_lib/demo'
 import { aplicarEdiciones, sinCruda, type Ediciones } from './_lib/ediciones'
 import { catalogoEjemplo, lecturaGaliciaDosLecturasEjemplo, lecturaIEBEjemplo, lecturaMPEjemplo } from './_lib/ejemplos'
@@ -108,10 +108,15 @@ export async function guardar(e: EntradaGuardar): Promise<ResultadoGuardar> {
     const lecturas = e.fuentes.map((f) => f.lectura)
     // La propuesta se vuelve a armar acá, contra la base de este momento.
     const propuesta = proponerCarga(aplicarEdiciones(lecturas, e.ediciones ?? {}), hechos, e.fecha, { ccl: dec(e.ccl) })
+    // Sin CCL tipeado, las operaciones usan el que ese día ya tiene cargado; el
+    // tipo de cambio que se graba es solo lo tipeado (no se pisa lo que no tipeaste).
+    const ccl = cclDelDia(hechos, e.fecha, dec(e.ccl))
     const armado = armarConfirmacion({
       lote: e.lote,
       fecha: e.fecha,
       tc: { ccl: e.ccl, cripto_venta: e.cripto, referencia: base.data.referencia },
+      ccl_del_dia: ccl ? ccl.valor.toFixed() : null,
+      cotizaciones_excel: cotizacionesDeExcel(hechos, e.fecha),
       propuesta,
       elecciones: e.elecciones,
       ediciones: e.ediciones ?? {},

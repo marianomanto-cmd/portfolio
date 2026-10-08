@@ -329,7 +329,7 @@ export function portafolioEjemplo(): PortafolioIEB {
       {
         titulo: 'Otros',
         escala: '1',
-        posiciones: [{ especie: 'DOLARUSA - DOLARES USA ESP 7000', moneda: 'USD', cantidad: '17.8', precio: '1573', ppp: null }],
+        posiciones: [{ especie: 'DOLARUSA - DOLARES USA ESP 7000', moneda: 'USD', cantidad: '23.4', precio: '1611', ppp: null }],
       },
     ],
     saldos: {

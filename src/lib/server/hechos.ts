@@ -18,6 +18,7 @@ import type {
   Saldo,
   TipoCambio,
 } from '@/lib/domain/tipos'
+import { ausentesVigentes } from '@/lib/carga/ausentes'
 import { leerTodo } from './supabase'
 
 // Lee todos los hechos de la base y los convierte al dominio. Los numeric
@@ -105,13 +106,15 @@ async function leerHechosDeLaBase(): Promise<Hechos> {
       ['fecha', 'bien_id'],
     ),
     leerTodo<Fila>('feriados', 'mercado,fecha,descripcion', ['fecha', 'mercado']),
-    leerTodo<Fila>(
+    // De lo grabado, solo las tenencias ausentes (un camino JSON, sin traer el resto).
+    leerTodo<Fila & { ausentes?: unknown }>(
       'cargas',
-      'id,lote,fecha,cuenta_id,origen,archivo_path,estado,creado_en,reemplaza_a,lector,tiempo_activo_ms',
+      'id,lote,fecha,cuenta_id,origen,archivo_path,estado,creado_en,reemplaza_a,lector,tiempo_activo_ms,ausentes:grabado->ausentes',
       ['id'],
     ),
   ])
 
+  const listaActivos = activos.map((r) => ({ id: n(r.id), ticker: String(r.ticker) }))
   return {
     cuentas: cuentas.map(
       (r): Cuenta => ({
@@ -264,5 +267,15 @@ async function leerHechosDeLaBase(): Promise<Hechos> {
         }),
       )
       .filter((c) => c.estado !== 'revertida'),
+    ausentes: ausentesVigentes(
+      cargas.map((r) => ({
+        id: n(r.id),
+        fecha: String(r.fecha),
+        cuenta_id: r.cuenta_id === null ? null : n(r.cuenta_id),
+        estado: r.estado as CargaResumen['estado'],
+        ausentes: r.ausentes ?? null,
+      })),
+      listaActivos,
+    ),
   }
 }

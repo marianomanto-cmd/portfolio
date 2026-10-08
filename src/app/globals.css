@@ -155,10 +155,19 @@ body {
 .usd {
   background: var(--usd-bg);
   border: 1px solid var(--usd-border);
-  color: var(--usd-text);
   border-radius: 6px;
   padding: 0 0.35em;
   white-space: nowrap;
+}
+/*
+ * Su tinta, salvo en un resultado: ahí manda el verde o el rojo, en las dos
+ * monedas (spec §UI: positivo y negativo por color y por signo). Esta regla
+ * está fuera de las capas de Tailwind y le ganaría a text-positive y
+ * text-negative. Los dos tonos llegan a AA sobre la pastilla, en claro, en
+ * oscuro y con la paleta daltónica.
+ */
+.usd:not(.text-positive):not(.text-negative) {
+  color: var(--usd-text);
 }
 
 :focus-visible {

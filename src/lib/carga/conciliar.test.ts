@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest'
 import { Decimal } from '@/lib/domain/dinero'
 import type { Activo, CargaResumen, Cuenta, Hechos, Operacion } from '@/lib/domain/tipos'
-import { precioPendiente, proponerCarga } from './conciliar'
+import { cclDelDia, precioPendiente, proponerCarga } from './conciliar'
 import type { FilaLeida, LecturaCuenta } from './contratos'
 import { tenencias } from '@/lib/domain/posiciones'
 
@@ -185,5 +185,193 @@ describe('motivos: primero lo que frena', () => {
   it('una fila que el lector dejó en error conserva su motivo antes que la propuesta', () => {
     const p = proponerCarga([lectura([fila('110', { motivos: ['La cuenta no cierra.'], estado: 'error' })])], hechos({}), '2026-10-08', { ccl: D(1500) })
     expect(p.filas[0].motivos[0]).toBe('La cuenta no cierra.')
+  })
+})
+
+// ───────────── Revisión de la fase 1a (números inventados) ─────────────
+
+const LECAP: Activo = {
+  id: 2, ticker: 'S09O6', nombre: 'LECAP 09/10/26', tipo: 'lecap', moneda_riesgo: 'ARS', geografia: 'AR', indexacion: 'fija',
+  ticker_subyacente: null, fecha_vencimiento: '2026-10-07', color: null, activo_bool: true,
+}
+const BONO: Activo = { ...LECAP, id: 3, ticker: 'T15E7', nombre: 'BONTE 15/01/27', tipo: 'bono', fecha_vencimiento: '2027-01-15' }
+const tc = (fecha: string, ccl: string | null) => ({ fecha, ccl: ccl === null ? null : D(ccl), mep: null, cripto_venta: null, oficial: null, carga_id: 9 })
+const coti = (fecha: string, activo_id: number, precio: string) => ({ fecha, activo_id, precio_pesos: D(precio), precio_usd_subyacente: null, carga_id: 1 })
+
+describe('una tenencia que la fuente ya no lista: se propone registrar la venta o el vencimiento', () => {
+  const base = (extra: Partial<Hechos> = {}) =>
+    hechos({
+      activos: [SPY, LECAP, BONO],
+      operaciones: [
+        op({ fecha: '2026-10-01', tipo: 'apertura', cantidad: D(100), precio: D(10000) }),
+        op({ fecha: '2026-10-01', tipo: 'apertura', activo_id: 2, cantidad: D(1_000_000), precio: D('1.02') }),
+        op({ fecha: '2026-10-01', tipo: 'apertura', activo_id: 3, cantidad: D(500_000), precio: D('1.1') }),
+      ],
+      cotizaciones: [coti('2026-10-05', 1, '12000'), coti('2026-10-06', 1, '12100'), coti('2026-10-06', 2, '1.049')],
+      cargas: [carga(1, '2026-10-06')],
+      ...extra,
+    })
+
+  it('Excel sin SPY, sin la LECAP vencida y sin el bono: venta, vencimiento y venta (o vencimiento), con su cuenta y su activo', () => {
+    const p = proponerCarga([lectura([])], base(), '2026-10-08', { ccl: D(1530) })
+    expect(p.ausentes).toEqual([
+      {
+        cuenta: 'IEB', cuenta_id: 1, activo_id: 1, ticker: 'SPY', tipo_activo: 'cedear', cantidad_app: '100',
+        sugerida: 'venta', opciones: ['venta'], ultimo_precio: { fecha: '2026-10-06', precio_pesos: '12100' }, ccl_del_dia: '1530',
+      },
+      expect.objectContaining({ activo_id: 2, ticker: 'S09O6', cantidad_app: '1000000', sugerida: 'vencimiento', opciones: ['vencimiento', 'venta'] }),
+      expect.objectContaining({ activo_id: 3, ticker: 'T15E7', sugerida: 'venta', opciones: ['venta', 'vencimiento'], ultimo_precio: null }),
+    ])
+  })
+
+  it('sin CCL tipeado, la ausente lleva el CCL que el día ya tiene (nunca el de otro día)', () => {
+    const conDia = proponerCarga([lectura([])], base({ tipos_cambio: [tc('2026-10-07', '1500'), tc('2026-10-08', '1531.5')] }), '2026-10-08', { ccl: null })
+    expect(conDia.ausentes.map((a) => a.ccl_del_dia)).toEqual(['1531.5', '1531.5', '1531.5'])
+    expect(conDia.ccl).toEqual({ valor: '1531.5', origen: 'cargado' })
+    const sinDia = proponerCarga([lectura([])], base({ tipos_cambio: [tc('2026-10-07', '1500')] }), '2026-10-08', { ccl: null })
+    expect(sinDia.ausentes.map((a) => a.ccl_del_dia)).toEqual([null, null, null])
+    expect(sinDia.ccl).toBeNull()
+  })
+
+  it('una captura solo declara ausente lo que cubre: la sección y la moneda de un total que cierra', () => {
+    const galicia: Cuenta = { id: 2, nombre: 'Galicia', tipo: 'banco', formato_carga: 'captura', activa: true }
+    const enGalicia = (o: Operacion) => ({ ...o, cuenta_id: 2 })
+    const h = base({
+      cuentas: [...CUENTAS, galicia],
+      operaciones: base().operaciones.map(enGalicia),
+      cargas: [{ ...carga(1, '2026-10-06'), cuenta_id: 2, origen: 'captura' }],
+    })
+    const captura = (controles: LecturaCuenta['controles']): LecturaCuenta => ({
+      cuenta: 'Galicia', origen: 'captura', fecha_reporte: null, filas: [], saldos: [], controles, advertencias: [], lector: 'test', cruda: null,
+    })
+    const total = (ok: boolean | null, seccion: 'bonos' | 'cedears', moneda: 'ARS' | 'USD' = 'ARS') => ({
+      tipo: 'galicia_total' as const, seccion: 'Bonos en pesos', moneda, cobertura: { seccion, moneda },
+      informado: '0', calculado: ok === null ? null : '0', ok, detalle: null, tolerancia: null,
+    })
+    // "Bonos en pesos" en cero y cerrando: la LECAP y el bono ya no están. SPY (CEDEAR) no está cubierto.
+    expect(proponerCarga([captura([total(true, 'bonos')])], h, '2026-10-08', { ccl: D(1530) }).ausentes.map((a) => a.ticker)).toEqual(['S09O6', 'T15E7'])
+    // Un total que no cierra (o que no se pudo controlar) no declara nada.
+    expect(proponerCarga([captura([total(false, 'bonos')])], h, '2026-10-08', { ccl: D(1530) }).ausentes).toEqual([])
+    expect(proponerCarga([captura([total(null, 'bonos')])], h, '2026-10-08', { ccl: D(1530) }).ausentes).toEqual([])
+    // Otra moneda u otra sección: tampoco.
+    expect(proponerCarga([captura([total(true, 'bonos', 'USD')])], h, '2026-10-08', { ccl: D(1530) }).ausentes).toEqual([])
+    expect(proponerCarga([captura([total(true, 'cedears')])], h, '2026-10-08', { ccl: D(1530) }).ausentes.map((a) => a.ticker)).toEqual(['SPY'])
+  })
+})
+
+describe('CCL de las operaciones: el tipeado o el que el día ya tiene (recarga del mismo día)', () => {
+  const h = () =>
+    hechos({
+      operaciones: [op({ fecha: '2026-10-01', tipo: 'apertura', cantidad: D(100), precio: D(20000) })],
+      cargas: [carga(1, '2026-10-08')],
+      tipos_cambio: [tc('2026-10-07', '1500'), tc('2026-10-08', '1548.2')],
+    })
+
+  it('cclDelDia: tipeado > cargado ese día; nunca el de otro día', () => {
+    expect(cclDelDia(h(), '2026-10-08', D('1550'))).toEqual({ valor: D('1550'), origen: 'tipeado' })
+    expect(cclDelDia(h(), '2026-10-08', null)).toEqual({ valor: D('1548.2'), origen: 'cargado' })
+    expect(cclDelDia(h(), '2026-10-09', null)).toBeNull()
+    expect(cclDelDia(hechos({ tipos_cambio: [tc('2026-10-08', null)] }), '2026-10-08', null)).toBeNull()
+  })
+
+  it('una compra en una recarga de la tarde usa el CCL ya cargado: no frena con "Falta el CCL del día"', () => {
+    const p = proponerCarga([lectura([fila('110', { ppc_unitario: '20200' })])], h(), '2026-10-08', { ccl: null })
+    expect(p.filas[0]).toMatchObject({ accion: 'compra', estado: 'advertencia', operacion: { tipo: 'compra', ccl_del_dia: '1548.2' } })
+    expect(p.filas[0].motivos.join(' ')).not.toMatch(/Falta el CCL/)
+  })
+})
+
+describe('un PPP o un precio de 0 es "sin dato" (D-107), nunca un costo ni un precio', () => {
+  it('primera carga con PPP 0: apertura con el costo sin dato, en advertencia', () => {
+    const p = proponerCarga([lectura([fila('300', { ppc_unitario: '0', ppc_mostrado: '0' })])], hechos({}), '2026-10-08', { ccl: D(1500) })
+    expect(p.filas[0]).toMatchObject({ accion: 'apertura', estado: 'advertencia', operacion: { tipo: 'apertura', precio: null } })
+    expect(p.filas[0].motivos.join(' ')).toMatch(/Sin PPP/)
+  })
+
+  it('una compra con PPP 0 no se infiere a $ 0: queda con el precio pendiente', () => {
+    // IEB ya cargada y sin SPY: la posición llegó (por ejemplo, transferida) con PPP 0.
+    const p = proponerCarga([lectura([fila('300', { ppc_unitario: '0' })])], hechos({ cargas: [carga(1, '2026-10-01')] }), '2026-10-08', { ccl: D(1500) })
+    expect(p.filas[0].operacion).toMatchObject({ tipo: 'compra', cantidad: '300', precio: null })
+  })
+
+  it('un precio de 0 no se graba como cotización: avisa y deja el último', () => {
+    const p = proponerCarga([lectura([fila('100', { precio_unitario: '0', precio_mostrado: '0' })])], hechos({ operaciones: [op({ fecha: '2026-10-01', tipo: 'apertura', cantidad: D(100), precio: D(20000) })], cargas: [carga(1, '2026-10-01')] }), '2026-10-08', { ccl: D(1500) })
+    expect(p.filas[0].cotizacion).toBeNull()
+    expect(p.filas[0].estado).toBe('advertencia')
+    expect(p.filas[0].motivos.join(' ')).toMatch(/precio en \$ 0,00: no se graba/)
+  })
+})
+
+describe('una tenencia que quedó pendiente el Día cero: "Ya la tenía" (apertura) además de la compra', () => {
+  it('en una cuenta ya cargada, una tenencia que la app nunca tuvo ofrece la apertura con el PPP como otra opción', () => {
+    const h = hechos({ activos: [SPY, BONO], operaciones: [op({ fecha: '2026-10-07', tipo: 'apertura', cantidad: D(100), precio: D(20000) })], cargas: [carga(1, '2026-10-07')] })
+    const t = { ...fila('9000000', { ppc_unitario: '1.0976', precio_unitario: '1.124' }), clave: 'IEB:T15E7', ticker: 'T15E7', seccion: 'bonos' as const }
+    const p = proponerCarga([lectura([fila('100'), t])], h, '2026-10-08', { ccl: D(1500) })
+    const f = p.filas.find((x) => x.ticker === 'T15E7')!
+    expect(f.accion).toBe('compra')
+    expect(f.operacion).toMatchObject({ tipo: 'compra', cantidad: '9000000', precio: '1.0976', ccl_del_dia: '1500' })
+    expect(f.apertura_alternativa).toEqual({
+      activo_id: 3, moneda: 'ARS', importe: null, comisiones: '0', notas: null,
+      tipo: 'apertura', cantidad: '9000000', precio: '1.0976', ccl_del_dia: null, fecha_origen: null,
+    })
+    expect(f.motivos.join(' ')).toMatch(/Ya la tenía/)
+    // Una compra de una tenencia que ya tuvo operaciones en la cuenta no la ofrece.
+    expect(p.filas.find((x) => x.ticker === 'SPY')?.apertura_alternativa).toBeUndefined()
+  })
+
+  it('una tenencia que ya tuvo operaciones en la cuenta (vendida toda y recomprada) no ofrece la apertura', () => {
+    const h = hechos({
+      operaciones: [
+        op({ fecha: '2026-10-01', tipo: 'apertura', cantidad: D(100), precio: D(20000) }),
+        op({ fecha: '2026-10-05', tipo: 'venta', cantidad: D(100), precio: D(21000), ccl_del_dia: D(1500) }),
+      ],
+      cargas: [carga(1, '2026-10-05')],
+    })
+    const p = proponerCarga([lectura([fila('50', { ppc_unitario: '21500' })])], h, '2026-10-08', { ccl: D(1500) })
+    expect(p.filas[0].accion).toBe('compra')
+    expect(p.filas[0].apertura_alternativa).toBeUndefined()
+  })
+})
+
+describe('Galicia: compra inferida con el costo total exacto, no con el PPP redondeado', () => {
+  it('(6.050.000 − 5.000.000) ÷ 1.000.000 = 1,05 exacto', () => {
+    const galicia: Cuenta = { id: 2, nombre: 'Galicia', tipo: 'banco', formato_carga: 'captura', activa: true }
+    const h = hechos({
+      cuentas: [...CUENTAS, galicia],
+      activos: [SPY, LECAP],
+      operaciones: [op({ fecha: '2026-10-01', tipo: 'apertura', cuenta_id: 2, activo_id: 2, cantidad: D(5_000_000), precio: D(1) })],
+      cargas: [{ ...carga(1, '2026-10-01'), cuenta_id: 2, origen: 'captura' }],
+    })
+    const l: LecturaCuenta = {
+      cuenta: 'Galicia', origen: 'captura', fecha_reporte: null, saldos: [], controles: [], advertencias: [], lector: 'test', cruda: null,
+      filas: [
+        fila('6000000', {
+          clave: 'Galicia:S09O6', ticker: 'S09O6', seccion: 'bonos', precio_unitario: '1.06',
+          // (valorizado − rendimiento $) ÷ cantidad, con 12 decimales: 6.050.000 ÷ 6.000.000.
+          ppc_unitario: '1.008333333333', costo_total: '6050000',
+        }),
+      ],
+    }
+    const p = proponerCarga([l], h, '2026-10-08', { ccl: D(1500) })
+    expect(p.filas[0].operacion).toMatchObject({ tipo: 'compra', cantidad: '1000000', precio: '1.05' })
+  })
+})
+
+describe('Galicia: una fila en dólares no se graba como precio en pesos', () => {
+  it('moneda_precio USD: error con su motivo, sin cotización ni operación', () => {
+    const galicia: Cuenta = { id: 2, nombre: 'Galicia', tipo: 'banco', formato_carga: 'captura', activa: true }
+    const l: LecturaCuenta = {
+      cuenta: 'Galicia', origen: 'captura', fecha_reporte: null, saldos: [], controles: [], advertencias: [], lector: 'test', cruda: null,
+      filas: [fila('1000', { clave: 'Galicia:GD30D', ticker: 'GD30D', seccion: 'bonos', moneda_emision: 'USD', moneda_precio: 'USD', precio_unitario: '0.65', ppc_unitario: '0.6' })],
+    }
+    const p = proponerCarga([l], hechos({ cuentas: [...CUENTAS, galicia] }), '2026-10-08', { ccl: D(1500) })
+    expect(p.filas[0]).toMatchObject({ estado: 'error', cotizacion: null, operacion: null, accion: 'revisar' })
+    expect(p.filas[0].motivos[0]).toMatch(/en dólares/)
+  })
+
+  it('en IEB, moneda_emision USD con precio en pesos sigue grabando su precio (no es una fila en dólares)', () => {
+    const p = proponerCarga([lectura([fila('100', { moneda_emision: 'USD', precio_unitario: '1456' })])], hechos({}), '2026-10-08', { ccl: D(1500) })
+    expect(p.filas[0].cotizacion).toEqual({ precio_pesos: '1456' })
+    expect(p.filas[0].estado).not.toBe('error')
   })
 })

@@ -11,7 +11,7 @@
 
 import { Decimal, leerNumeroAR } from '@/lib/domain/dinero'
 import type { Fecha } from '@/lib/domain/tipos'
-import type { Alternativa, DecisionFila, DecisionSaldo, FilaLeida, PropuestaCarga, SaldoLeido } from '@/lib/carga/contratos'
+import type { Alternativa, AusentePropuesto, DecisionFila, DecisionSaldo, FilaLeida, PropuestaCarga, SaldoLeido } from '@/lib/carga/contratos'
 import type { EdicionFila } from './ediciones'
 
 export type Resolucion = 'aceptada' | 'pendiente'
@@ -22,6 +22,11 @@ export interface EleccionFila {
   motivo: string | null
   /** Operación de conciliación corregida a mano. */
   operacion: { cantidad: string; precio: string | null } | null
+  /**
+   * "Ya la tenía": en vez de la compra propuesta, la apertura con el PPP
+   * (DecisionFila.apertura_alternativa). Solo vale si la propuesta la ofrece.
+   */
+  apertura?: boolean
   /**
    * accion 'completar_precio' (D-19): undefined = el precio propuesto; texto =
    * el que tipeaste; null = grabar la fila sin completar (la compra sigue pendiente).
@@ -39,10 +44,27 @@ export interface EleccionSaldo {
   huella: string
 }
 
+/**
+ * Una tenencia que la fuente ya no lista, registrada desde la bandeja: la venta
+ * o el vencimiento de toda la cantidad que tiene la app. El precio (venta) o el
+ * importe cobrado (vencimiento, o venta) los tipea el dueño.
+ */
+export interface RegistroAusente {
+  tipo: 'venta' | 'vencimiento'
+  /** La cantidad de la app cuando lo registraste: si cambia, la elección se cae. */
+  cantidad: string
+  /** Por 1 VN / unidad, en pesos. */
+  precio: string | null
+  /** Total cobrado, en pesos. */
+  importe: string | null
+}
+
+export type EleccionAusente = 'pendiente' | RegistroAusente
+
 export interface Elecciones {
   filas: Readonly<Record<string, EleccionFila>>
   saldos: Readonly<Record<string, EleccionSaldo>>
-  ausentes: Readonly<Record<string, Resolucion>>
+  ausentes: Readonly<Record<string, EleccionAusente>>
 }
 
 export const SIN_ELECCIONES: Elecciones = { filas: {}, saldos: {}, ausentes: {} }
@@ -57,6 +79,7 @@ export function huellaFila(d: DecisionFila): string {
     d.operacion?.precio ?? '-',
     d.cotizacion?.precio_pesos ?? '-',
     d.completar ? `${d.completar.operacion_id}:${d.completar.precio}` : '-',
+    d.apertura_alternativa ? `apertura:${d.apertura_alternativa.cantidad}:${d.apertura_alternativa.precio ?? '-'}` : '-',
   ].join('|')
 }
 
@@ -97,8 +120,15 @@ export function eleccionSaldo(e: Elecciones, d: DecisionSaldo): EleccionSaldo | 
  */
 export type EstadoItem = 'verificada' | 'aceptada' | 'advertencia' | 'sin_alta' | 'error' | 'pendiente'
 
+/** Elegiste "Ya la tenía" y la propuesta ofrece esa apertura. */
+export const eligioApertura = (d: DecisionFila, e: EleccionFila | null) =>
+  e?.resolucion === 'aceptada' && e.apertura === true && Boolean(d.apertura_alternativa)
+
 export function estadoFila(d: DecisionFila, e: EleccionFila | null): EstadoItem {
   if (e?.resolucion === 'pendiente') return 'pendiente'
+  // La apertura no necesita el CCL del día: elegirla destraba una fila cuyo único
+  // error era ese (la lectura en sí no tiene error).
+  if (eligioApertura(d, e) && d.fila.estado !== 'error' && d.activo_id !== null) return 'aceptada'
   if (d.estado === 'error') return 'error'
   if (d.activo_id === null) return 'sin_alta'
   if (d.estado === 'verificada') return 'verificada'
@@ -116,8 +146,37 @@ export function estadoSaldo(d: DecisionSaldo, e: EleccionSaldo | null): EstadoIt
 export const seGraba = (e: EstadoItem) => e === 'verificada' || e === 'aceptada'
 export const aRevisar = (e: EstadoItem) => e === 'advertencia' || e === 'sin_alta' || e === 'error'
 
-export function claveAusente(a: PropuestaCarga['ausentes'][number]): string {
+export function claveAusente(a: Pick<AusentePropuesto, 'cuenta' | 'ticker'>): string {
   return `${a.cuenta}:ausente:${a.ticker}`
+}
+
+/** La venta o el vencimiento elegidos para una ausente, si siguen valiendo (misma cantidad, una opción que se ofrece). */
+export function registroAusente(e: Elecciones, a: AusentePropuesto): RegistroAusente | null {
+  const x = e.ausentes[claveAusente(a)]
+  return x && typeof x === 'object' && x.cantidad === a.cantidad_app && a.opciones.includes(x.tipo) ? x : null
+}
+
+/**
+ * Qué falta para registrar la venta o el vencimiento de una ausente, o null si
+ * está completo. Los mismos controles que la base (una venta lleva precio o
+ * importe; un vencimiento, el importe cobrado; las dos, el CCL del día).
+ */
+export function problemaRegistroAusente(a: AusentePropuesto, r: RegistroAusente): string | null {
+  const pos = (v: string | null) => v !== null && RE_DECIMAL.test(v) && new Decimal(v).gt(0)
+  if (r.precio !== null && !pos(r.precio)) return 'el precio tiene que ser mayor que cero'
+  if (r.importe !== null && !pos(r.importe)) return 'el importe tiene que ser mayor que cero'
+  if (r.tipo === 'vencimiento' && r.importe === null) return 'el vencimiento necesita el importe cobrado'
+  if (r.tipo === 'vencimiento' && r.precio !== null) return 'un vencimiento lleva el importe cobrado, no el precio'
+  if (r.tipo === 'venta' && r.precio === null && r.importe === null) return 'la venta necesita el precio o el importe'
+  if (a.ccl_del_dia === null) return `la ${r.tipo} necesita el CCL del día: tipealo arriba`
+  return null
+}
+
+export function estadoAusente(e: Elecciones, a: AusentePropuesto): EstadoItem {
+  if (e.ausentes[claveAusente(a)] === 'pendiente') return 'pendiente'
+  const r = registroAusente(e, a)
+  if (!r) return 'advertencia'
+  return problemaRegistroAusente(a, r) === null ? 'aceptada' : 'error'
 }
 
 export interface ItemBandeja {
@@ -127,7 +186,7 @@ export interface ItemBandeja {
   estado: EstadoItem
   fila?: DecisionFila
   saldo?: DecisionSaldo
-  ausente?: PropuestaCarga['ausentes'][number]
+  ausente?: AusentePropuesto
 }
 
 export interface ResumenBandeja {
@@ -155,10 +214,10 @@ export function resumirBandeja(p: PropuestaCarga | null, e: Elecciones, tiposDeC
       items.push({ clave: d.clave, tipo: 'saldo', cuenta: d.cuenta, estado: estadoSaldo(d, eleccionSaldo(e, d)), saldo: d })
     }
     for (const a of p.ausentes) {
-      const clave = claveAusente(a)
       // Una tenencia que la fuente no trae no se resuelve sola: queda a revisar
-      // hasta que la dejes pendiente (y la carga queda con listado incompleto).
-      items.push({ clave, tipo: 'ausente', cuenta: a.cuenta, estado: e.ausentes[clave] === 'pendiente' ? 'pendiente' : 'advertencia', ausente: a })
+      // hasta que registres la venta o el vencimiento, o la dejes pendiente (y
+      // entonces vale "sin dato" y la carga queda con listado incompleto).
+      items.push({ clave: claveAusente(a), tipo: 'ausente', cuenta: a.cuenta, estado: estadoAusente(e, a), ausente: a })
     }
   }
   items.sort((a, b) => ORDEN[a.estado] - ORDEN[b.estado])
@@ -215,8 +274,8 @@ export function textoBoton(r: ResumenBandeja, opciones: { leyendo: string[]; pro
  * que explica la TNA que muestra la captura, tomando la TNA con medio último
  * dígito de más (la mostrada está redondeada), o cuando baja (los intereses no
  * restan). Sin TNA no se pregunta nada: solo se muestra la diferencia (el
- * efectivo de un bróker sube y baja con cada compra y venta). La TNA puede
- * venir como fracción (0,275) o como porcentaje (27,5).
+ * efectivo de un bróker sube y baja con cada compra y venta). La TNA viene en
+ * porcentaje, como la muestra la captura (27,5 es 27,5 %).
  */
 export function saltoDeSaldo(
   anterior: string,
@@ -228,9 +287,10 @@ export function saltoDeSaldo(
   const suba = new Decimal(actual).minus(a)
   if (tna === null || dias <= 0) return { suba: suba.toFixed(), explicadoHasta: null, sinExplicar: null, baja: null }
   const baja = suba.lt(0) ? suba.negated().toDecimalPlaces(2).toFixed() : null
+  // El lector guarda la TNA siempre en porcentaje ("1" es 1 %, "27.5" es 27,5 %).
   const t = new Decimal(tna)
   const tope = t.plus(new Decimal(5).times(new Decimal(10).pow(-(t.decimalPlaces() + 1))))
-  const fraccion = t.gt(1) ? tope.div(100) : tope
+  const fraccion = tope.div(100)
   const explicado = a.abs().times(fraccion).times(dias).div(365)
   const sinExplicar = suba.minus(explicado)
   return {

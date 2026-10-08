@@ -82,6 +82,24 @@ export function sumaColumna(
   }
 }
 
+/**
+ * La suma parcial de un total que el motor dejó en "sin dato" porque le falta
+ * una parte (D-65): se vuelve a sumar con traza a partir de sus insumos, que
+ * son las partes de la suma (sumaCalc). No lee el texto del motivo. null si el
+ * total tiene valor, si no es una suma parcial, si algún insumo no es un monto
+ * en esa moneda (entonces no es una suma de partes) o si no se conoce ninguna.
+ */
+export function parcialDeTotal(total: CalcVista, moneda: 'ARS' | 'USD'): ReturnType<typeof sumaColumna> | null {
+  if (total.valor !== null || !total.etiquetas.includes('parcial') || total.insumos.length === 0) return null
+  if (total.insumos.some((i) => i.unidad !== moneda)) return null
+  const partes = total.insumos.map((i) => ({
+    nombre: i.nombre,
+    calc: i.calc ?? { valor: i.valor, formula: i.valor === null ? 'sin dato' : fmt(i.valor, moneda), insumos: [], etiquetas: [] },
+  }))
+  const r = sumaColumna(partes, moneda, total.explicacion ?? '')
+  return r.parcial && r.contadas > 0 ? r : null
+}
+
 function etiquetas(partes: { calc: CalcVista }[]): CalcVista['etiquetas'] {
   const orden = ['parcial', 'pendiente', 'viejo', 'inferido', 'declarado'] as const
   const todas = new Set(partes.flatMap((p) => p.calc.etiquetas))
@@ -157,6 +175,33 @@ export function fraccionDe(num: CalcVista, den: CalcVista, unidad: 'ARS' | 'USD'
     explicacion,
     insumos,
     etiquetas: [...new Set([...num.etiquetas, ...den.etiquetas])],
+  }
+}
+
+const DESDE: Record<'compra' | 'declarada' | 'apertura', { formula: string; explicacion: string }> = {
+  compra: { formula: 'desde tu primera compra registrada', explicacion: 'Días corridos desde tu primera compra registrada de esta posición.' },
+  declarada: { formula: 'desde la fecha de compra que declaraste', explicacion: 'Días corridos desde la fecha de compra que declaraste en la apertura.' },
+  apertura: {
+    formula: 'desde la apertura en la app',
+    explicacion: 'Días corridos desde la apertura en la app: la posición ya estaba antes de tu primera carga y no declaraste la fecha de compra (se declara desde la 1b). No es cuánto hace que la tenés.',
+  },
+}
+
+/**
+ * Los días en posición (Cartera), con su traza: de dónde se cuentan. La
+ * fecha de compra que declaraste lleva la etiqueta "declarado".
+ */
+export function diasEnPosicion(dias: number | null, desde: 'compra' | 'declarada' | 'apertura' | null): CalcVista {
+  if (dias === null || desde === null) {
+    return { valor: null, motivo: 'La posición no tiene fecha de inicio.', formula: 'sin dato', insumos: [], etiquetas: [] }
+  }
+  const d = DESDE[desde]
+  return {
+    valor: String(dias),
+    formula: `${numero(String(dias), 0)} ${dias === 1 ? 'día' : 'días'} ${d.formula}`,
+    explicacion: d.explicacion,
+    insumos: [],
+    etiquetas: desde === 'declarada' ? ['declarado'] : [],
   }
 }
 

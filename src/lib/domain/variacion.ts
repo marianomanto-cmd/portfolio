@@ -77,6 +77,8 @@ export interface Flujo {
    * cancelan entre el título y la caja.
    */
   externo: boolean
+  /** La operación de la posición que lo genera (para desglosar solo la tenencia vigente). */
+  operacion?: { id: number; tipo: Operacion['tipo']; cantidad: Decimal }
 }
 
 /** El intervalo entre observaciones frescas con que se atribuyó una partida. */
@@ -364,7 +366,7 @@ function flujosPosicion(ctx: Contexto, cuenta_id: number, activo_id: number, des
       default:
         continue
     }
-    out.push({ fecha: o.fecha, descripcion, ars, usd: ars.div(ccl), ccl, inferido, carga_id: o.carga_id, externo })
+    out.push({ fecha: o.fecha, descripcion, ars, usd: ars.div(ccl), ccl, inferido, carga_id: o.carga_id, externo, operacion: { id: o.id, tipo: o.tipo, cantidad: o.cantidad } })
   }
   return out
 }
@@ -680,6 +682,8 @@ export interface TramoDesdeCompra {
   resultado: Doble
 }
 
+const escalar = (d: Doble, k: Decimal): Doble => ({ ars: d.ars.times(k), usd: d.usd.times(k) })
+
 export type DesdeCompra =
   | { tipo: 'ok'; primera: Fecha; activo: Doble; tc: Doble; sin_atribuir: Doble; resultado: Doble; tramos: TramoDesdeCompra[] }
   | { tipo: 'sin_dato'; motivo: string }
@@ -748,23 +752,84 @@ export function desgloseDesdeCompra(h: Hechos, clave: string, hasta: Fecha, opci
       resultado: x.resultado,
     })
   }
+  // Solo la tenencia vigente (E', fase 3): una venta saca de lo acumulado la
+  // parte de lo vendido con el mismo promedio ponderado que el costo, y una
+  // renta no entra (D-114: el resultado de la fila es el del título). Así
+  // activo + TC + sin atribuir = resultado de la fila (valor − costo vigente).
   const cargas = ctx.cargas.filter((d) => d >= primera && d <= hasta)
+  const esBaja = (t?: Operacion['tipo']) => t === 'venta' || t === 'vencimiento'
   for (let i = 1; i < cargas.length; i++) {
-    const v = intervalo(ctx, cargas[i - 1], cargas[i])
+    const a = cargas[i - 1]
+    const b = cargas[i]
+    const v = intervalo(ctx, a, b)
     const f = v.faltantes.find((x) => x.clave === clave)
-    if (f) return { tipo: 'sin_dato', motivo: `Entre el ${fechaCorta(cargas[i - 1])} y el ${fechaCorta(cargas[i])}: ${f.motivo}` }
+    if (f) return { tipo: 'sin_dato', motivo: `Entre el ${fechaCorta(a)} y el ${fechaCorta(b)}: ${f.motivo}` }
     const c = v.contribuciones.find((x) => x.clave === clave)
     if (!c) continue
+    const ventas = ops.filter((o) => esBaja(o.tipo) && enRango(o.fecha, a, b))
+    const conRenta = c.flujos.some((x) => x.operacion?.tipo === 'renta') || (c.ancla?.flujos.some((x) => x.operacion?.tipo === 'renta') ?? false)
+    if (!ventas.length && !conRenta) {
+      tramos.push({ desde: a, hasta: b, tipo: 'intervalo', descripcion: `${fechaCorta(a)} → ${fechaCorta(b)}`, activo: c.activo, tc: c.tc, sin_atribuir: c.sin_atribuir, resultado: c.resultado })
+      continue
+    }
+    let pB: Decimal | null = null
+    let cB: Decimal | null = null
+    if (ventas.length) {
+      // Exacto si la venta cae en una carga con observación fresca: se toma al
+      // precio y al CCL de esa observación (la diferencia es de lo vendido).
+      if (
+        ventas.some((o) => o.fecha !== b) ||
+        !fresca(ctx, ref, b) ||
+        ops.some((o) => o.fecha === b && (o.tipo === 'apertura' || o.tipo === 'compra' || o.tipo === 'ajuste_ratio'))
+      )
+        return { tipo: 'no_aplica', motivo: `Hubo una venta el ${fechaCorta(ventas[0].fecha)} sin una observación fresca propia (precio y CCL de ese día), o junto con una compra o un cambio de ratio.` }
+      if (!c.ancla || c.ancla.hasta !== b) return { tipo: 'sin_dato', motivo: `Falta un valor para atribuir el intervalo ${fechaCorta(a)} → ${fechaCorta(b)}.` }
+      pB = (ctx.ix.cotizaciones.get(String(ref.activo_id)) ?? []).find((x) => x.fecha === b)?.precio_pesos ?? null
+      cB = ctx.cclTipeado.get(b) ?? null
+      if (pB === null || cB === null) return { tipo: 'sin_dato', motivo: `Falta el precio o el CCL del ${fechaCorta(b)}.` }
+    }
+    const ajustar = (fs: readonly Flujo[]): Flujo[] =>
+      fs
+        .filter((x) => x.operacion?.tipo !== 'renta')
+        .map((x) => {
+          if (!x.operacion || !esBaja(x.operacion.tipo) || x.fecha !== b || pB === null || cB === null) return x
+          const ars = x.operacion.cantidad.times(pB).negated()
+          return { ...x, ars, usd: ars.div(cB), ccl: cB }
+        })
+    const V0 = c.v0 ?? CERO2
+    const V1 = c.v1 ?? CERO2
+    const fl = ajustar(c.flujos)
+    const resultado: Doble = { ars: V1.ars.minus(V0.ars).minus(sumar(fl, 'ars')), usd: V1.usd.minus(V0.usd).minus(sumar(fl, 'usd')) }
+    let activoT = CERO2
+    let tcT = CERO2
+    if (c.ancla && !c.arrastrado) {
+      const x = d35(activo.moneda_riesgo, c.ancla.v0, c.ancla.v1, c.ancla.ccl0, c.ancla.ccl1, ajustar(c.ancla.flujos))
+      activoT = x.activo
+      tcT = x.tc
+    }
+    const notas = [conRenta ? 'sin cupones ni dividendos: el resultado de la fila es el del título (D-114)' : null, ventas.length ? 'la venta al precio y al CCL de ese día' : null].filter(Boolean)
     tramos.push({
-      desde: cargas[i - 1],
-      hasta: cargas[i],
+      desde: a,
+      hasta: b,
       tipo: 'intervalo',
-      descripcion: `${fechaCorta(cargas[i - 1])} → ${fechaCorta(cargas[i])}`,
-      activo: c.activo,
-      tc: c.tc,
-      sin_atribuir: c.sin_atribuir,
-      resultado: c.resultado,
+      descripcion: `${fechaCorta(a)} → ${fechaCorta(b)} (${notas.join('; ')})`,
+      activo: activoT,
+      tc: tcT,
+      sin_atribuir: { ars: limpiar(resultado.ars.minus(activoT.ars).minus(tcT.ars)), usd: limpiar(resultado.usd.minus(activoT.usd).minus(tcT.usd)) },
+      resultado,
     })
+    if (ventas.length) {
+      const despues = cantidadEn(ctx, k, b)
+      const antes = ventas.reduce((x, o) => x.plus(o.cantidad), despues)
+      const factor = despues.div(antes)
+      for (const t of tramos) {
+        t.activo = escalar(t.activo, factor)
+        t.tc = escalar(t.tc, factor)
+        t.sin_atribuir = escalar(t.sin_atribuir, factor)
+        t.resultado = escalar(t.resultado, factor)
+        t.descripcion += ` × ${numero(despues, 4, { min: 0 })} ÷ ${numero(antes, 4, { min: 0 })} (venta del ${fechaCorta(b)})`
+      }
+    }
   }
   const total = (sel: (t: TramoDesdeCompra) => Doble): Doble => tramos.reduce((a, t) => sumar2(a, sel(t)), CERO2)
   return {
@@ -784,18 +849,79 @@ export interface Cuadre {
   ars_ok: boolean | null
   usd_ok: boolean | null
   detalle: string
+  /**
+   * Patrimonio de hoy − patrimonio de la carga anterior − flujos externos −
+   * (activos + TC + sin atribuir), en cada moneda. 0 cuando cierra; null si no
+   * se puede verificar.
+   */
+  diferencia?: { ars: Calc; usd: Calc } | null
 }
+
+/** Pata de caja de una operación que va a un saldo que no está en ninguna de las dos fotos. */
+interface PataSinSaldo {
+  descripcion: string
+  cuenta: string
+  moneda: Moneda
+  ars: Decimal
+  usd: Decimal
+}
+
+/**
+ * Operaciones de (d0, d1] cuya plata entra o sale de un saldo que la app no
+ * tiene (la cuenta nunca cargó saldo en esa moneda): esa plata no aparece en
+ * ningún lado y el cuadre no cierra por ese monto (manual §4.1, caso conocido).
+ */
+function pataSinSaldo(ctx: Contexto, d0: Fecha, d1: Fecha): PataSinSaldo[] {
+  const conSaldo = new Set<string>()
+  for (const d of [d0, d1]) for (const i of fotoEn(ctx, d).items) if (i.clase === 'saldo') conSaldo.add(i.clave)
+  const out: PataSinSaldo[] = []
+  for (const o of ordenarOps(ctx.h.operaciones)) {
+    if (!enRango(o.fecha, d0, d1) || conSaldo.has(`s:${o.cuenta_id}:${o.moneda}`)) continue
+    let caja: Decimal | null = null
+    if (o.tipo === 'compra') {
+      const c = costoAlta(o)
+      const p = c === null ? precioDia(ctx, o.activo_id, o.fecha) : null
+      caja = c !== null ? c.negated() : p !== null ? o.cantidad.times(p).negated() : null
+    } else if (o.tipo === 'venta' || o.tipo === 'vencimiento') {
+      const c = ingresoBaja(o)
+      const p = c === null ? precioDia(ctx, o.activo_id, o.fecha) : null
+      caja = c !== null ? c : p !== null ? o.cantidad.times(p) : null
+    } else if (o.tipo === 'renta' || o.tipo === 'amortizacion') caja = o.importe
+    const ccl = o.ccl_del_dia ?? cclDe(ctx, o.fecha)
+    if (caja === null || ccl === null) continue
+    const cuenta = ctx.ix.cuentas.get(o.cuenta_id)?.nombre ?? `la cuenta ${o.cuenta_id}`
+    const ticker = ctx.ix.activos.get(o.activo_id)?.ticker ?? `activo ${o.activo_id}`
+    out.push({
+      descripcion: `${o.tipo} de ${ticker} del ${fechaCorta(o.fecha)} en ${cuenta} (${monto(caja.abs(), o.moneda, { decimales: 2 })})`,
+      cuenta,
+      moneda: o.moneda,
+      ars: o.moneda === 'ARS' ? caja : caja.times(ccl),
+      usd: o.moneda === 'USD' ? caja : caja.div(ccl),
+    })
+  }
+  return out
+}
+
+const CIERRA = new Decimal('1e-12')
 
 /**
  * El cuadre que puede fallar (B04): el patrimonio financiero recalculado
  * desde los hechos en las dos fechas, menos los flujos externos (aportes,
  * retiros, aperturas, saldos iniciales), tiene que dar la suma de activo + TC
  * + sin atribuir de cada partida. Solo una partida financiera sin dato lo
- * vuelve "no verificable" (B12).
+ * vuelve "no verificable" (B12). Cuando no cierra, dice por cuánto en cada
+ * moneda (con traza) y nombra las operaciones cuya plata fue a un saldo que
+ * la app no tiene (manual §4.1).
  */
 export function cuadre(v: Variacion, h: Hechos, opciones: { hoy?: Fecha } = {}): Cuadre {
   const falt = v.faltantes.filter((f) => f.clave.startsWith('p:') || f.clave.startsWith('s:'))
-  if (falt.length) return { ars_ok: null, usd_ok: null, detalle: `No verificable: ${falt.length} partida(s) financiera(s) sin dato.` }
+  if (falt.length)
+    return {
+      ars_ok: null,
+      usd_ok: null,
+      detalle: `No verificable: ${falt.length === 1 ? '1 partida financiera sin dato' : `${falt.length} partidas financieras sin dato`} (${falt.map((f) => `${f.nombre}: ${f.motivo.trim().replace(/\.+$/, '')}`).join('; ')}).`,
+      diferencia: null,
+    }
   const ctx = contexto(h, opciones.hoy ?? v.hasta)
   const fin = (d: Fecha, k: 'ars' | 'usd'): Decimal | null => {
     let t = CERO
@@ -808,25 +934,63 @@ export function cuadre(v: Variacion, h: Hechos, opciones: { hoy?: Fecha } = {}):
     return t
   }
   const cs = v.contribuciones.filter((c) => c.clase === 'posicion' || c.clase === 'saldo')
-  const chequear = (k: 'ars' | 'usd'): boolean | null => {
+  const diferencia = (k: 'ars' | 'usd'): Calc | null => {
+    const m: Moneda = k === 'ars' ? 'ARS' : 'USD'
     const p1 = fin(v.hasta, k)
     const p0 = fin(v.desde, k)
     if (p1 === null || p0 === null) return null
     const externos = cs.reduce((a, c) => a.plus(sumar(c.flujos.filter((f) => f.externo), k)), CERO)
     const partes = cs.reduce((a, c) => a.plus(c.activo[k]).plus(c.tc[k]).plus(c.sin_atribuir[k]), CERO)
-    return p1.minus(p0).minus(externos).minus(partes).abs().lte('1e-12')
+    const dif = p1.minus(p0).minus(externos).minus(partes)
+    const valor = dif.abs().lte(CIERRA) ? CERO : dif
+    const fm = (d: Decimal, signo = false) => monto(d, m, { decimales: 2, signo })
+    return calc(
+      valor,
+      `${fm(p1)} − ${fm(p0)} − flujos externos ${fm(externos, true)} − (activos + TC + sin atribuir) ${fm(partes, true)} = ${fm(valor, true)}`,
+      [
+        { nombre: `Patrimonio financiero del ${fechaCorta(v.hasta)}`, valor: p1.toFixed(), unidad: m },
+        { nombre: `Patrimonio financiero del ${fechaCorta(v.desde)}`, valor: p0.toFixed(), unidad: m },
+        { nombre: 'Aportes, retiros y otros flujos externos', valor: externos.toFixed(), unidad: m },
+        { nombre: 'Activos + TC + sin atribuir', valor: partes.toFixed(), unidad: m },
+      ],
+      {
+        explicacion:
+          'Lo que el desglose del día no explica del cambio de tu patrimonio financiero, recalculado desde los hechos. Tiene que dar 0: si no, la plata entró o salió por un saldo que la app no tiene, o es un bug (D-66).',
+      },
+    )
   }
-  const okA = chequear('ars')
-  const okU = chequear('usd')
-  if (okA === null || okU === null) return { ars_ok: null, usd_ok: null, detalle: 'No verificable: falta un valor del patrimonio financiero.' }
-  return {
-    ars_ok: okA,
-    usd_ok: okU,
-    detalle:
-      okA && okU
-        ? 'Patrimonio de hoy − patrimonio de la carga anterior − aportes y retiros = activos + TC + sin atribuir, en las dos monedas.'
-        : 'El desglose no cierra contra el patrimonio recalculado: revisar (puede faltar un saldo que recibió un cobro).',
+  const difA = diferencia('ars')
+  const difU = diferencia('usd')
+  if (difA === null || difU === null)
+    return { ars_ok: null, usd_ok: null, detalle: 'No verificable: falta un valor del patrimonio financiero.', diferencia: null }
+  const okA = (difA.valor as Decimal).isZero()
+  const okU = (difU.valor as Decimal).isZero()
+  if (okA && okU)
+    return {
+      ars_ok: true,
+      usd_ok: true,
+      detalle: 'Patrimonio de hoy − patrimonio de la carga anterior − aportes y retiros = activos + TC + sin atribuir, en las dos monedas.',
+      diferencia: { ars: difA, usd: difU },
+    }
+  const da = difA.valor as Decimal
+  const du = difU.valor as Decimal
+  let detalle = `El desglose no cierra por ${monto(da, 'ARS', { decimales: 2, signo: true })} · ${monto(du, 'USD', { decimales: 2, signo: true })}.`
+  const patas = pataSinSaldo(ctx, v.desde, v.hasta)
+  if (patas.length) {
+    const sinSaldo = [...new Set(patas.map((p) => `${p.cuenta} no tiene saldo en ${p.moneda === 'ARS' ? 'pesos' : 'dólares'} cargado`))]
+    // La plata que va a un saldo que no existe falta en el patrimonio: la diferencia es −Σ patas.
+    const restoA = da.plus(patas.reduce((a, p) => a.plus(p.ars), CERO))
+    const restoU = du.plus(patas.reduce((a, p) => a.plus(p.usd), CERO))
+    const explica = restoA.abs().lte('1e-9') && restoU.abs().lte('1e-9')
+    detalle += ` La plata de ${patas.length === 1 ? 'esta operación' : 'estas operaciones'} entró o salió de un saldo que la app no tiene: ${patas.map((p) => p.descripcion).join('; ')} (${sinSaldo.join('; ')}). ${
+      explica
+        ? 'Eso explica toda la diferencia.'
+        : `Lo que queda sin explicar (${monto(restoA, 'ARS', { decimales: 2, signo: true })} · ${monto(restoU, 'USD', { decimales: 2, signo: true })}) es un bug: revisar.`
+    }`
+  } else {
+    detalle += ' Puede faltar un saldo que recibió un cobro o pagó una compra; si no tiene explicación, es un bug: revisar.'
   }
+  return { ars_ok: okA, usd_ok: okU, detalle, diferencia: { ars: difA, usd: difU } }
 }
 
 // ───────────── Agregados con traza ─────────────

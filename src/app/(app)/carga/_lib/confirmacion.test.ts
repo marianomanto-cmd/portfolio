@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { Decimal } from '@/lib/domain/dinero'
 import { proponerCarga } from '@/lib/carga/conciliar'
 import type { LecturaCuenta } from '@/lib/carga/contratos'
-import { SIN_ELECCIONES, huellaFila, huellaSaldo, type Elecciones } from './bandeja'
-import { armarConfirmacion, type EntradaConfirmacion } from './confirmacion'
+import { SIN_ELECCIONES, claveAusente, huellaFila, huellaSaldo, type Elecciones, type RegistroAusente } from './bandeja'
+import { armarConfirmacion, cotizacionesDeExcel, type EntradaConfirmacion } from './confirmacion'
 import { aplicarEdiciones, type Ediciones } from './ediciones'
 import { CUENTAS_SIN_BASE, hechosSinBase } from './demo'
 import { catalogoEjemplo, lecturaGaliciaEjemplo, lecturaIEBEjemplo, lecturaMPEjemplo } from './ejemplos'
@@ -94,12 +94,12 @@ describe('armarConfirmacion', () => {
     // FIMA no está en el catálogo: no se graba.
     expect(galicia.cotizaciones).toEqual([{ activo_id: -5, precio_pesos: '1.0852' }])
     expect(galicia.listado_completo).toBe(false)
-    // MP: dos lecturas distintas, nunca las acepta el Enter general.
-    expect(mp.saldos).toEqual([])
-    expect(mp.listado_completo).toBe(false)
+    // MP: dos lecturas distintas, nunca las acepta el Enter general. Como no
+    // graba nada, no crea su carga (no reemplaza a la buena del día): queda
+    // dicho en el resumen.
+    expect(mp).toBeUndefined()
+    expect(r.resumen.sin_grabar).toEqual([{ cuenta: 'Mercado Pago', pendientes: 1 }])
     expect(r.resumen.pendientes).toBe(2)
-    const grabadoMP = mp.grabado as { saldos: { resolucion: string; motivo: string }[] }
-    expect(grabadoMP.saldos[0]).toMatchObject({ resolucion: 'pendiente', motivo: 'sin revisar al guardar' })
   })
 
   it('elegir una de las dos lecturas graba ese monto, con el motivo', () => {
@@ -267,5 +267,173 @@ describe('D-19, referencia del CCL y motivo principal', () => {
     const r = armarConfirmacion(e)
     expect(r).toEqual({ ok: false, errores: [expect.stringContaining('La cuenta no cierra')] })
     expect(r.ok ? '' : r.errores[0]).not.toContain('Detalle menor')
+  })
+})
+
+// ───────────── Revisión de la fase 1a (números inventados) ─────────────
+
+const cargaIEB = (id: number, fecha: string, extra: object = {}) => ({
+  id, lote: null, fecha, cuenta_id: 1, origen: 'excel' as const, archivo_path: 'x', estado: 'vigente' as const,
+  creado_en: `${fecha}T13:00:00Z`, reemplaza_a: null, lector: null, tiempo_activo_ms: null, ...extra,
+})
+
+describe('tenencias que la fuente ya no lista: venta, vencimiento o pendiente', () => {
+  // IEB ya cargada con 1.240 SPY y 1.000.000 de la LECAP S13N6; el Excel de hoy no trae ninguna de las dos.
+  function hechosConTenencias() {
+    const hechos = hechosSinBase(catalogoEjemplo())
+    hechos.activos = hechos.activos.map((a) => (a.ticker === 'S13N6' ? { ...a, fecha_vencimiento: '2026-10-13' } : a))
+    const b = { fecha_origen: null, cuenta_id: 1, moneda: 'ARS' as const, importe: null, comisiones: new Decimal(0), carga_id: 1, notas: null, ccl_del_dia: null }
+    hechos.operaciones.push(
+      { ...b, id: 40, fecha: '2026-10-01', activo_id: -1, tipo: 'apertura', cantidad: new Decimal(1240), precio: new Decimal('30145.16') },
+      { ...b, id: 41, fecha: '2026-10-01', activo_id: -5, tipo: 'apertura', cantidad: new Decimal(1_000_000), precio: new Decimal('1.02') },
+    )
+    hechos.cargas.push(cargaIEB(1, '2026-10-13'))
+    return hechos
+  }
+  const sinPosiciones = () => ({ ...lecturaIEBEjemplo(FECHA), filas: [] })
+  const elegir = (base: EntradaConfirmacion, porTicker: Record<string, 'pendiente' | Omit<RegistroAusente, 'cantidad'> & { cantidad?: string }>): Elecciones => {
+    const ausentes: Record<string, Elecciones['ausentes'][string]> = {}
+    for (const a of base.propuesta.ausentes) {
+      const x = porTicker[a.ticker]
+      if (x === undefined) continue
+      ausentes[claveAusente(a)] = x === 'pendiente' ? 'pendiente' : { cantidad: a.cantidad_app, ...x }
+    }
+    return { ...SIN_ELECCIONES, ausentes }
+  }
+
+  it('sin elegir nada: quedan en lo grabado con su activo y su cuenta (así valen "sin dato"), y el listado queda incompleto', () => {
+    const base = entrada([sinPosiciones()], { hechos: hechosConTenencias() })
+    expect(base.propuesta.ausentes.map((a) => [a.ticker, a.sugerida])).toEqual([
+      ['SPY', 'venta'],
+      ['S13N6', 'vencimiento'],
+    ])
+    const r = armarConfirmacion({ ...base, elecciones: elegir(base, { S13N6: 'pendiente' }) })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    const [ieb] = r.confirmacion.cuentas
+    expect(ieb.operaciones).toEqual([])
+    expect(ieb.listado_completo).toBe(false)
+    expect((ieb.grabado as { ausentes: unknown[] }).ausentes).toEqual([
+      { ticker: 'SPY', activo_id: -1, cuenta_id: 1, cantidad_app: '1240', resolucion: 'sin revisar al guardar' },
+      { ticker: 'S13N6', activo_id: -5, cuenta_id: 1, cantidad_app: '1000000', resolucion: 'pendiente' },
+    ])
+    expect(r.resumen.cuentas[0].pendientes).toBe(2)
+  })
+
+  it('registrada: la venta (precio tipeado) y el vencimiento (importe cobrado) se graban con el CCL del día, nunca con el último precio', () => {
+    const base = entrada([sinPosiciones()], { hechos: hechosConTenencias() })
+    const r = armarConfirmacion({
+      ...base,
+      elecciones: elegir(base, { SPY: { tipo: 'venta', precio: '35150', importe: null }, S13N6: { tipo: 'vencimiento', precio: null, importe: '1049000' } }),
+    })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    const [ieb] = r.confirmacion.cuentas
+    expect(ieb.operaciones).toEqual([
+      { activo_id: -1, tipo: 'venta', cantidad: '1240', moneda: 'ARS', precio: '35150', importe: null, comisiones: '0', ccl_del_dia: '1548.2', fecha_origen: null, notas: 'IEB ya no lo lista' },
+      { activo_id: -5, tipo: 'vencimiento', cantidad: '1000000', moneda: 'ARS', precio: null, importe: '1049000', comisiones: '0', ccl_del_dia: '1548.2', fecha_origen: null, notas: 'IEB ya no lo lista' },
+    ])
+    expect(ieb.listado_completo).toBe(true)
+    expect((ieb.grabado as { ausentes: { resolucion: string }[] }).ausentes.map((a) => a.resolucion)).toEqual(['registrada', 'registrada'])
+    expect(r.resumen.cuentas[0]).toMatchObject({ operaciones: 2, pendientes: 0 })
+  })
+
+  it('lo que falta para registrarla frena el Enter con su motivo: el importe de un vencimiento, el CCL', () => {
+    const base = entrada([sinPosiciones()], { hechos: hechosConTenencias() })
+    const sinImporte = armarConfirmacion({ ...base, elecciones: elegir(base, { S13N6: { tipo: 'vencimiento', precio: null, importe: null }, SPY: 'pendiente' }) })
+    expect(sinImporte).toEqual({ ok: false, errores: ['IEB · S13N6: el vencimiento necesita el importe cobrado.'] })
+
+    const sinCcl = entrada([sinPosiciones()], { hechos: hechosConTenencias(), ccl: null })
+    const r = armarConfirmacion({ ...sinCcl, elecciones: elegir(sinCcl, { SPY: { tipo: 'venta', precio: '35150', importe: null }, S13N6: 'pendiente' }) })
+    expect(r).toEqual({ ok: false, errores: ['IEB · SPY: la venta necesita el CCL del día: tipealo arriba.'] })
+  })
+
+  it('sin CCL tipeado, usa el que el día ya tiene (recarga a la tarde)', () => {
+    const sinCcl = entrada([sinPosiciones()], { hechos: hechosConTenencias(), ccl: null })
+    const r = armarConfirmacion({
+      ...sinCcl,
+      ccl_del_dia: '1547.9',
+      elecciones: elegir(sinCcl, { SPY: { tipo: 'venta', precio: null, importe: '43500000' }, S13N6: 'pendiente' }),
+    })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.confirmacion.cuentas[0].operaciones).toEqual([expect.objectContaining({ tipo: 'venta', importe: '43500000', precio: null, ccl_del_dia: '1547.9' })])
+    // El tipo de cambio que se graba es solo lo tipeado: el CCL del día no se vuelve a grabar.
+    expect(r.confirmacion.tipo_cambio).toEqual({ ccl: null, cripto_venta: '1541', mep: null, oficial: null })
+  })
+
+  it('una elección vieja (la app tiene otra cantidad) no se graba: la ausente vuelve a quedar sin revisar', () => {
+    const base = entrada([sinPosiciones()], { hechos: hechosConTenencias() })
+    const vieja = elegir(base, { SPY: { tipo: 'venta', precio: '35150', importe: null, cantidad: '1000' }, S13N6: 'pendiente' })
+    const r = armarConfirmacion({ ...base, elecciones: vieja })
+    expect(r.ok && r.confirmacion.cuentas[0].operaciones).toEqual([])
+    expect(r.ok && (r.confirmacion.cuentas[0].grabado as { ausentes: { resolucion: string }[] }).ausentes[0].resolucion).toBe('sin revisar al guardar')
+  })
+})
+
+describe('una fuente que no graba nada no crea su carga', () => {
+  it('Mercado Pago con el saldo pendiente: no reemplaza a la carga buena del día; el resumen lo dice', () => {
+    const r = armarConfirmacion(entrada([lecturaMPEjemplo()]))
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.confirmacion.cuentas).toEqual([])
+    expect(r.resumen.sin_grabar).toEqual([{ cuenta: 'Mercado Pago', pendientes: 1 }])
+  })
+
+  it('sin tipo de cambio y con todo pendiente: "Nada para guardar" con el porqué', () => {
+    const r = armarConfirmacion({ ...entrada([lecturaMPEjemplo()]), tc: { ccl: null, cripto_venta: null } })
+    expect(r).toEqual({ ok: false, errores: ['Nada para guardar: todo lo de Mercado Pago quedó pendiente.'] })
+  })
+})
+
+describe('"Ya la tenía": una tenencia que quedó pendiente el Día cero entra como apertura', () => {
+  it('elegida, se graba la apertura con el PPP y sin CCL, en vez de la compra', () => {
+    const hechos = hechosSinBase(catalogoEjemplo())
+    hechos.cargas.push(cargaIEB(1, '2026-10-07'))
+    const l = lecturaIEBEjemplo(FECHA)
+    l.filas = l.filas.filter((f) => f.ticker === 'T30J7')
+    const base = entrada([l], { hechos, ccl: null })
+    const d = base.propuesta.filas[0]
+    expect(d.accion).toBe('compra')
+    expect(d.estado).toBe('error') // la compra necesita el CCL del día
+    expect(d.apertura_alternativa).toMatchObject({ tipo: 'apertura', cantidad: '9000000', precio: '1.0976', ccl_del_dia: null })
+    const elecciones: Elecciones = {
+      ...SIN_ELECCIONES,
+      filas: { [d.clave]: { resolucion: 'aceptada', motivo: 'ya la tenía', operacion: null, apertura: true, huella: huellaFila(d) } },
+    }
+    const r = armarConfirmacion({ ...base, elecciones })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.confirmacion.cuentas[0].operaciones).toEqual([
+      expect.objectContaining({ tipo: 'apertura', activo_id: -3, cantidad: '9000000', precio: '1.0976', ccl_del_dia: null }),
+    ])
+    expect((r.confirmacion.cuentas[0].grabado as { filas: { como_apertura?: boolean }[] }).filas[0].como_apertura).toBe(true)
+  })
+})
+
+describe('un precio por activo y por día, también entre lotes: una captura no pisa el del Excel', () => {
+  it('cotizacionesDeExcel: los precios del día que grabó un Excel no revertido', () => {
+    const hechos = hechosSinBase(catalogoEjemplo())
+    hechos.cargas.push(cargaIEB(1, FECHA), cargaIEB(2, FECHA, { estado: 'revertida' }), { ...cargaIEB(3, FECHA), cuenta_id: 2, origen: 'captura' as const })
+    const c = (activo_id: number, precio: string, carga_id: number, fecha = FECHA) => ({ fecha, activo_id, precio_pesos: new Decimal(precio), precio_usd_subyacente: null, carga_id })
+    hechos.cotizaciones.push(c(-3, '1.124', 1), c(-1, '35150', 2), c(-5, '1.0852', 3), c(-2, '52300', 1, '2026-10-13'))
+    expect(cotizacionesDeExcel(hechos, FECHA)).toEqual([{ activo_id: -3, precio_pesos: '1.124', cuenta: 'IEB' }])
+  })
+
+  it('la captura posterior no graba su precio y lo anota: vale el de IEB, grabado antes hoy', () => {
+    const g = lecturaGaliciaEjemplo()
+    g.filas = [{ ...g.filas[0], clave: 'Galicia:T30J7', ticker: 'T30J7', precio_unitario: '1.125', valorizado: null, chequeo: null }]
+    const r = armarConfirmacion({ ...entrada([g]), cotizaciones_excel: [{ activo_id: -3, precio_pesos: '1.124', cuenta: 'IEB' }] })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.confirmacion.cuentas[0].cotizaciones).toEqual([])
+    const gr = r.confirmacion.cuentas[0].grabado as { filas: { nota: string }[] }
+    expect(gr.filas[0].nota).toBe('precio no grabado: vale el de IEB, grabado antes hoy (1.124); esta fuente mostraba 1.125')
+  })
+
+  it('un Excel posterior sí lo reemplaza (el Excel manda)', () => {
+    const l = lecturaIEBEjemplo(FECHA)
+    const r = armarConfirmacion({ ...entrada([l]), cotizaciones_excel: [{ activo_id: -3, precio_pesos: '1.12', cuenta: 'IEB' }] })
+    expect(r.ok && r.confirmacion.cuentas[0].cotizaciones).toContainEqual({ activo_id: -3, precio_pesos: '1.124' })
   })
 })

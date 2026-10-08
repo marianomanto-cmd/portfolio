@@ -775,7 +775,8 @@ function armarFila(h: Hoja, s: Seccion, clase: ClaseSeccion, p: Posicion, clave:
 
   // PPP: en la escala de la fuente y por 1 VN.
   let ppcMostrado: Decimal | null = null
-  if (p.ppp.k === 'n' && p.ppp.v.isPositive()) {
+  // gt(0) y no isPositive(): en decimal.js, isPositive() es true para el 0 (arquitectura §12, D-107).
+  if (p.ppp.k === 'n' && p.ppp.v.gt(0)) {
     ppcMostrado = p.ppp.v
   } else if (p.ppp.k === 'n') {
     avisos.push(`PPP en ${fPrecio(p.ppp.v)}: el costo queda sin dato.`)
@@ -983,6 +984,7 @@ function armarPosiciones(h: Hoja, pat: Patrimonio) {
     }
     let sumaSeccion: Decimal | null = new Decimal(0)
     let tolSeccion = new Decimal(0)
+    const desde = filas.length
     for (const p of s.posiciones) {
       const val = valorNum(p.posicion)
       if (val === null || p.posicion.k !== 'n') {
@@ -1023,6 +1025,13 @@ function armarPosiciones(h: Hoja, pat: Patrimonio) {
     const c = controlSubtotal(s, nombre, sumaSeccion, tolSeccion)
     if (typeof c === 'string') advertencias.push(c)
     else if (c) subtotales.push(c)
+    // Un Subtotal que no cierra: lo raro va arriba y nada de la sección se guarda
+    // como verificado (D-11), igual que en Galicia cuando su total no cierra.
+    if (c && typeof c !== 'string' && c.ok === false) {
+      const motivo = `El Subtotal de ${nombre} no cierra con lo leído: ¿falta una posición o hay un número mal leído?`
+      for (const f of filas.slice(desde)) degradar(f, motivo)
+      advertencias.push(`${motivo} ${c.detalle ?? ''}`.trim())
+    }
   }
 
   // Un ticker repetido no se puede conciliar por separado (D-15).
@@ -1213,6 +1222,13 @@ function controlB2(
   }
 }
 
+/** Una fila o un saldo que no se puede dar por verificado: pasa a advertencia (no se graba con el Enter general). */
+function degradar(x: { estado: FilaLeida['estado']; motivos: string[] }, motivo: string) {
+  if (x.estado === 'error') return
+  x.estado = 'advertencia'
+  if (!x.motivos.includes(motivo)) x.motivos.push(motivo)
+}
+
 // ───────────── Lectura completa ─────────────
 
 /** Lee el Excel "Portafolio" exportado por IEB. Determinístico, sin IA. */
@@ -1240,6 +1256,13 @@ export async function leerExcelIEB(datos: ArrayBuffer | Uint8Array): Promise<Lec
   const b2 = controlB2(pat.b2, pos.suma, sdo.ars, sdo.usd, pos.dolares, hS)
 
   const advertencias = [...pat.advertencias, ...sal.advertencias, ...pos.advertencias, ...sdo.advertencias, ...b2.advertencias]
+  if (b2.control?.ok === false) {
+    // B2 no cierra: algo de la cuenta está mal leído o falta. Nada queda verificado.
+    const motivo = 'El Patrimonio total (B2) no cierra con lo leído: ¿falta una posición o hay un número mal leído?'
+    for (const f of pos.filas) degradar(f, motivo)
+    for (const x of sdo.saldos) degradar(x, motivo)
+    advertencias.unshift(`${motivo} ${b2.control.detalle ?? ''}`.trim())
+  }
   if (pat.numerosComoTexto.length) {
     const refs = pat.numerosComoTexto
     advertencias.push(

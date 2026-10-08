@@ -17,6 +17,7 @@ import {
   huellaSaldo,
   resumirBandeja,
   textoBoton,
+  type EleccionAusente,
   type EleccionFila,
   type EleccionSaldo,
   type Elecciones,
@@ -321,10 +322,10 @@ export function PantallaCarga({ contexto }: { contexto: ContextoCarga }) {
       return { ...x, saldos }
     })
   }, [])
-  const elegirAusente = useCallback((clave: string, pendiente: boolean) => {
+  const elegirAusente = useCallback((clave: string, e: EleccionAusente | null) => {
     setElecciones((x) => {
       const ausentes = { ...x.ausentes }
-      if (pendiente) ausentes[clave] = 'pendiente'
+      if (e !== null) ausentes[clave] = e
       else delete ausentes[clave]
       return { ...x, ausentes }
     })
@@ -651,7 +652,11 @@ export function PantallaCarga({ contexto }: { contexto: ContextoCarga }) {
             <Bandeja
               resumen={resumen}
               propuesta={lecturas.length ? propuesta : null}
-              eleccionDe={{ fila: (d) => eleccionFila(elecciones, d), saldo: (d) => eleccionSaldo(elecciones, d) }}
+              eleccionDe={{
+                fila: (d) => eleccionFila(elecciones, d),
+                saldo: (d) => eleccionSaldo(elecciones, d),
+                ausente: (clave) => elecciones.ausentes[clave] ?? null,
+              }}
               edicionDe={(clave) => ediciones[clave] ?? null}
               avisos={avisos}
               fecha={fecha}

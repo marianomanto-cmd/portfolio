@@ -99,7 +99,17 @@ export interface VistaHoy {
   aviso_fin_de_anio: string | null
   /** Quién movió la variación del día, ordenado por aporte absoluto. */
   movimientos: MovimientoActivo[]
-  cuadre: { ars_ok: boolean | null; usd_ok: boolean | null; detalle: string }
+  cuadre: {
+    ars_ok: boolean | null
+    usd_ok: boolean | null
+    detalle: string
+    /**
+     * Patrimonio de hoy − el de la carga anterior − flujos externos − (activos
+     * + TC + sin atribuir), con traza: "0" si cierra, el monto si no ("no cierra
+     * por $ X"). null o ausente si no se puede verificar.
+     */
+    diferencia?: Par | null
+  }
 }
 
 export interface MovimientoActivo {

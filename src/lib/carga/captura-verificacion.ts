@@ -632,6 +632,16 @@ function normalizarNombre(t: string | null): string {
   return (t ?? '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim()
 }
 
+/** Largo máximo de un ticker en el catálogo (esquemaActivo y escritura.tickerValido). */
+export const MAX_TICKER = 30
+
+/** "Fima Premium Clase A" → "FIMA-PREMIUM-CLASE-A": un ticker válido y estable para un fondo sin código. */
+export function tickerDeNombre(nombre: string): string {
+  return normalizarNombre(nombre)
+    .replace(/[^A-Z0-9.]+/g, '-')
+    .replace(/^[-.]+|[-.]+$/g, '')
+}
+
 function claveFila(f: FilaModelo): string {
   const t = normalizarTicker(f.ticker)
   return t !== '' ? `T:${t}` : f.nombre ? `N:${normalizarNombre(f.nombre)}` : ''
@@ -799,7 +809,10 @@ function armarFilaGalicia(
     diferencias.unshift({ campo: 'ticker', a: fa.ticker ?? 'ilegible', b: fb.ticker ?? 'ilegible', elegida: tickerA ? 'A' : 'B' })
     alternativas.unshift({ campo: 'ticker', a: fa.ticker ?? 'ilegible', b: fb.ticker ?? 'ilegible', propuesta: tickerA ? 'A' : 'B' })
   }
-  if (ticker === '' && seccion === 'fci' && nombre) ticker = normalizarNombre(nombre)
+  // Un fondo sin código (FIMA) usa su nombre como ticker (D-108), en una forma
+  // que el catálogo acepta y que da igual todos los días: mayúsculas, sin tildes
+  // y con un guion en lugar de espacios y signos ("FIMA-PREMIUM-CLASE-A").
+  if (ticker === '' && seccion === 'fci' && nombre) ticker = tickerDeNombre(nombre)
 
   if (solo) {
     motivos.push(`Solo la lectura ${solo} vio esta fila: confirmala contra la captura.`)
@@ -807,6 +820,11 @@ function armarFilaGalicia(
   }
   if (ticker === '') {
     motivos.push('Especie ilegible: no se sabe de qué activo es esta fila.')
+    estado = 'error'
+  } else if (ticker.length > MAX_TICKER) {
+    motivos.unshift(
+      `El nombre del fondo da un código de más de ${MAX_TICKER} caracteres ("${corto(ticker)}"): no se puede dar de alta así. Dejalo pendiente.`,
+    )
     estado = 'error'
   }
   for (const d of diferencias) {
@@ -871,6 +889,8 @@ function armarFilaGalicia(
     seccion,
     tipo_sugerido: tipoSugerido(seccion, fa ?? (fb as FilaModelo)),
     moneda_emision: moneda,
+    // Lo que se ve en U$D (sección "Bonos en dólares") no es un precio en pesos.
+    ...(moneda === 'USD' ? { moneda_precio: 'USD' as const } : {}),
     cantidad: valorDe(v.cantidad),
     precio_mostrado: valorDe(v.precio),
     escala,
@@ -979,11 +999,17 @@ function armarGalicia(a: SalidaModelo | null, b: SalidaModelo | null): Resultado
         continue
       }
       let control: ControlLeido
+      // Qué tenencias cubre este total: las de la sección y la moneda. Si cierra,
+      // una tenencia de la app de esa sección y moneda que no está, falta (ausente).
+      const tipoSeccion = seccionDe(sec.titulo, { ticker: null, nombre: null } as unknown as FilaModelo)
+      const cobertura = tipoSeccion && tipoSeccion !== 'otros' ? { seccion: tipoSeccion, moneda: moneda ?? 'ARS' } : null
       if (filasMoneda.length === 0 && filasSec.length === 0) {
         const informado = candidatos[0]
         control = {
           tipo: 'galicia_total',
           seccion: t.etiqueta,
+          moneda: moneda ?? 'ARS',
+          cobertura,
           informado: informado.valor as string,
           calculado: null,
           ok: new Decimal(informado.valor as string).isZero() ? true : null,
@@ -999,6 +1025,8 @@ function armarGalicia(a: SalidaModelo | null, b: SalidaModelo | null): Resultado
         control = {
           tipo: 'galicia_total',
           seccion: t.etiqueta,
+          moneda: moneda ?? 'ARS',
+          cobertura,
           informado: candidatos[0].valor as string,
           calculado: null,
           ok: null,
@@ -1013,6 +1041,8 @@ function armarGalicia(a: SalidaModelo | null, b: SalidaModelo | null): Resultado
         control = {
           tipo: 'galicia_total',
           seccion: t.etiqueta,
+          moneda: moneda ?? 'ARS',
+          cobertura,
           informado: elegido.c.valor as string,
           calculado: elegido.r.calculado.toFixed(),
           ok: elegido.r.ok,

@@ -12,6 +12,7 @@ import { conjuntoFeriados, esViejo, fechaCorta } from './fechas'
 import { tenencias, type Tenencia } from './posiciones'
 import type {
   Activo,
+  Ausente,
   Bien,
   BienValuacion,
   Cotizacion,
@@ -50,6 +51,11 @@ export interface ItemFoto {
   /** Positivo para activos, negativo para deudas. */
   valor_ars: Calc
   valor_usd: Calc
+  /**
+   * Posición que la fuente de su cuenta ya no lista desde `fecha` (venta total
+   * o vencimiento sin registrar): vale "sin dato" con `motivo` (ver Ausente).
+   */
+  ausente?: { fecha: Fecha; carga_id: number; motivo: string } | null
 }
 
 export interface Foto {
@@ -92,6 +98,8 @@ export interface Indices {
   feriados: Set<Fecha>
   activos: Map<number, Activo>
   cuentas: Map<number, Cuenta>
+  /** Ausentes por `${cuenta_id}:${activo_id}`, por fecha ascendente. */
+  ausentes: Map<string, Ausente[]>
 }
 
 export function indexar(h: Hechos): Indices {
@@ -104,7 +112,22 @@ export function indexar(h: Hechos): Indices {
     feriados: conjuntoFeriados(h.feriados, 'AR'),
     activos: new Map(h.activos.map((a) => [a.id, a])),
     cuentas: new Map(h.cuentas.map((c) => [c.id, c])),
+    ausentes: agrupar(h.ausentes ?? [], (a) => `${a.cuenta_id}:${a.activo_id}`),
   }
+}
+
+/**
+ * La ausencia que rige a una fecha: la primera declarada en o antes de esa
+ * fecha (la fuente no la lista desde entonces). Antes de esa fecha la tenencia
+ * se valúa como siempre.
+ */
+export function ausenteA(ix: Indices, cuenta_id: number, activo_id: number, fecha: Fecha): Ausente | null {
+  return (ix.ausentes.get(`${cuenta_id}:${activo_id}`) ?? []).find((a) => a.fecha <= fecha) ?? null
+}
+
+/** "IEB ya no la lista desde el mar 06/10: registrá la venta o el vencimiento en Cargar." */
+export function motivoAusente(cuenta: Cuenta | null, a: Ausente): string {
+  return `${cuenta?.nombre ?? 'Tu cuenta'} ya no la lista desde el ${fechaCorta(a.fecha)}: registrá la venta o el vencimiento en Cargar.`
 }
 
 /** CCL vigente a una fecha (el último cargado en o antes de esa fecha). */
@@ -211,8 +234,27 @@ function armarFoto(h: Hechos, fecha: Fecha, opciones: { hoy?: Fecha; ix?: Indice
           { etiquetas: etiq, explicacion: 'El último precio que cargaste para este título.' },
         )
       : sinDato(motivoSinPrecio)
+    // La fuente de la cuenta ya no la lista y la venta (o el vencimiento) no
+    // está registrada: valuarla al último precio la contaría dos veces (la
+    // plata de la venta ya está en el saldo). Vale "sin dato" hasta que se
+    // registre, y todo total que la incluya muestra la suma parcial (D-65).
+    const aus = ausenteA(ix, t.cuenta_id, t.activo_id, fecha)
+    const motivoAus = aus ? motivoAusente(cuenta, aus) : null
     const valorArs: Calc =
-      cot === null
+      aus && motivoAus
+        ? sinDato(
+            motivoAus,
+            [
+              insCant,
+              deCalc('Último precio cargado', precio, 'ARS'),
+              { nombre: `${cuenta?.nombre ?? 'La cuenta'} no trae ${activo.ticker} desde el`, valor: aus.fecha, unidad: 'fecha', origen: { carga_id: aus.carga_id } },
+            ],
+            {
+              etiquetas: ['pendiente'],
+              explicacion: `La última carga de ${cuenta?.nombre ?? 'la cuenta'} ya no trae ${activo.ticker} y dejaste la fila pendiente. Si la vendiste o venció, la plata ya está en tu saldo: valuarla además al último precio la contaría dos veces.`,
+            },
+          )
+        : cot === null
         ? sinDato(cotUlt ? motivoSinPrecio : `Falta el precio de ${activo.ticker}.`, [insCant])
         : trazado(
             t.cantidad.times(cot.precio_pesos),
@@ -240,6 +282,7 @@ function armarFoto(h: Hechos, fecha: Fecha, opciones: { hoy?: Fecha; ix?: Indice
       viejo,
       valor_ars: valorArs,
       valor_usd: valorUsd,
+      ausente: aus && motivoAus ? { fecha: aus.fecha, carga_id: aus.carga_id, motivo: motivoAus } : null,
     })
   }
 

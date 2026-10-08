@@ -6,7 +6,7 @@ import type { CalcVista } from '@/lib/domain/calc'
 import { numero } from '@/lib/domain/dinero'
 import { fechaCorta } from '@/lib/domain/fechas'
 import type { FilaCartera, VistaCartera } from '@/lib/vistas/contratos'
-import { compararCifras, decimalesPrecio, fraccionDe, restoMayor, sumaColumna } from '@/components/calculos'
+import { compararCifras, decimalesPrecio, diasEnPosicion, fraccionDe, restoMayor, sumaColumna } from '@/components/calculos'
 import { Monto, MontoTrazado, Porcentaje, SinDato } from '@/components/monto'
 import { Traza } from '@/components/traza'
 import { Chip, ChipEtiqueta, Rotulo } from '@/components/ui'
@@ -43,7 +43,7 @@ function desgloseEn(f: FilaCartera, moneda: 'ARS' | 'USD'): { activo: CalcVista;
 
 const SIN_DESGLOSE: CalcVista = {
   valor: null,
-  motivo: 'Sin el resultado en dólares no se puede separar activo de tipo de cambio. Declarando el CCL de compra en Datos, aparece.',
+  motivo: 'Sin el resultado en dólares no se puede separar activo de tipo de cambio. Si es una apertura sin CCL de compra, ese CCL se declara desde la 1b (Pendientes).',
   formula: 'sin dato',
   insumos: [],
   etiquetas: [],
@@ -136,7 +136,7 @@ function Celda({ f, k }: { f: FilaCartera; k: Clave }) {
     case 'tc_ars': {
       const moneda = k === 'tc_usd' ? 'USD' : 'ARS'
       const d = desgloseEn(f, moneda)
-      if (!d) return <Traza calc={SIN_DESGLOSE} titulo={`${t} · activo / TC en ${moneda === 'USD' ? 'dólares' : 'pesos'}`}><SinDato /></Traza>
+      if (!d) return <Traza calc={SIN_DESGLOSE} titulo={`${t} · activo / TC en ${moneda === 'USD' ? 'dólares' : 'pesos'}`}><SinDato motivo={SIN_DESGLOSE.motivo} /></Traza>
       // Lo que se ve suma exacto el resultado que se ve (resto mayor, visión §4.0).
       const total = moneda === 'USD' ? f.resultado.usd : f.resultado.ars
       const dec = moneda === 'USD' ? 2 : 0
@@ -179,8 +179,20 @@ function Celda({ f, k }: { f: FilaCartera; k: Clave }) {
           {f.cantidad.valor === null ? <SinDato /> : <span className="num">{numero(f.cantidad.valor, 4, { min: 0 })}</span>}
         </Traza>
       )
-    case 'dias':
-      return f.dias_en_posicion === null ? <SinDato /> : <span className="num">{f.dias_en_posicion}</span>
+    case 'dias': {
+      // De dónde se cuentan, a la vista: "desde apertura" no es cuánto hace que la tenés.
+      const c = diasEnPosicion(f.dias_en_posicion, f.dias_desde)
+      return (
+        <Doble
+          arriba={
+            <Traza calc={c} titulo={`${t} · días en posición`}>
+              {c.valor === null ? <SinDato motivo={c.motivo} /> : <span className="num">{c.valor}</span>}
+            </Traza>
+          }
+          abajo={f.dias_desde === 'apertura' ? <Chip>desde apertura</Chip> : <ChipEtiqueta calc={c} />}
+        />
+      )
+    }
     case 'valor_ars':
       return <MontoTrazado calc={f.valor.ars} moneda="ARS" titulo={`${t} · valor en pesos`} />
     case 'valor_usd':
@@ -306,10 +318,33 @@ function useTotales(pos: FilaCartera[], liq: FilaCartera[], completo: boolean, v
   }, [pos, liq, completo, v])
 }
 
-function TotalCelda({ t, moneda, titulo, signo = true, color = true }: { t: ReturnType<typeof sumaColumna>; moneda: 'ARS' | 'USD'; titulo: string; signo?: boolean; color?: boolean }) {
+function TotalCelda({
+  t,
+  moneda,
+  titulo,
+  signo = true,
+  color = true,
+  rotulo,
+}: {
+  t: ReturnType<typeof sumaColumna>
+  moneda: 'ARS' | 'USD'
+  titulo: string
+  signo?: boolean
+  color?: boolean
+  /** Rótulo pegado al total, en su renglón ("TC sin dato"), y la suma parcial debajo. */
+  rotulo?: string
+}) {
+  const total = <MontoTrazado calc={t.total} moneda={moneda} titulo={titulo} signo={signo} color={color} />
   return (
     <span className="inline-flex flex-col items-end leading-tight">
-      <MontoTrazado calc={t.total} moneda={moneda} titulo={titulo} signo={signo} color={color} />
+      {rotulo ? (
+        <span className="inline-flex items-baseline gap-1">
+          <span>{rotulo}</span>
+          {total}
+        </span>
+      ) : (
+        total
+      )}
       {t.parcial ? (
         <span className="flex flex-col items-end text-[12px] font-normal text-muted">
           <span>suma parcial ({t.contadas} de {t.de})</span>
@@ -410,7 +445,7 @@ export function TablaCartera({ v }: { v: VistaCartera }) {
                     <button
                       type="button"
                       onClick={() => ordenar(c.clave)}
-                      className={`inline-flex items-center gap-1 whitespace-nowrap rounded hover:text-text ${activo ? 'text-text' : ''}`}
+                      className={`tocable inline-flex items-center gap-1 whitespace-nowrap rounded hover:text-text ${activo ? 'text-text' : ''}`}
                     >
                       {c.titulo}
                       {activo ? orden!.asc ? <ArrowUp aria-hidden className="size-3" /> : <ArrowDown aria-hidden className="size-3" /> : null}
@@ -437,7 +472,7 @@ export function TablaCartera({ v }: { v: VistaCartera }) {
                             onClick={() => alternar(f.clave)}
                             aria-expanded={abierta}
                             aria-label={`${f.ticker}: ${abierta ? 'ocultar' : 'ver'} el detalle`}
-                            className="flex w-full items-center gap-1 text-left"
+                            className="tocable flex w-full items-center gap-1 text-left"
                           >
                             <ChevronRight aria-hidden className={`size-4 shrink-0 text-muted transition-transform ${abierta ? 'rotate-90' : ''}`} />
                             <Activo f={f} />
@@ -561,14 +596,18 @@ function PieCelda({ k, tot, n }: { k: Clave; tot: ReturnType<typeof useTotales>;
       return (
         <span className="inline-flex flex-col items-end gap-0.5 leading-tight">
           <TotalCelda t={tot.actArs} moneda="ARS" titulo="Lo que pusieron los activos, en pesos" color={false} />
-          <span className="inline-flex items-center gap-1 text-[12px] text-muted">TC <TotalCelda t={tot.tcArs} moneda="ARS" titulo="Lo que puso el TC, en pesos" color={false} /></span>
+          <span className="text-[12px] text-muted">
+            <TotalCelda t={tot.tcArs} moneda="ARS" titulo="Lo que puso el TC, en pesos" color={false} rotulo="TC" />
+          </span>
         </span>
       )
     case 'tc_usd':
       return (
         <span className="inline-flex flex-col items-end gap-0.5 leading-tight">
           <TotalCelda t={tot.actUsd} moneda="USD" titulo="Lo que pusieron los activos, en dólares" color={false} />
-          <span className="inline-flex items-center gap-1 text-[12px] text-muted">TC <TotalCelda t={tot.tcUsd} moneda="USD" titulo="Lo que puso el TC, en dólares" color={false} /></span>
+          <span className="text-[12px] text-muted">
+            <TotalCelda t={tot.tcUsd} moneda="USD" titulo="Lo que puso el TC, en dólares" color={false} rotulo="TC" />
+          </span>
         </span>
       )
     case 'valor_ars':

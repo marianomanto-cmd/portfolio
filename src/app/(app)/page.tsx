@@ -9,7 +9,8 @@ import type { FraseDelDia, Pendiente, TarjetaPatrimonio, VistaHoy } from '@/lib/
 import { ErrorVista } from '@/components/error-vista'
 import { Frase, type FilaDetalle, type ParteMostrada } from '@/components/hoy/frase'
 import { Mostrar } from '@/components/hoy/redondeo-frase'
-import { Monto, MontoTrazado, Porcentaje } from '@/components/monto'
+import { parcialDeTotal } from '@/components/calculos'
+import { Monto, MontoTrazado, Porcentaje, SinDato } from '@/components/monto'
 import { hoyDelPedido } from '@/components/shell/datos'
 import { Traza } from '@/components/traza'
 import { Aviso, Chip, ChipEtiqueta, Rotulo, Tarjeta } from '@/components/ui'
@@ -111,19 +112,35 @@ const tono = (c: CalcVista, valor: string | null): ParteMostrada['tono'] =>
   valor === null || /^-?0(\.0+)?$/.test(valor) ? null : valor.startsWith('-') ? 'neg' : 'pos'
 
 function partesFrase(f: FraseDelDia, m: Mostrar): ParteMostrada[] {
-  return f.partes.map((p) => {
+  return f.partes.map((p, i) => {
     if (!p.calc) return { texto: p.texto, calc: null, tono: null, esMonto: false, titulo: '' }
     const c = p.calc
     const esPct = p.texto.trim().endsWith('%')
-    if (esPct || c.valor === null) return { texto: p.texto, calc: c, tono: null, esMonto: !esPct, titulo: tituloParte(f, c) }
+    if (esPct || c.valor === null) return { texto: p.texto, calc: c, tono: null, esMonto: !esPct, titulo: tituloParte(f, i) }
     const moneda = p.texto.includes('US$') ? 'USD' : 'ARS'
     const conSigno = /^[+−-]/.test(p.texto.trim())
     const texto = m.texto(c, moneda, { signo: conSigno, abs: !conSigno })
-    return { texto, calc: c, tono: conSigno ? tono(c, m.valor(c)) : null, esMonto: true, titulo: tituloParte(f, c) }
+    return { texto, calc: c, tono: conSigno ? tono(c, m.valor(c)) : null, esMonto: true, titulo: tituloParte(f, i) }
   })
 }
 
-function tituloParte(f: FraseDelDia, c: CalcVista): string {
+const mayuscula = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+
+/**
+ * El nombre que la frase le da a una cifra que no es la variación, los
+ * activos, el CCL ni lo sin atribuir: el grupo que la sigue ("de SPY", "de tus
+ * pesos en efectivo", en la segunda oración de una carga express).
+ */
+function nombreDeParte(f: FraseDelDia, i: number): string | null {
+  const sig = f.partes[i + 1]
+  if (!sig || sig.calc) return null
+  const t = sig.texto.trim().replace(/[.,;:]+$/, '')
+  return /^de /.test(t) ? t : null
+}
+
+function tituloParte(f: FraseDelDia, i: number): string {
+  const p = f.partes[i]
+  const c = p.calc!
   if (mismo(c, f.variacion.ars)) return 'Variación en pesos'
   if (mismo(c, f.variacion.usd)) return 'Variación en dólares'
   if (mismo(c, f.tc.ars)) return 'Lo que puso el CCL, en pesos'
@@ -131,7 +148,10 @@ function tituloParte(f: FraseDelDia, c: CalcVista): string {
   if (mismo(c, f.activos.ars)) return 'Lo que pusieron tus activos, en pesos'
   if (mismo(c, f.activos.usd)) return 'Lo que pusieron tus activos, en dólares'
   if (f.sin_atribuir && (mismo(c, f.sin_atribuir.ars) || mismo(c, f.sin_atribuir.usd))) return 'Sin atribuir (sin precio o saldo nuevo)'
-  return 'Variación porcentual'
+  if (p.texto.trim().endsWith('%')) return 'Variación porcentual'
+  const en = p.texto.includes('US$') ? 'en dólares' : 'en pesos'
+  const nombre = nombreDeParte(f, i)
+  return nombre ? `${mayuscula(nombre)}, ${en}` : `Cifra de la frase, ${en}`
 }
 const mismo = (a: CalcVista, b: CalcVista) => a.valor === b.valor && a.formula === b.formula
 
@@ -151,7 +171,24 @@ function detalleFrase(f: FraseDelDia, m: Mostrar): FilaDetalle[] {
   if (f.sin_atribuir) {
     filas.push({ etiqueta: 'Sin atribuir', ars: parte(f.sin_atribuir.ars, 'ARS', 'Sin atribuir, en pesos'), usd: parte(f.sin_atribuir.usd, 'USD', 'Sin atribuir, en dólares') })
   }
-  return filas
+  // Las demás cifras de la frase (la segunda oración de una carga express),
+  // cada una en su renglón tocable con el nombre que le da la frase (D-113).
+  // Una cifra igual a otra que ya está arriba no se repite.
+  const vistas: CalcVista[] = filas.flatMap((x) => [x.ars?.calc, x.usd?.calc]).filter((c): c is CalcVista => Boolean(c))
+  const extra = new Map<string, FilaDetalle>()
+  f.partes.forEach((p, i) => {
+    const c = p.calc
+    if (!c || p.texto.trim().endsWith('%') || vistas.some((x) => mismo(x, c))) return
+    const lado = p.texto.includes('US$') ? 'usd' : 'ars'
+    const base = mayuscula(nombreDeParte(f, i) ?? 'En la frase')
+    let etiqueta = base
+    for (let n = 2; extra.get(etiqueta)?.[lado]; n++) etiqueta = `${base} (${n})`
+    const fila = extra.get(etiqueta) ?? { etiqueta, ars: null, usd: null }
+    fila[lado] = parte(c, lado === 'usd' ? 'USD' : 'ARS', tituloParte(f, i))
+    extra.set(etiqueta, fila)
+    vistas.push(c)
+  })
+  return [...filas, ...extra.values()]
 }
 
 // ───────────── Las dos tarjetas ─────────────
@@ -161,8 +198,40 @@ const esCero = (c: CalcVista) => c.valor !== null && /^-?0(\.0+)?$/.test(c.valor
 function Cifra({ c, moneda, m, titulo, signo = false, color = false, className = '' }: { c: CalcVista; moneda: 'ARS' | 'USD'; m: Mostrar; titulo: string; signo?: boolean; color?: boolean; className?: string }) {
   return (
     <Traza calc={c} titulo={titulo} moneda={moneda}>
-      <Monto valor={m.valor(c)} moneda={moneda} decimales={0} signo={signo} color={color} className={className} />
+      {c.valor === null ? (
+        <SinDato motivo={c.motivo} />
+      ) : (
+        <Monto valor={m.valor(c)} moneda={moneda} decimales={0} signo={signo} color={color} className={className} />
+      )}
     </Traza>
+  )
+}
+
+/**
+ * Un total al que le falta una parte es "sin dato", y debajo, en gris, va la
+ * suma de lo que sí se conoce, rotulada como parcial (D-65).
+ */
+function SumaParcial({ t, className = '' }: { t: TarjetaPatrimonio; className?: string }) {
+  const ars = parcialDeTotal(t.valor.ars, 'ARS')
+  const usd = parcialDeTotal(t.valor.usd, 'USD')
+  if (!ars?.parcial && !usd?.parcial) return null
+  const rotulo = (x: { contadas: number; de: number }) => `suma parcial (${x.contadas} de ${x.de}): `
+  const misma = ars && usd && ars.contadas === usd.contadas && ars.de === usd.de
+  return (
+    <p className={`flex flex-wrap items-baseline gap-x-1.5 text-[13px] leading-6 text-muted ${className}`}>
+      {ars?.parcial ? (
+        <span className="inline-flex items-baseline gap-1.5">
+          {rotulo(ars)}
+          <MontoTrazado calc={ars.parcial} moneda="ARS" titulo={`${t.titulo} · suma parcial en pesos`} decimales={0} />
+        </span>
+      ) : null}
+      {usd?.parcial ? (
+        <span className="inline-flex items-baseline gap-1.5">
+          {ars?.parcial ? '·' : null} {misma ? null : rotulo(usd)}
+          <MontoTrazado calc={usd.parcial} moneda="USD" titulo={`${t.titulo} · suma parcial en dólares`} decimales={0} />
+        </span>
+      ) : null}
+    </p>
   )
 }
 
@@ -184,6 +253,7 @@ function TarjetaKpi({ t, m, corto, desglose = false }: { t: TarjetaPatrimonio; m
           <Cifra c={t.valor.usd} moneda="USD" m={m} titulo={`${titulo} · en dólares`} className="text-[15px] font-semibold" />
           {t.variacion_pct ? <Porcentaje calc={t.variacion_pct.usd} titulo={`${titulo} · variación en dólares`} color /> : null}
         </div>
+        <SumaParcial t={t} className="col-span-2 justify-end pb-1" />
       </div>
 
       {/* Desktop */}
@@ -196,6 +266,7 @@ function TarjetaKpi({ t, m, corto, desglose = false }: { t: TarjetaPatrimonio; m
           <Cifra c={t.valor.ars} moneda="ARS" m={m} titulo={`${titulo} · en pesos`} className="cifra text-[28px] font-semibold leading-9 xl:text-[32px]" />
           <Cifra c={t.valor.usd} moneda="USD" m={m} titulo={`${titulo} · en dólares`} className="cifra text-[22px] font-semibold leading-8 xl:text-2xl" />
         </div>
+        <SumaParcial t={t} className="mt-1" />
         {t.variacion ? (
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[15px]">
             <span className="inline-flex items-center gap-2">
@@ -259,12 +330,13 @@ function LineaExposicion({ v }: { v: VistaHoy }) {
   const verbo = sens === null ? null : sens.startsWith('-') ? 'pierde' : 'gana'
   return (
     <Tarjeta as="div" className="px-3 md:px-5 md:py-3">
-      {/* Teléfono: un renglón de 48 px */}
+      {/* Teléfono: un renglón de 48 px. Si no entra, baja el rótulo a dos
+          renglones y los montos quedan enteros adentro de la tarjeta (D-30). */}
       <div className="flex min-h-12 items-center justify-between gap-2 text-[13px] md:hidden">
-        <Link href="/exposicion" className="tocable inline-flex shrink-0 items-center font-medium text-text">
+        <Link href="/exposicion" className="tocable inline-flex min-w-0 items-center font-medium text-text">
           Pesos fin. − leasing
         </Link>
-        <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap">
+        <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
           {lado ? <span className="text-muted">{lado}</span> : null}
           <MontoTrazado calc={e.neto_ars} moneda="ARS" titulo="Pesos financieros − deuda del leasing" compacta />
           <MontoTrazado calc={e.neto_usd} moneda="USD" titulo="El neto en dólares" decimales={0} />

@@ -459,7 +459,8 @@ describe('Galicia: dos lecturas', () => {
     const l = armar(fondos())
     const f = l.filas[0]
     expect(f).toMatchObject({
-      ticker: 'FIMA PREMIUM CLASE A',
+      // D-108: el nombre, en una forma que el catálogo acepta (sin espacios).
+      ticker: 'FIMA-PREMIUM-CLASE-A',
       seccion: 'fci',
       tipo_sugerido: 'fci',
       escala: '0.001',
@@ -1066,7 +1067,7 @@ describe('la lectura encaja en proponerCarga', () => {
     expect(t?.activo_nuevo?.tipo).toBe('bono')
     expect(new Decimal(t!.operacion!.precio!).times(2_000_000).toDecimalPlaces(2).toFixed()).toBe('2481345.67')
 
-    const f = p.filas.find((x) => x.ticker === 'FIMA PREMIUM CLASE A')
+    const f = p.filas.find((x) => x.ticker === 'FIMA-PREMIUM-CLASE-A')
     expect(f?.cotizacion).toEqual({ precio_pesos: '45.67812' })
     expect(f?.activo_nuevo).toMatchObject({ tipo: 'fci', indexacion: null })
 

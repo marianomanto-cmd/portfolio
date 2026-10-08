@@ -43,7 +43,7 @@ export function BarraLateral({ puntoCarga }: { puntoCarga?: ReactNode }) {
           aria-label="Cargar los datos de hoy"
           title="Cargar (c)"
           aria-current={activa?.href === cargar.href ? 'page' : undefined}
-          className="relative flex h-10 items-center gap-3 rounded-lg bg-accent px-[14px] text-sm font-medium text-on-accent shadow-sm transition-colors hover:bg-accent-strong"
+          className="tocable relative flex h-10 items-center gap-3 rounded-lg bg-accent px-[14px] text-sm font-medium text-on-accent shadow-sm transition-colors hover:bg-accent-strong"
         >
           <cargar.icono aria-hidden className="size-5 shrink-0" strokeWidth={2} />
           <span className="nav-texto">Cargar</span>
@@ -68,7 +68,7 @@ export function BarraLateral({ puntoCarga }: { puntoCarga?: ReactNode }) {
                       aria-label={s.nombre}
                       title={expandida ? undefined : s.nombre}
                       aria-current={actual ? 'page' : undefined}
-                      className={`flex h-10 items-center gap-3 rounded-lg px-[14px] text-sm transition-colors ${
+                      className={`tocable flex h-10 items-center gap-3 rounded-lg px-[14px] text-sm transition-colors ${
                         actual ? 'bg-accent-soft font-medium text-accent' : 'text-muted hover:bg-surface-2 hover:text-text'
                       }`}
                     >
@@ -88,7 +88,7 @@ export function BarraLateral({ puntoCarga }: { puntoCarga?: ReactNode }) {
           onClick={() => cambiarPreferencia('nav', expandida ? 'colapsada' : 'expandida')}
           aria-label={expandida ? 'Colapsar la barra lateral' : 'Expandir la barra lateral'}
           title={expandida ? 'Colapsar' : 'Expandir'}
-          className="flex h-10 w-full items-center gap-3 rounded-lg px-[14px] text-sm text-muted transition-colors hover:bg-surface-2 hover:text-text"
+          className="tocable flex h-10 w-full items-center gap-3 rounded-lg px-[14px] text-sm text-muted transition-colors hover:bg-surface-2 hover:text-text"
         >
           {expandida ? (
             <PanelLeftClose aria-hidden className="size-5 shrink-0" strokeWidth={1.75} />

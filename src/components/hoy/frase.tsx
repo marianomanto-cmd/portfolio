@@ -53,9 +53,12 @@ export function Frase({ partes, detalle, recortar = false }: { partes: ParteMost
     ),
   )
 
+  // Se recorta solo con el dedo, que es cuando está el botón que la abre
+  // entera. Con mouse en una ventana angosta se lee entera, con cada cifra
+  // tocable en el lugar.
   return (
     <div>
-      <p className={`text-[15px] leading-7 md:text-base md:leading-8 ${recortar ? 'max-md:line-clamp-3 max-md:leading-6' : ''}`}>{cuerpo}</p>
+      <p className={`text-[15px] leading-7 md:text-base md:leading-8 ${recortar ? 'max-md:pointer-coarse:line-clamp-3 max-md:pointer-coarse:leading-6' : ''}`}>{cuerpo}</p>
       {grueso ? (
         <>
           <button

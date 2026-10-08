@@ -7,6 +7,7 @@ import {
   anotarExito,
   esperaPendiente,
   origenDelPedido,
+  reservarIntento,
   textoEspera,
   trabaTrasErrores,
   type Registro,
@@ -50,6 +51,22 @@ describe('registro de intentos', () => {
     const r: Registro = new Map()
     for (let i = 0; i < 4; i++) anotarError(r, 'ip', T0 + i)
     expect(anotarError(r, 'ip', T0 + OLVIDO_MS + 10_000)).toBe(0)
+  })
+
+  it('reservarIntento: en el mismo instante, solo 3 pasan y el resto queda trabado', () => {
+    const r: Registro = new Map()
+    const reservas = Array.from({ length: 10 }, () => reservarIntento(r, 'ip', T0))
+    expect(reservas.slice(0, 3)).toEqual([
+      { trabado: false, traba: 0 },
+      { trabado: false, traba: 0 },
+      { trabado: false, traba: 1000 },
+    ])
+    expect(reservas.slice(3).every((x) => x.trabado && x.espera === 1000)).toBe(true)
+    // Trabado no suma errores: vencida la traba, el siguiente es el 4.º.
+    expect(reservarIntento(r, 'ip', T0 + 1000)).toEqual({ trabado: false, traba: 2000 })
+    // Si la clave era correcta, anotarExito borra lo reservado.
+    anotarExito(r, 'ip')
+    expect(reservarIntento(r, 'ip', T0 + 1001)).toEqual({ trabado: false, traba: 0 })
   })
 
   it('no recuerda más de MAXIMO_ORIGENES orígenes (se olvida de los más viejos)', () => {

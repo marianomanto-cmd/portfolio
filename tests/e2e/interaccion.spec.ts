@@ -103,6 +103,23 @@ test.describe('teléfono (iPhone 13, 390 × 664)', () => {
   })
 })
 
+test.describe('ventana angosta con mouse (640 × 900)', () => {
+  test.use({ viewport: { width: 640, height: 900 } })
+
+  test('la frase se lee entera, o hay cómo verla entera', async ({ page }) => {
+    for (const ruta of ['/', '/?demo=express']) {
+      await page.goto(ruta)
+      expect(await esperarHidratacion(page)).toBe(true)
+      const frase = page.getByLabel('Qué pasó desde la última carga').locator('p').first()
+      const { recortada } = await frase.evaluate((el) => ({ recortada: el.scrollHeight > el.clientHeight + 1 }))
+      const boton = page.getByRole('button', { name: /Ver la frase completa/ })
+      if (recortada) await expect(boton, `${ruta}: la frase está recortada y no hay cómo verla entera`).toBeVisible()
+      // Con mouse, cada cifra de la frase abre su traza en el lugar.
+      if (!recortada) expect(await frase.getByRole('button').count(), ruta).toBeGreaterThan(0)
+    }
+  })
+})
+
 test.describe('desktop (1280 × 900)', () => {
   test.use({ viewport: { width: 1280, height: 900 } })
 
@@ -131,6 +148,35 @@ test.describe('desktop (1280 × 900)', () => {
     const b = (await panel.boundingBox())!
     expect(b.x).toBeGreaterThanOrEqual(0)
     expect(b.x + b.width).toBeLessThanOrEqual(1280)
+  })
+
+  test('los resultados en dólares van en verde o en rojo también dentro de la pastilla', async ({ page }) => {
+    for (const ruta of ['/', '/cartera']) {
+      await page.goto(ruta)
+      expect(await esperarHidratacion(page)).toBe(true)
+      const r = await page.evaluate(() => {
+        const sonda = (clase: string) => {
+          const s = document.createElement('span')
+          s.className = clase
+          document.body.appendChild(s)
+          const c = getComputedStyle(s).color
+          s.remove()
+          return c
+        }
+        const tono = { 'text-negative': sonda('text-negative'), 'text-positive': sonda('text-positive') }
+        const tinta = sonda('usd')
+        const conTono = Array.from(document.querySelectorAll('.usd.text-negative, .usd.text-positive'))
+        const mal = conTono
+          .filter((el) => getComputedStyle(el).color !== tono[el.classList.contains('text-negative') ? 'text-negative' : 'text-positive'])
+          .map((el) => `${el.textContent}: ${getComputedStyle(el).color}`)
+        // Sin resultado, la pastilla conserva su tinta.
+        const neutra = document.querySelector('.usd:not(.text-negative):not(.text-positive)')
+        return { cuantos: conTono.length, mal, neutra: neutra ? getComputedStyle(neutra).color === tinta : null }
+      })
+      expect(r.cuantos, ruta).toBeGreaterThan(0)
+      expect(r.mal, ruta).toEqual([])
+      expect(r.neutra, ruta).toBe(true)
+    }
   })
 
   test('Cartera: ordenar por una columna y filtrar', async ({ page }) => {

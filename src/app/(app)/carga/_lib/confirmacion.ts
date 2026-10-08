@@ -7,7 +7,7 @@
 // la base, no con la que vio el navegador.
 
 import { Decimal } from '@/lib/domain/dinero'
-import type { Fecha } from '@/lib/domain/tipos'
+import type { Fecha, Hechos } from '@/lib/domain/tipos'
 import type {
   ConfirmacionCarga,
   CotizacionAGrabar,
@@ -23,9 +23,12 @@ import {
   claveAusente,
   eleccionFila,
   eleccionSaldo,
+  eligioApertura,
   estadoFila,
   estadoSaldo,
   precioACompletar,
+  problemaRegistroAusente,
+  registroAusente,
   seGraba,
   type Elecciones,
 } from './bandeja'
@@ -45,7 +48,18 @@ export interface FuenteConfirmada {
 export interface EntradaConfirmacion {
   lote: string
   fecha: Fecha
+  /** Lo tipeado: es lo único que se graba como tipo de cambio del día. */
   tc: { ccl: string | null; cripto_venta: string | null; referencia?: string | null }
+  /**
+   * CCL de las operaciones: el tipeado o, si no se tipeó, el que el día ya
+   * tiene cargado (conciliar.cclDelDia). Sin este campo, el tipeado.
+   */
+  ccl_del_dia?: string | null
+  /**
+   * Precios que el día ya tiene grabados desde un Excel (vigente): una captura
+   * no los pisa, como dentro de un mismo lote (vale el del Excel).
+   */
+  cotizaciones_excel?: readonly { activo_id: number; precio_pesos: string; cuenta: NombreCuenta }[]
   /** Propuesta armada con las lecturas ya editadas. */
   propuesta: PropuestaCarga
   elecciones: Elecciones
@@ -72,6 +86,11 @@ export interface ResumenCuenta {
 
 export interface ResumenGuardado {
   cuentas: ResumenCuenta[]
+  /**
+   * Fuentes que no grabaron nada (todo quedó pendiente): no crean carga, así no
+   * reemplazan a la buena del día ni la cuenta figura al día.
+   */
+  sin_grabar?: { cuenta: NombreCuenta; pendientes: number }[]
   tipo_cambio: { ccl: boolean; cripto: boolean }
   /** Lo que guarda el Enter: filas + saldos + tipos de cambio (lo que dice el botón). */
   total: number
@@ -87,6 +106,22 @@ const esPositivo = (v: string | null) => v !== null && /^-?\d+(\.\d+)?$/.test(v)
 /** "No cierra." → "No cierra" (el mensaje sigue después). */
 const quitarPunto = (m: string) => m.trim().replace(/\.$/, '')
 
+/**
+ * Los precios del día que ya grabó un Excel (su carga sigue vigente o fue
+ * reemplazada, no revertida): una captura posterior no los pisa (D-106).
+ */
+export function cotizacionesDeExcel(hechos: Pick<Hechos, 'cotizaciones' | 'cargas' | 'cuentas'>, fecha: Fecha): NonNullable<EntradaConfirmacion['cotizaciones_excel']> {
+  const out: { activo_id: number; precio_pesos: string; cuenta: NombreCuenta }[] = []
+  for (const c of hechos.cotizaciones) {
+    if (c.fecha !== fecha) continue
+    const carga = hechos.cargas.find((x) => x.id === c.carga_id)
+    if (!carga || carga.origen !== 'excel' || carga.estado === 'revertida') continue
+    const cuenta = hechos.cuentas.find((x) => x.id === carga.cuenta_id)?.nombre ?? 'IEB'
+    out.push({ activo_id: c.activo_id, precio_pesos: c.precio_pesos.toFixed(), cuenta: cuenta as NombreCuenta })
+  }
+  return out
+}
+
 export function armarConfirmacion(e: EntradaConfirmacion): ResultadoArmado {
   const errores: string[] = []
   const referencia = e.tc.referencia?.trim() ? e.tc.referencia.trim().slice(0, 200) : null
@@ -98,7 +133,11 @@ export function armarConfirmacion(e: EntradaConfirmacion): ResultadoArmado {
   // Un precio por activo y por día (la clave de cotizaciones es fecha + activo):
   // si dos cuentas traen el mismo activo, vale el del Excel, que es determinístico.
   const fuentes = [...e.fuentes].sort((a, b) => Number(a.lectura.origen !== 'excel') - Number(b.lectura.origen !== 'excel'))
-  const cotizado = new Map<number, { cuenta: NombreCuenta; precio: string }>()
+  const cotizado = new Map<number, { cuenta: NombreCuenta; precio: string; antes?: boolean }>()
+  // Entre lotes vale lo mismo: lo que un Excel ya grabó hoy no lo pisa una captura.
+  const excelPrevio = new Map((e.cotizaciones_excel ?? []).map((c) => [c.activo_id, c]))
+  const cclOperaciones = e.ccl_del_dia === undefined ? e.tc.ccl : e.ccl_del_dia
+  const sinGrabar: { cuenta: NombreCuenta; pendientes: number }[] = []
   const vistas = new Set<NombreCuenta>()
   const cuentas: CuentaAGrabar[] = []
   const resumen: ResumenCuenta[] = []
@@ -130,6 +169,10 @@ export function armarConfirmacion(e: EntradaConfirmacion): ResultadoArmado {
     const saldosGrabado: unknown[] = []
     let pendientes = 0
     let grabadas = 0
+    const previoDeExcel = (activo_id: number) => {
+      const x = lectura.origen === 'excel' ? undefined : excelPrevio.get(activo_id)
+      return x ? { cuenta: x.cuenta, precio: x.precio_pesos, antes: true } : undefined
+    }
 
     for (const d of e.propuesta.filas.filter((x) => x.cuenta === nombre)) {
       const el = eleccionFila(e.elecciones, d)
@@ -167,12 +210,13 @@ export function armarConfirmacion(e: EntradaConfirmacion): ResultadoArmado {
       let cotizacion: string | null = null
       let nota: string | null = null
       if (d.cotizacion) {
-        const previa = cotizado.get(activo_id)
+        const previa = cotizado.get(activo_id) ?? previoDeExcel(activo_id)
         if (previa) {
+          const deCuando = previa.antes ? ', grabado antes hoy' : ''
           nota =
             previa.precio === d.cotizacion.precio_pesos
-              ? `precio igual al de ${previa.cuenta}`
-              : `precio no grabado: vale el de ${previa.cuenta} (${previa.precio}); esta fuente mostraba ${d.cotizacion.precio_pesos}`
+              ? `precio igual al de ${previa.cuenta}${deCuando}`
+              : `precio no grabado: vale el de ${previa.cuenta}${deCuando} (${previa.precio}); esta fuente mostraba ${d.cotizacion.precio_pesos}`
         } else {
           cotizacion = d.cotizacion.precio_pesos
           cotizado.set(activo_id, { cuenta: nombre, precio: cotizacion })
@@ -180,13 +224,15 @@ export function armarConfirmacion(e: EntradaConfirmacion): ResultadoArmado {
         }
       }
       let grabada: OperacionAGrabar | null = null
-      if (d.operacion) {
-        const op: OperacionAGrabar = { ...d.operacion, activo_id }
+      // "Ya la tenía": la apertura con el PPP en vez de la compra propuesta.
+      const base = eligioApertura(d, el) ? d.apertura_alternativa! : d.operacion
+      if (base) {
+        const op: OperacionAGrabar = { ...base, activo_id }
         if (el?.operacion) {
           op.cantidad = el.operacion.cantidad
           op.precio = el.operacion.precio
         }
-        if (op.tipo !== 'apertura') op.ccl_del_dia = e.tc.ccl
+        if (op.tipo !== 'apertura') op.ccl_del_dia = cclOperaciones
         const problema =
           !esPositivo(op.cantidad)
             ? 'la cantidad tiene que ser mayor que cero'
@@ -228,6 +274,7 @@ export function armarConfirmacion(e: EntradaConfirmacion): ResultadoArmado {
         cotizacion,
         nota,
         ...(d.accion === 'completar_precio' ? { completada } : {}),
+        ...(eligioApertura(d, el) ? { como_apertura: true } : {}),
       })
     }
 
@@ -256,10 +303,52 @@ export function armarConfirmacion(e: EntradaConfirmacion): ResultadoArmado {
       saldosGrabado.push({ ...registro, resolucion: estado === 'aceptada' ? 'aceptada' : 'verificada', motivo: el?.motivo ?? null, grabado: montoFinal })
     }
 
-    const ausentes = e.propuesta.ausentes
-      .filter((a) => a.cuenta === nombre)
-      .map((a) => ({ ticker: a.ticker, cantidad_app: a.cantidad_app, resolucion: e.elecciones.ausentes[claveAusente(a)] ?? 'sin revisar al guardar' }))
-    pendientes += ausentes.length
+    // Tenencias que la fuente no trajo: la venta o el vencimiento que registraste,
+    // o pendientes. Las pendientes quedan en lo grabado con su activo y su cuenta:
+    // hasta que se registren valen "sin dato" (Hechos.ausentes, leído de acá).
+    const ausentes: unknown[] = []
+    let ausentesPendientes = 0
+    for (const a of e.propuesta.ausentes.filter((x) => x.cuenta === nombre)) {
+      const registro = { ticker: a.ticker, activo_id: a.activo_id, cuenta_id: cuenta.id, cantidad_app: a.cantidad_app }
+      const r = registroAusente(e.elecciones, a)
+      if (r) {
+        const problema = problemaRegistroAusente({ ...a, ccl_del_dia: cclOperaciones }, r)
+        if (problema) {
+          errores.push(`${nombre} · ${a.ticker}: ${problema}.`)
+          continue
+        }
+        const op: OperacionAGrabar = {
+          activo_id: a.activo_id,
+          tipo: r.tipo,
+          cantidad: a.cantidad_app,
+          moneda: 'ARS',
+          precio: r.tipo === 'venta' ? r.precio : null,
+          importe: r.importe,
+          comisiones: '0',
+          ccl_del_dia: cclOperaciones,
+          fecha_origen: null,
+          notas: `${nombre} ya no lo lista`,
+        }
+        operaciones.push(op)
+        grabadas++
+        ausentes.push({ ...registro, resolucion: 'registrada', grabada: op })
+        continue
+      }
+      const el = e.elecciones.ausentes[claveAusente(a)]
+      ausentesPendientes++
+      ausentes.push({ ...registro, resolucion: el === 'pendiente' ? 'pendiente' : 'sin revisar al guardar' })
+    }
+    pendientes += ausentesPendientes
+
+    // Una fuente que no graba nada (todo quedó pendiente) no crea su carga: no
+    // reemplaza a la buena del día ni hace figurar la cuenta al día. Si declara
+    // tenencias ausentes, sí: eso es un dato (valen "sin dato" desde hoy).
+    const nada = cotizaciones.length + saldos.length + operaciones.length + completar.length + ausentesPendientes === 0
+    if (nada) {
+      sinGrabar.push({ cuenta: nombre, pendientes })
+      pendientesTotales += pendientes
+      continue
+    }
 
     const listado_completo = pendientes === 0
     cuentas.push({
@@ -298,7 +387,11 @@ export function armarConfirmacion(e: EntradaConfirmacion): ResultadoArmado {
   }
 
   if (!tipo_cambio && cuentas.length === 0 && errores.length === 0) {
-    errores.push('Nada para guardar: tipeá el CCL o el cripto, o soltá un archivo.')
+    errores.push(
+      sinGrabar.length
+        ? `Nada para guardar: todo lo de ${sinGrabar.map((x) => x.cuenta).join(' y ')} quedó pendiente.`
+        : 'Nada para guardar: tipeá el CCL o el cripto, o soltá un archivo.',
+    )
   }
   if (errores.length) return { ok: false, errores }
 
@@ -315,6 +408,7 @@ export function armarConfirmacion(e: EntradaConfirmacion): ResultadoArmado {
     },
     resumen: {
       cuentas: resumen,
+      ...(sinGrabar.length ? { sin_grabar: sinGrabar } : {}),
       tipo_cambio: { ccl: e.tc.ccl !== null, cripto: e.tc.cripto_venta !== null },
       total,
       pendientes: pendientesTotales,

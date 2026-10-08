@@ -32,8 +32,9 @@ export async function sinIndicadorDev(page: Page) {
 
 /**
  * Los controles de D-30 en el navegador: scroll horizontal, elementos fuera de
- * la pantalla, texto cortado en controles, controles superpuestos y, con
- * puntero grueso, tocables de menos de 44 px. Devuelve una línea por problema.
+ * la pantalla o fuera de su tarjeta, texto cortado en controles, controles
+ * superpuestos y, con puntero grueso, tocables de menos de 44 px. Devuelve una
+ * línea por problema.
  */
 export async function revisarLayout(page: Page, grueso: boolean): Promise<string[]> {
   return page.evaluate((grueso) => {
@@ -97,6 +98,38 @@ export async function revisarLayout(page: Page, grueso: boolean): Promise<string
         if (recortado) continue
         out.push(`fuera de la pantalla (${Math.round(r.left)} a ${Math.round(r.right)}, ancho ${vw}): ${desc(el)}`)
         reportados.push(el)
+      }
+    }
+
+    // Fuera de su tarjeta: nada visible pasa el borde del contenedor con borde
+    // más cercano (D-30 también vale adentro de la pantalla: un monto que pisa
+    // el borde de su tarjeta está cortado aunque entre en la pantalla). Un
+    // panel flotante (absolute o fixed) o algo que un ancestro recorta no cuenta.
+    const fueraDeTarjeta: Element[] = []
+    for (const el of Array.from(document.body.querySelectorAll('*'))) {
+      if (fueraDeTarjeta.some((p) => p.contains(el)) || ignorar(el)) continue
+      const r = el.getBoundingClientRect()
+      if (r.width === 0 || r.height === 0) continue
+      const pe = getComputedStyle(el).position
+      if (pe === 'absolute' || pe === 'fixed') continue
+      let caja: Element | null = null
+      for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+        const ca = getComputedStyle(a)
+        if (parseFloat(ca.borderLeftWidth) > 0 && parseFloat(ca.borderRightWidth) > 0) {
+          caja = a
+          break
+        }
+        if (ca.overflowX !== 'visible' || ca.position === 'absolute' || ca.position === 'fixed') break
+      }
+      if (!caja) continue
+      const rc = caja.getBoundingClientRect()
+      const cc = getComputedStyle(caja)
+      const izq = rc.left + parseFloat(cc.borderLeftWidth)
+      const der = rc.right - parseFloat(cc.borderRightWidth)
+      const exceso = Math.max(r.right - der, izq - r.left)
+      if (exceso > 1 && visible(el)) {
+        out.push(`se sale ${Math.round(exceso * 10) / 10} px de su tarjeta: ${desc(el)} en ${desc(caja)}`)
+        fueraDeTarjeta.push(el)
       }
     }
 

@@ -176,10 +176,10 @@ describe('leerExcelIEB · Portafolio de ejemplo', async () => {
 
   it('saldo en dólares = Total USD de Saldos + DOLARUSA, con sus dos partes', () => {
     const u = saldo(l, 'USD')
-    expect(u?.monto).toBe('4200')
+    expect(u?.monto).toBe('4205.6')
     expect(u?.partes).toEqual([
       { concepto: 'Saldo Total USD', monto: '4182.2' },
-      { concepto: 'DOLARUSA (dólares en especie)', monto: '17.8' },
+      { concepto: 'DOLARUSA (dólares en especie)', monto: '23.4' },
     ])
     expect(u?.estado).toBe('verificada')
     expect(u?.lugar).toBe('hoja Saldos, fila 20 · DOLARUSA en hoja Patrimonio, fila 41')
@@ -191,7 +191,7 @@ describe('leerExcelIEB · Portafolio de ejemplo', async () => {
       ['Acciones', '15690000', '15690000', true],
       ['Bonos', '17879750', '17879750', true],
       ['Cedears', '43721061.55', '43721061.55', true],
-      ['Otros', '27999.4', '27999.4', true],
+      ['Otros', '37697.4', '37697.4', true],
     ])
   })
 
@@ -200,12 +200,12 @@ describe('leerExcelIEB · Portafolio de ejemplo', async () => {
     expect(c.informado).toBe(patrimonioIEB(p).toFixed())
     expect(c.calculado).toBe(c.informado)
     expect(c.ok).toBe(true)
-    expect(c.detalle).toContain('US$ 4.182,20 × 1.573,00 (dólar de IEB, DOLARUSA)')
+    expect(c.detalle).toContain('US$ 4.182,20 × 1.611,00 (dólar de IEB, DOLARUSA)')
     expect(c.detalle).toContain('diferencia $ 0,00')
     // La tolerancia como dato (D-37) y el dólar de IEB con nombre (D-66).
     expect(c.tolerancia).toMatch(/^\d+(\.\d+)?$/)
     expect(new Decimal(c.tolerancia!).gt(0)).toBe(true)
-    expect(l.tipo_cambio_fuente).toEqual({ dolar_ieb: '1573' })
+    expect(l.tipo_cambio_fuente).toEqual({ dolar_ieb: '1611' })
     for (const s of l.controles.filter((x) => x.tipo === 'ieb_subtotal')) expect(s.tolerancia).toMatch(/^\d+(\.\d+)?$/)
   })
 
@@ -362,7 +362,7 @@ describe('leerExcelIEB · números exactos: nada pasa por float (D-32)', () => {
   it('decimalDeExcel: 15 cifras significativas, sin notación científica ni −0', () => {
     expect(decimalDeExcel(0.1 + 0.2).toFixed()).toBe('0.3')
     expect(decimalDeExcel(1.0434999999999999).toFixed()).toBe('1.0435')
-    expect(decimalDeExcel(2.8259907).toFixed()).toBe('2.8259907')
+    expect(decimalDeExcel(4.7130251).toFixed()).toBe('4.7130251')
     expect(decimalDeExcel(1e-7).toFixed()).toBe('0.0000001')
     expect(decimalDeExcel(-185000).toFixed()).toBe('-185000')
     expect(decimalDeExcel(-0).isNegative()).toBe(false)
@@ -380,7 +380,7 @@ describe('leerExcelIEB · números exactos: nada pasa por float (D-32)', () => {
     expect(decimalesMostrados('"US$" #,##0.000', v)).toBe(3)
     // General: los decimales del propio valor.
     expect(decimalesMostrados(null, v)).toBe(4)
-    expect(decimalesMostrados('General', new Decimal('17.8'))).toBe(1)
+    expect(decimalesMostrados('General', new Decimal('23.4'))).toBe(1)
   })
 })
 
@@ -542,7 +542,7 @@ describe('leerExcelIEB · robustez', () => {
   })
 
   it('sin DOLARUSA y con dólares en Saldos: B2 no se puede verificar (ok null, nunca OK)', async () => {
-    const l = await leer({ ...sinSeccion(portafolioEjemplo(), 'Otros'), dolarIEB: '1573' })
+    const l = await leer({ ...sinSeccion(portafolioEjemplo(), 'Otros'), dolarIEB: '1611' })
     expect(saldo(l, 'USD')).toMatchObject({ monto: '4182.2', partes: [{ concepto: 'Saldo Total USD', monto: '4182.2' }], estado: 'verificada' })
     expect(b2(l)).toMatchObject({ calculado: null, ok: null })
     expect(b2(l).detalle).toContain('no trae DOLARUSA')
@@ -566,7 +566,7 @@ describe('leerExcelIEB · robustez', () => {
   it('USD Ext. con saldo: avisa y no lo suma', async () => {
     const p = portafolioEjemplo()
     const l = await leer({ ...p, saldos: { ...p.saldos, usdExt: '250' } })
-    expect(saldo(l, 'USD')?.monto).toBe('4200')
+    expect(saldo(l, 'USD')?.monto).toBe('4205.6')
     expect(l.advertencias).toEqual([
       'La hoja Saldos trae US$ 250,00 en «USD Ext.» (fila 25): no se suman al saldo de IEB. Revisá si corresponde.',
     ])
@@ -835,7 +835,7 @@ describe('leerExcelIEB → proponerCarga (src/lib/carga/conciliar.ts)', async ()
   it('pasan los dos saldos y los cinco controles, sin advertencias de fecha', () => {
     expect(propuesta.saldos.map((s) => [s.clave, s.monto, s.estado])).toEqual([
       ['IEB:saldo:ARS', '-85500', 'verificada'],
-      ['IEB:saldo:USD', '4200', 'verificada'],
+      ['IEB:saldo:USD', '4205.6', 'verificada'],
     ])
     expect(propuesta.controles).toHaveLength(5)
     expect(propuesta.controles.every((c) => c.cuenta === 'IEB' && c.control.ok === true)).toBe(true)

@@ -47,6 +47,19 @@ acá después del primer cruce y reemplazan a I-5, I-6, I-7, I-8 e I-10:
   desde su costo al CCL de compra hasta su valor en esa observación (visión 4.5
   y D-35 adoptada). Reemplaza a I-11 (CCL_prom queda solo si hubo una baja o un
   cambio de ratio antes de la primera observación).
+- E' (fase 3, hallazgo "el desglose de la fila no suma su resultado después
+  de una venta parcial"). Desde la compra se desglosa SOLO LA TENENCIA
+  VIGENTE, con el mismo promedio ponderado que el costo: en cada venta
+  posterior a la primera observación fresca, lo acumulado de activo y TC se
+  multiplica por cantidad después ÷ cantidad antes. Para que sea exacto, la
+  venta se toma como si fuera al precio y al CCL de la observación de ese día
+  (lo que difiere es de lo vendido, que ya no está en la fila). Si la venta no
+  cae en una carga con observación fresca de la partida, o ese día hay además
+  una compra, una apertura o un cambio de ratio, se usa el intervalo único
+  con CCL_prom (como con una baja antes de la primera observación). Así
+  activo + TC + sin atribuir = resultado de la fila (valor − costo vigente).
+  Y, como en I-9, si el resultado de la fila en una moneda es "sin dato"
+  (compra con precio pendiente), su activo y su TC también.
 - B07 (pedido explícito): un precio anterior a un cambio de ratio no sirve
   para la cantidad nueva: el valor es "sin dato".
 - Una partida "sin dato" en un intervalo lo es en las dos monedas (como el
@@ -463,14 +476,21 @@ def _partes_de_lo_conocido(d: dict) -> dict:
     return d
 
 
-def flujos_intervalo(partida: dict, ccl: dict[str, str | None], t0: str, t1: str) -> list[tuple[Monto, Monto]]:
-    """Flujos de la partida con t0 < fecha ≤ t1, fijos (decisiones A y C)."""
+def flujos_intervalo(partida: dict, ccl: dict[str, str | None], t0: str, t1: str,
+                     reprecio: tuple[str, Decimal, Decimal] | None = None) -> list[tuple[Monto, Monto]]:
+    """Flujos de la partida con t0 < fecha ≤ t1, fijos (decisiones A y C).
+
+    `reprecio` = (fecha, precio, ccl): las ventas de esa fecha se toman a ese
+    precio y ese CCL (E', desde la compra de la tenencia vigente)."""
     out: list[tuple[Monto, Monto]] = []
     for op in ordenar(partida['operaciones']):
         if not (t0 < op['fecha'] <= t1):
             continue
         tipo = op['tipo']
         c_op = dec(op.get('ccl')) if op.get('ccl') is not None else ccl_de(ccl, op['fecha'])
+        if tipo == 'venta' and reprecio is not None and op['fecha'] == reprecio[0]:
+            out.append((neg(prod(dec(op['cantidad']), reprecio[1])), reprecio[2]))
+            continue
         if tipo == 'compra':
             costo = costo_operacion_ars(op)
             if costo is None:  # decisión C: precio pendiente → precio del día
@@ -660,9 +680,42 @@ def desde_compra(partida: dict, ccl: dict[str, str | None], fecha: str, cargas: 
         x = intervalo(partida, ccl, a, b)
         if x['resultado_ars'] is None:
             return sin
+        ventas = [op for op in ops if op['tipo'] == 'venta' and a < op['fecha'] <= b]
+        if not ventas:
+            for c in suma_partes:
+                suma_partes[c] += x[c]
+            continue
+        # E': la tenencia vigente. La venta, al precio y al CCL de la observación
+        # de ese día; después, lo acumulado × cantidad después ÷ cantidad antes.
+        if (any(op['fecha'] != b for op in ventas) or not fresca(partida, ccl, b)
+                or any(op['fecha'] == b and op['tipo'] in ('apertura', 'compra', 'ajuste_ratio') for op in ops)):
+            return _i9(base | desglose_desde_compra(partida['riesgo'], f['costo_ars'], f['costo_usd'], f['valor_ars'], f['valor_usd'], f['ccl']))
+        p_b = next(dec(p['precio']) for p in partida['precios'] if p['fecha'] == b)
+        c_b = dec(ccl[b])
+        a0 = ancla(partida, ccl, a)
+        fa0 = foto(partida, ccl, a0)
+        fa1 = foto(partida, ccl, b)
+        fl = flujos_intervalo(partida, ccl, a0, b, (b, p_b, c_b))
+        if fa0['valor_ars'] is None or fa1['valor_ars'] is None or any(f is None or c is None for f, c in fl):
+            return sin
+        d = desglose_intervalo(partida['riesgo'], fa0['valor_ars'], fa0['valor_usd'], fa1['valor_ars'], fa1['valor_usd'],
+                               dec(ccl[a0]), c_b, fl, True)
         for c in suma_partes:
-            suma_partes[c] += x[c]
-    return base | suma_partes
+            suma_partes[c] += d[c]
+        despues = tenencia(partida['operaciones'], b)['cantidad']
+        antes = despues + sum((dec(op['cantidad']) for op in ventas), CERO)
+        for c in suma_partes:
+            suma_partes[c] = suma_partes[c] * despues / antes
+    return _i9(base | suma_partes)
+
+
+def _i9(d: dict) -> dict:
+    """I-9 en el desglose desde la compra: sin resultado en una moneda, sin partes en esa moneda."""
+    for m in ('ars', 'usd'):
+        if d.get(f'resultado_{m}') is None:
+            for parte in ('activo', 'tc'):
+                d[f'{parte}_{m}'] = None
+    return d
 
 
 # ───────────────────────────── un caso completo ──────────────────────────────

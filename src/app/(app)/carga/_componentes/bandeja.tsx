@@ -9,7 +9,7 @@
 import { useId, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { ChevronRight } from 'lucide-react'
 import Link from 'next/link'
-import type { DecisionFila, DecisionSaldo, FilaLeida, PropuestaCarga } from '@/lib/carga/contratos'
+import type { AusentePropuesto, DecisionFila, DecisionSaldo, FilaLeida, PropuestaCarga } from '@/lib/carga/contratos'
 import { monto, numero, porcentaje } from '@/lib/domain/dinero'
 import { diasEntre, fechaCorta } from '@/lib/domain/fechas'
 import type { Fecha } from '@/lib/domain/tipos'
@@ -19,17 +19,21 @@ import {
   diferenciaDolarIEB,
   enlaceMovimiento,
   precioACompletar,
+  problemaRegistroAusente,
   saltoDeSaldo,
+  type EleccionAusente,
   type EleccionFila,
   type EleccionSaldo,
   type EstadoItem,
   type ItemBandeja,
+  type RegistroAusente,
   type ResumenBandeja,
 } from '../_lib/bandeja'
 import type { ActivoLocal } from '../_lib/demo'
 import type { EdicionFila } from '../_lib/ediciones'
 import { leerMonto } from '../_lib/entrada'
 import { AltaActivo } from './alta-activo'
+import { ConMontos, M } from './montos'
 import { Boton, Chip, Entrada } from './ui'
 
 // ───────────── Formato ─────────────
@@ -40,7 +44,7 @@ function decimalesDe(v: string): number {
 }
 
 const pesos = (v: string, dec = 2) => monto(v, 'ARS', { decimales: dec })
-const precio = (v: string) => monto(v, 'ARS', { decimales: Math.min(6, Math.max(2, decimalesDe(v))) })
+const precio = (v: string, m: 'ARS' | 'USD' = 'ARS') => monto(v, m, { decimales: Math.min(6, Math.max(2, decimalesDe(v))) })
 const cantidad = (v: string) => numero(v, 6, { min: 0 })
 const montoMoneda = (v: string, m: 'ARS' | 'USD') => monto(v, m, { decimales: 2 })
 /** Decimal normalizado → texto para editar ("1.0986" → "1,0986"). */
@@ -119,7 +123,7 @@ function Motivos({ motivos, principal = false }: { motivos: string[]; principal?
     <ul className="mt-1 space-y-0.5 text-sm text-muted">
       {motivos.map((m, i) => (
         <li key={i} className={`break-words ${principal && i === 0 ? 'font-medium text-negative' : ''}`}>
-          {m}
+          <ConMontos texto={m} />
         </li>
       ))}
     </ul>
@@ -134,7 +138,14 @@ function Motivos({ motivos, principal = false }: { motivos: string[]; principal?
 function DosLecturas({
   campos,
 }: {
-  campos: { etiqueta: string; opciones: { lectura: 'A' | 'B'; texto: string; propuesta: boolean; elegida: boolean; onElegir: (() => void) | null }[] }[]
+  campos: {
+    etiqueta: string
+    /** El valor es plata (se tapa en el modo privado). */
+    monto?: boolean
+    /** "cierra" solo si la propuesta salió de un control aritmético que cerró; si no, "propuesta". */
+    rotulo: 'cierra' | 'propuesta'
+    opciones: { lectura: 'A' | 'B'; texto: string; propuesta: boolean; elegida: boolean; onElegir: (() => void) | null }[]
+  }[]
 }) {
   if (!campos.length) return null
   return (
@@ -156,9 +167,9 @@ function DosLecturas({
                 >
                   <span className="block text-xs text-muted">
                     Lectura {o.lectura}
-                    {o.propuesta ? ' · cierra' : ''}
+                    {o.propuesta ? ` · ${c.rotulo}` : ''}
                   </span>
-                  <span className="num block break-words">{o.texto}</span>
+                  <span className={`num block break-words ${c.monto ? 'monto' : ''}`}>{o.texto}</span>
                 </button>
               ) : (
                 <div key={o.lectura} className="min-w-0 rounded-lg border border-dashed border-border px-2 py-1.5 text-sm">
@@ -166,7 +177,7 @@ function DosLecturas({
                     Lectura {o.lectura}
                     {o.propuesta ? ' · propuesta' : ''}
                   </span>
-                  <span className="num block break-words text-text">{o.texto}</span>
+                  <span className={`num block break-words text-text ${c.monto ? 'monto' : ''}`}>{o.texto}</span>
                 </div>
               ),
             )}
@@ -391,7 +402,15 @@ function EditorLectura({
     <div className="mt-3 space-y-3 rounded-xl border border-border bg-surface-2 p-3" onKeyDown={(e) => e.stopPropagation()}>
       <p className="text-sm text-muted">
         Corregí lo que la fuente muestra. Vuelvo a controlar contra el valorizado
-        {d.fila.valorizado ? <> ({pesos(d.fila.valorizado)})</> : ' (esta fila no trae valorizado: no hay control)'}.
+        {d.fila.valorizado ? (
+          <>
+            {' '}
+            (<M>{pesos(d.fila.valorizado)}</M>)
+          </>
+        ) : (
+          ' (esta fila no trae valorizado: no hay control)'
+        )}
+        .
       </p>
       <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
         <div className="min-w-0 space-y-1">
@@ -441,7 +460,8 @@ const mismaEdicion = (a: EdicionFila, b: EdicionFila | null) =>
   b !== null && a.cantidad === b.cantidad && a.precio_unitario === b.precio_unitario && (a.valorizado ?? null) === (b.valorizado ?? null)
 
 function textoOperacion(d: DecisionFila, el: EleccionFila | null): string | null {
-  const op = el?.operacion ? { ...d.operacion!, ...el.operacion } : d.operacion
+  const base = el?.apertura && d.apertura_alternativa ? d.apertura_alternativa : d.operacion
+  const op = el?.operacion && base ? { ...base, ...el.operacion } : base
   if (!op) return null
   const q = cantidad(op.cantidad)
   const p = op.precio ? ` a ${precio(op.precio)}` : op.tipo === 'apertura' ? ' (costo sin dato)' : ' (precio pendiente)'
@@ -480,6 +500,12 @@ function ItemFila({
   const [modo, setModo] = useState<'ver' | 'operacion' | 'lectura' | 'alta' | 'precio'>('ver')
   const f = d.fila
   const faltaCcl = d.motivos.some((m) => m.startsWith('Falta el CCL'))
+  // Galicia muestra "Bonos en dólares" en U$D: se ve en dólares y no se graba (queda en error).
+  const mon: 'ARS' | 'USD' = f.moneda_precio === 'USD' || (d.cuenta !== 'IEB' && f.moneda_emision === 'USD') ? 'USD' : 'ARS'
+  const enDolares = mon === 'USD'
+  const comoApertura = Boolean(eleccion?.apertura && d.apertura_alternativa)
+  // "Ya la tenía": la otra opción de una compra de una tenencia nueva en una cuenta ya cargada.
+  const puedeApertura = Boolean(d.apertura_alternativa) && f.estado !== 'error' && (estado === 'advertencia' || (estado === 'error' && faltaCcl))
   const operacion = textoOperacion(d, eleccion)
   const completa = d.accion === 'completar_precio' && d.completar ? d.completar : null
   const precioElegido = completa ? precioACompletar(d, eleccion) : null
@@ -500,7 +526,10 @@ function ItemFila({
     }
   }
   const pendiente = () => onElegir(d, { resolucion: 'pendiente', motivo: 'la dejé pendiente', operacion: null })
-  const editar = () => setModo(completa && estado !== 'error' ? 'precio' : d.operacion && estado !== 'error' ? 'operacion' : 'lectura')
+  const yaLaTenia = () =>
+    onElegir(d, { resolucion: 'aceptada', motivo: 'ya la tenía: apertura con el PPP, sin pago de hoy', operacion: null, apertura: true })
+  const editar = () =>
+    enDolares ? undefined : setModo(completa && estado !== 'error' ? 'precio' : d.operacion && estado !== 'error' && !comoApertura ? 'operacion' : 'lectura')
 
   const escala =
     f.escala && f.escala !== '1' && f.precio_mostrado
@@ -511,6 +540,8 @@ function ItemFila({
   const fuente = original ?? f
   const lecturas = alternativasFila(fuente, edicion).map((a) => ({
     etiqueta: a.etiqueta,
+    monto: !['cantidad', 'rendimiento_porcentaje', 'ticker'].includes(a.campo),
+    rotulo: (fuente.chequeo?.ok ? 'cierra' : 'propuesta') as 'cierra' | 'propuesta',
     opciones: a.opciones.map((o) => {
       const decimal = /^-?\d+(\.\d+)?$/.test(o.valor)
       const texto = !decimal
@@ -519,7 +550,7 @@ function ItemFila({
           ? cantidad(o.valor)
           : a.campo === 'rendimiento_porcentaje'
             ? `${numero(o.valor, 2)}%`
-            : precio(o.valor)
+            : precio(o.valor, mon)
       const editada = o.edicion !== null && o.edicion !== 'aceptar'
       // Elegida: la que coincide con lo que hoy usa la fila.
       const elegida =
@@ -559,13 +590,14 @@ function ItemFila({
       <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-4">
         <Dato etiqueta="Leí">{d.cantidad_leida !== null ? cantidad(d.cantidad_leida) : 'sin dato'}</Dato>
         <Dato etiqueta="La app tiene">{d.cantidad_app !== null ? cantidad(d.cantidad_app) : 'sin dato'}</Dato>
-        <Dato etiqueta="Precio por 1 VN">{f.precio_unitario ? precio(f.precio_unitario) : 'sin dato'}</Dato>
-        <Dato etiqueta="Valorizado">{f.valorizado ? pesos(f.valorizado) : 'sin dato'}</Dato>
+        <Dato etiqueta="Precio por 1 VN">{f.precio_unitario ? <M usd={enDolares}>{precio(f.precio_unitario, mon)}</M> : 'sin dato'}</Dato>
+        <Dato etiqueta="Valorizado">{f.valorizado ? <M usd={enDolares}>{montoMoneda(f.valorizado, mon)}</M> : 'sin dato'}</Dato>
       </dl>
       {escala ? <p className="mt-1 text-xs text-muted">{escala}.</p> : null}
       {f.chequeo ? (
         <p className={`num mt-1 break-words text-xs ${f.chequeo.ok ? 'text-muted' : 'text-negative'}`}>
-          {f.chequeo.ok ? '✓' : '≠'} {f.chequeo.regla}: {pesos(f.chequeo.calculado)} {f.chequeo.ok ? '≈' : 'contra'} {pesos(f.chequeo.esperado)} (±{pesos(f.chequeo.tolerancia)})
+          {f.chequeo.ok ? '✓' : '≠'} {f.chequeo.regla}: <M usd={enDolares}>{montoMoneda(f.chequeo.calculado, mon)}</M> {f.chequeo.ok ? '≈' : 'contra'}{' '}
+          <M usd={enDolares}>{montoMoneda(f.chequeo.esperado, mon)}</M> (±<M usd={enDolares}>{montoMoneda(f.chequeo.tolerancia, mon)}</M>)
         </p>
       ) : null}
       {completa ? (
@@ -573,18 +605,20 @@ function ItemFila({
           <span className="text-muted">Propuesta: </span>
           {precioElegido !== null || estado !== 'aceptada' ? (
             <>
-              completar el precio de la compra del {fechaCorta(completa.fecha)}: <span className="num">{precio(precioElegido ?? completa.precio)}</span>
+              completar el precio de la compra del {fechaCorta(completa.fecha)}: <span className="num monto">{precio(precioElegido ?? completa.precio)}</span>
               {eleccion?.precio_completar ? ' (corregido)' : ', inferido del PPP'}
             </>
           ) : (
             'grabar la fila sin completar el precio (la compra sigue pendiente)'
           )}
-          <span className="num block break-words text-xs text-muted">{completa.formula}</span>
+          <span className="num block break-words text-xs text-muted">
+            <ConMontos texto={completa.formula} />
+          </span>
         </p>
       ) : operacion ? (
         <p className="mt-1 text-sm text-text">
           <span className="text-muted">Propuesta: </span>
-          {operacion}
+          <ConMontos texto={operacion} />
         </p>
       ) : d.accion === 'ninguna' ? null : (
         <p className="mt-1 text-sm text-muted">{NOMBRE_ACCION[d.accion]}</p>
@@ -657,12 +691,17 @@ function ItemFila({
             <Boton variante="primario" onClick={aceptar} title="Completar (A)">
               Completar<span className="max-sm:hidden">
                 {' '}
-                a <span className="num">{precio(completa.precio)}</span>
+                a <span className="num monto">{precio(completa.precio)}</span>
               </span>
             </Boton>
           ) : estado === 'advertencia' ? (
             <Boton variante="primario" onClick={aceptar} title="Aceptar (A)">
               {d.operacion ? `Aceptar ${nombreOperacion(d.operacion.tipo)}` : d.accion === 'revisar' ? 'Grabar solo el precio' : 'Aceptar'}
+            </Boton>
+          ) : null}
+          {puedeApertura ? (
+            <Boton variante="secundario" onClick={yaLaTenia} title="Ya la tenía: entra como apertura con el PPP">
+              Ya la tenía (apertura)
             </Boton>
           ) : null}
           {estado === 'sin_alta' ? (
@@ -675,7 +714,7 @@ function ItemFila({
               Tipear el CCL
             </Boton>
           ) : null}
-          {estado === 'error' && !faltaCcl ? (
+          {estado === 'error' && !faltaCcl && !enDolares ? (
             <Boton variante="primario" onClick={() => setModo('lectura')} title="Editar (E)">
               Editar
             </Boton>
@@ -697,7 +736,7 @@ function ItemFila({
               ) : null}
             </>
           ) : null}
-          {(estado === 'advertencia' || estado === 'aceptada') && d.operacion ? (
+          {(estado === 'advertencia' || estado === 'aceptada') && d.operacion && !comoApertura ? (
             <Boton variante="secundario" onClick={() => setModo('operacion')} title="Editar (E)">
               Editar {nombreOperacion(d.operacion.tipo)}
             </Boton>
@@ -783,33 +822,48 @@ function ItemSaldo({
     >
       <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-4">
         <Dato etiqueta={eleccion?.monto ? 'Elegido' : 'Leí'}>
-          <span className={moneda === 'USD' ? 'usd' : ''}>{montoMoneda(mostrado, moneda)}</span>
+          <M usd={moneda === 'USD'}>{montoMoneda(mostrado, moneda)}</M>
         </Dato>
         <Dato etiqueta="Antes">
           {d.anterior ? (
             <>
-              {montoMoneda(d.anterior.monto, moneda)} <span className="text-xs text-muted">({fechaCorta(d.anterior.fecha)})</span>
+              <M usd={moneda === 'USD'}>{montoMoneda(d.anterior.monto, moneda)}</M> <span className="text-xs text-muted">({fechaCorta(d.anterior.fecha)})</span>
             </>
           ) : (
             'primera carga'
           )}
         </Dato>
         {salto ? (
-          <Dato etiqueta="Cambio">{monto(salto.suba, moneda, { decimales: 2, signo: true })}</Dato>
+          <Dato etiqueta="Cambio">
+            <M usd={moneda === 'USD'}>{monto(salto.suba, moneda, { decimales: 2, signo: true })}</M>
+          </Dato>
         ) : null}
-        {d.saldo.tna ? <Dato etiqueta="TNA de la captura">{numero(d.saldo.tna, 2, { min: 1 })}{Number(d.saldo.tna) > 1 ? '%' : ''}</Dato> : null}
+        {/* El lector guarda la TNA en porcentaje, como la muestra la captura. */}
+        {d.saldo.tna ? <Dato etiqueta="TNA de la captura">{numero(d.saldo.tna, 2, { min: 1 })}%</Dato> : null}
       </dl>
       {partes.length ? (
         <p className="num mt-1 break-words text-xs text-muted">
-          = {partes.map((p) => `${p.concepto} ${montoMoneda(p.monto, moneda)}`).join(' + ')}
+          ={' '}
+          {partes.map((p, i) => (
+            <span key={i}>
+              {i ? ' + ' : ''}
+              {p.concepto} <M usd={moneda === 'USD'}>{montoMoneda(p.monto, moneda)}</M>
+            </span>
+          ))}
         </p>
       ) : null}
       {salto?.sinExplicar || salto?.baja ? (
         <p className="mt-2 rounded-lg bg-accent-soft px-3 py-2 text-sm text-text">
           <span className="font-medium">¿Entró o salió plata?</span>{' '}
-          {salto.sinExplicar
-            ? `Subió ${montoMoneda(salto.sinExplicar, moneda)} más de lo que explica la TNA de la captura.`
-            : `Bajó ${montoMoneda(salto.baja!, moneda)}, y los intereses no restan.`}{' '}
+          {salto.sinExplicar ? (
+            <>
+              Subió <M usd={moneda === 'USD'}>{montoMoneda(salto.sinExplicar, moneda)}</M> más de lo que explica la TNA de la captura.
+            </>
+          ) : (
+            <>
+              Bajó <M usd={moneda === 'USD'}>{montoMoneda(salto.baja!, moneda)}</M>, y los intereses no restan.
+            </>
+          )}{' '}
           Sin registrar el movimiento, se lee como {salto.sinExplicar ? 'ganancia' : 'pérdida'} (D-06).{' '}
           <Link
             href={enlaceMovimiento({
@@ -836,6 +890,9 @@ function ItemSaldo({
           campos={[
             {
               etiqueta: 'Saldo',
+              monto: true,
+              // Un saldo no tiene control aritmético (manual §12): la propuesta no "cierra" nada.
+              rotulo: 'propuesta',
               opciones: alternativas.slice(0, 2).map((a, i) => ({
                 lectura: i === 0 ? ('A' as const) : ('B' as const),
                 texto: montoMoneda(a.monto, moneda),
@@ -906,6 +963,203 @@ function ItemSaldo({
   )
 }
 
+// ───────────── Tenencia que la fuente ya no lista ─────────────
+
+function EditorAusente({
+  a,
+  tipo,
+  inicial,
+  onRegistrar,
+  onCancelar,
+}: {
+  a: AusentePropuesto
+  tipo: 'venta' | 'vencimiento'
+  inicial: RegistroAusente | null
+  onRegistrar: (r: RegistroAusente) => void
+  onCancelar: () => void
+}) {
+  const id = useId()
+  const [p, setP] = useState(aEditable(inicial?.tipo === tipo ? inicial.precio : null))
+  const [imp, setImp] = useState(aEditable(inicial?.tipo === tipo ? inicial.importe : null))
+  const [error, setError] = useState<string | null>(null)
+  function registrar() {
+    let precioFinal: string | null = null
+    let importe: string | null = null
+    if (tipo === 'venta' && p.trim() !== '') {
+      const cp = leerMonto(p, { positivo: true })
+      if (cp.error) return setError(`Precio: ${cp.error}`)
+      precioFinal = cp.valor
+    }
+    if (imp.trim() !== '') {
+      const ci = leerMonto(imp, { positivo: true })
+      if (ci.error) return setError(`Importe: ${ci.error}`)
+      importe = ci.valor
+    }
+    const r: RegistroAusente = { tipo, cantidad: a.cantidad_app, precio: precioFinal, importe }
+    const problema = problemaRegistroAusente({ ...a, ccl_del_dia: a.ccl_del_dia ?? '1' }, r)
+    if (problema) return setError(`${problema.charAt(0).toUpperCase()}${problema.slice(1)}.`)
+    onRegistrar(r)
+  }
+  const alEnter = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      registrar()
+    }
+  }
+  return (
+    <div className="mt-3 grid gap-3 rounded-xl border border-border bg-surface-2 p-3 sm:grid-cols-[1fr_1fr_auto]" onKeyDown={(e) => e.stopPropagation()}>
+      {tipo === 'venta' ? (
+        <div className="min-w-0 space-y-1">
+          <label htmlFor={`${id}-p`} className="text-sm font-medium">
+            Precio de venta por 1 VN / unidad, en pesos
+          </label>
+          <Entrada id={`${id}-p`} inputMode="decimal" value={p} onChange={(e) => setP(e.target.value)} className="num" autoFocus onKeyDown={alEnter} />
+        </div>
+      ) : null}
+      <div className="min-w-0 space-y-1">
+        <label htmlFor={`${id}-i`} className="text-sm font-medium">
+          {tipo === 'venta' ? (
+            <>
+              o el importe total cobrado <span className="font-normal text-muted">(en pesos)</span>
+            </>
+          ) : (
+            'Importe cobrado, en pesos (el total)'
+          )}
+        </label>
+        <Entrada
+          id={`${id}-i`}
+          inputMode="decimal"
+          value={imp}
+          onChange={(e) => setImp(e.target.value)}
+          className="num"
+          autoFocus={tipo === 'vencimiento'}
+          onKeyDown={alEnter}
+        />
+      </div>
+      <div className="flex items-end gap-2 [&>*]:max-sm:flex-1">
+        <Boton variante="primario" onClick={registrar}>
+          Registrar así
+        </Boton>
+        <Boton variante="fantasma" onClick={onCancelar}>
+          Cancelar
+        </Boton>
+      </div>
+      {error ? <p role="alert" className="text-sm text-negative sm:col-span-3">{error}</p> : null}
+    </div>
+  )
+}
+
+function ItemAusente({
+  a,
+  estado,
+  eleccion,
+  onElegir,
+  onIrAlCcl,
+  clave,
+}: {
+  a: AusentePropuesto
+  clave: string
+  estado: EstadoItem
+  eleccion: EleccionAusente | null
+  onElegir: (clave: string, e: EleccionAusente | null) => void
+  onIrAlCcl: () => void
+}) {
+  const [editando, setEditando] = useState<'venta' | 'vencimiento' | null>(null)
+  const registro = eleccion && typeof eleccion === 'object' ? eleccion : null
+  const problema = registro ? problemaRegistroAusente(a, registro) : null
+  const renta = a.tipo_activo === 'bono' || a.tipo_activo === 'lecap'
+  const nombreOp = (t: 'venta' | 'vencimiento') => (t === 'venta' ? 'venta' : 'vencimiento')
+  return (
+    <Fila
+      estado={estado}
+      titulo={
+        <>
+          {a.cuenta} · <span className="num">{a.ticker}</span>
+        </>
+      }
+      subtitulo="la fuente no lo trae"
+      onKeyDown={(e) =>
+        teclasFila(e, {
+          e: () => setEditando(a.sugerida),
+          p: () => onElegir(clave, 'pendiente'),
+        })
+      }
+    >
+      <p className="mt-1 text-sm text-muted">
+        La app tiene <span className="num">{cantidad(a.cantidad_app)}</span> y {a.cuenta} ya no lo lista: ¿lo vendiste todo{renta ? ' o venció' : ''}?
+        Registralo con lo que cobraste. Si lo dejás pendiente, desde esta carga vale «sin dato» hasta que lo registres.
+      </p>
+      {a.ultimo_precio ? (
+        <p className="mt-1 text-xs text-muted">
+          Último precio en la app: <M>{precio(a.ultimo_precio.precio_pesos)}</M> por 1 VN ({fechaCorta(a.ultimo_precio.fecha)}). Es solo una referencia: no se usa
+          solo.
+        </p>
+      ) : null}
+      {registro ? (
+        <p className="mt-1 text-sm text-text">
+          <span className="text-muted">Registrás: </span>
+          {nombreOp(registro.tipo).charAt(0).toUpperCase()}
+          {nombreOp(registro.tipo).slice(1)} de <span className="num">{cantidad(registro.cantidad)}</span>
+          {registro.precio ? (
+            <>
+              {' '}
+              a <M>{precio(registro.precio)}</M>
+            </>
+          ) : null}
+          {registro.importe ? (
+            <>
+              {' '}
+              por <M>{pesos(registro.importe)}</M> cobrados
+            </>
+          ) : null}
+          {a.ccl_del_dia ? <> · CCL {numero(a.ccl_del_dia, 2)}</> : null}
+        </p>
+      ) : null}
+      {problema ? <Motivos motivos={[`${problema.charAt(0).toUpperCase()}${problema.slice(1)}.`]} principal /> : null}
+      {!registro && a.ccl_del_dia === null && estado !== 'pendiente' ? (
+        <p className="mt-1 text-sm text-muted">Para registrarlo hace falta el CCL del día.</p>
+      ) : null}
+      {editando ? (
+        <EditorAusente
+          a={a}
+          tipo={editando}
+          inicial={registro}
+          onCancelar={() => setEditando(null)}
+          onRegistrar={(r) => {
+            onElegir(clave, r)
+            setEditando(null)
+          }}
+        />
+      ) : (
+        <Acciones>
+          {estado === 'pendiente' || estado === 'aceptada' || registro ? (
+            <Boton variante="fantasma" onClick={() => onElegir(clave, null)}>
+              Deshacer elección
+            </Boton>
+          ) : null}
+          {estado !== 'pendiente'
+            ? a.opciones.map((t, i) => (
+                <Boton key={t} variante={i === 0 && !registro ? 'primario' : 'secundario'} onClick={() => setEditando(t)} title={i === 0 ? 'Registrar (E)' : undefined}>
+                  {registro?.tipo === t ? `Editar ${nombreOp(t)}` : `Registrar ${nombreOp(t)}`}
+                </Boton>
+              ))
+            : null}
+          {a.ccl_del_dia === null && estado !== 'pendiente' ? (
+            <Boton variante="secundario" onClick={onIrAlCcl}>
+              Tipear el CCL
+            </Boton>
+          ) : null}
+          {estado !== 'pendiente' && !registro ? (
+            <Boton variante="fantasma" onClick={() => onElegir(clave, 'pendiente')} title="Dejar pendiente (P)">
+              Dejar pendiente
+            </Boton>
+          ) : null}
+        </Acciones>
+      )}
+    </Fila>
+  )
+}
+
 // ───────────── Bandeja ─────────────
 
 export function Bandeja({
@@ -939,7 +1193,11 @@ export function Bandeja({
   ccl?: string | null
   resumen: ResumenBandeja
   propuesta: PropuestaCarga | null
-  eleccionDe: { fila: (d: DecisionFila) => EleccionFila | null; saldo: (d: DecisionSaldo) => EleccionSaldo | null }
+  eleccionDe: {
+    fila: (d: DecisionFila) => EleccionFila | null
+    saldo: (d: DecisionSaldo) => EleccionSaldo | null
+    ausente: (clave: string) => EleccionAusente | null
+  }
   edicionDe: (clave: string) => EdicionFila | null
   avisos: string[]
   fecha: Fecha
@@ -947,7 +1205,7 @@ export function Bandeja({
   error: string | null
   onFila: (d: DecisionFila, e: Omit<EleccionFila, 'huella'> | null) => void
   onSaldo: (d: DecisionSaldo, e: Omit<EleccionSaldo, 'huella'> | null) => void
-  onAusente: (clave: string, pendiente: boolean) => void
+  onAusente: (clave: string, e: EleccionAusente | null) => void
   onEditar: (clave: string, e: EdicionFila | null) => void
   onAlta: (a: ActivoLocal) => void
   onIrAlCcl: () => void
@@ -979,35 +1237,16 @@ export function Bandeja({
       return <ItemSaldo key={i.clave} d={i.saldo} estado={i.estado} eleccion={eleccionDe.saldo(i.saldo)} fecha={fecha} onElegir={onSaldo} />
     }
     if (i.tipo === 'ausente' && i.ausente) {
-      const a = i.ausente
       return (
-        <Fila
+        <ItemAusente
           key={i.clave}
+          clave={i.clave}
+          a={i.ausente}
           estado={i.estado}
-          titulo={
-            <>
-              {a.cuenta} · <span className="num">{a.ticker}</span>
-            </>
-          }
-          subtitulo="la fuente no lo trae"
-          onKeyDown={(e) => teclasFila(e, { p: () => onAusente(i.clave, true) })}
-        >
-          <p className="mt-1 text-sm text-muted">
-            La app tiene <span className="num">{cantidad(a.cantidad_app)}</span> y la fuente no lo lista. Si lo vendiste todo, todavía no
-            lo puedo registrar desde acá: queda pendiente y la carga de {a.cuenta} queda con el listado incompleto.
-          </p>
-          <Acciones>
-            {i.estado === 'pendiente' ? (
-              <Boton variante="fantasma" onClick={() => onAusente(i.clave, false)}>
-                Deshacer elección
-              </Boton>
-            ) : (
-              <Boton variante="secundario" onClick={() => onAusente(i.clave, true)} title="Dejar pendiente (P)">
-                Dejar pendiente
-              </Boton>
-            )}
-          </Acciones>
-        </Fila>
+          eleccion={eleccionDe.ausente(i.clave)}
+          onElegir={onAusente}
+          onIrAlCcl={onIrAlCcl}
+        />
       )
     }
     return null
@@ -1079,8 +1318,8 @@ export function Bandeja({
         if (!dif) return null
         return (
           <p className="num break-words text-sm text-muted">
-            <Chip tono="neutro">≠</Chip> DOLARUSA al dólar de IEB {pesos(dif.dolar)} vs tu CCL {pesos(dif.ccl)}: diferencia{' '}
-            {monto(dif.diferencia, 'ARS', { decimales: 2, signo: true })} ({porcentaje(dif.fraccion, { signo: true })}). IEB valúa tus dólares con el suyo; la
+            <Chip tono="neutro">≠</Chip> DOLARUSA al dólar de IEB <M>{pesos(dif.dolar)}</M> vs tu CCL <M>{pesos(dif.ccl)}</M>: diferencia{' '}
+            <M>{monto(dif.diferencia, 'ARS', { decimales: 2, signo: true })}</M> ({porcentaje(dif.fraccion, { signo: true })}). IEB valúa tus dólares con el suyo; la
             app, con tu CCL.
           </p>
         )
@@ -1096,10 +1335,19 @@ export function Bandeja({
                   {cuenta} · {c.tipo === 'ieb_b2' ? 'cierra contra B2' : c.tipo === 'ieb_subtotal' ? `subtotal ${c.seccion ?? ''}` : 'total de la captura'}
                 </span>
                 <span className="num min-w-0 break-words text-muted">
-                  {pesos(c.informado)}
-                  {c.calculado !== null ? ` ${c.ok ? '=' : '≠'} ${pesos(c.calculado)}` : ''}
+                  <M usd={c.moneda === 'USD'}>{montoMoneda(c.informado, c.moneda ?? 'ARS')}</M>
+                  {c.calculado !== null ? (
+                    <>
+                      {` ${c.ok ? '=' : '≠'} `}
+                      <M usd={c.moneda === 'USD'}>{montoMoneda(c.calculado, c.moneda ?? 'ARS')}</M>
+                    </>
+                  ) : null}
                 </span>
-                {c.detalle ? <span className="min-w-0 text-xs text-muted">{c.detalle}</span> : null}
+                {c.detalle ? (
+                  <span className="min-w-0 text-xs text-muted">
+                    <ConMontos texto={c.detalle} />
+                  </span>
+                ) : null}
               </li>
             ))}
           </ul>

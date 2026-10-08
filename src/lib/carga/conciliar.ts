@@ -17,6 +17,7 @@ import { tenencias, type Tenencia } from '@/lib/domain/posiciones'
 import type { Activo, Fecha, Hechos, Moneda, Operacion } from '@/lib/domain/tipos'
 import type {
   ActivoNuevo,
+  AusentePropuesto,
   DecisionFila,
   DecisionSaldo,
   EstadoFila,
@@ -147,6 +148,36 @@ function toleranciaCosto(f: FilaLeida, q1: Decimal, q0: Decimal, costo0: Decimal
   return Decimal.max(precision, costo0.abs().times('0.01'))
 }
 
+/**
+ * CCL con el que se registran las operaciones de una carga: el tipeado ahora o,
+ * si no se tipeó, el que ese mismo día ya tiene cargado (una recarga a la tarde
+ * no obliga a retipearlo). Nunca el de otro día: eso sería inventarlo.
+ */
+export function cclDelDia(
+  hechos: Pick<Hechos, 'tipos_cambio'>,
+  fecha: Fecha,
+  tipeado: Decimal | null,
+): { valor: Decimal; origen: 'tipeado' | 'cargado' } | null {
+  if (tipeado !== null) return { valor: tipeado, origen: 'tipeado' }
+  const delDia = hechos.tipos_cambio.find((t) => t.fecha === fecha)?.ccl ?? null
+  return delDia !== null && delDia.gt(0) ? { valor: delDia, origen: 'cargado' } : null
+}
+
+/** Sección de una captura en la que la fuente lista cada tipo de activo. */
+const SECCION_DE_TIPO: Record<Activo['tipo'], NonNullable<FilaLeida['seccion']>> = {
+  cedear: 'cedears',
+  accion_local: 'acciones',
+  bono: 'bonos',
+  lecap: 'bonos',
+  fci: 'fci',
+}
+
+/** Un número leído mayor que cero, o null (un PPP o un precio de 0 es "sin dato", D-107). */
+function positivo(v: string | null): string | null {
+  if (v === null || !/^-?\d+(\.\d+)?$/.test(v)) return null
+  return new Decimal(v).gt(0) ? v : null
+}
+
 export function proponerCarga(
   lecturas: LecturaCuenta[],
   hechos: Hechos,
@@ -156,8 +187,17 @@ export function proponerCarga(
   const porTicker = new Map<string, Activo>(hechos.activos.map((a) => [a.ticker.toUpperCase(), a]))
   // Lo que la app tenía al cierre del día de la carga (B21).
   const tens = tenencias(hechos.operaciones, fecha)
-  const propuesta: PropuestaCarga = { fecha, filas: [], saldos: [], controles: [], advertencias: [], ausentes: [] }
-  const ccl = tc.ccl ? tc.ccl.toFixed() : null
+  const usado = cclDelDia(hechos, fecha, tc.ccl)
+  const propuesta: PropuestaCarga = {
+    fecha,
+    filas: [],
+    saldos: [],
+    controles: [],
+    advertencias: [],
+    ausentes: [],
+    ccl: usado ? { valor: usado.valor.toFixed(), origen: usado.origen } : null,
+  }
+  const ccl = usado ? usado.valor.toFixed() : null
 
   for (const l of lecturas) {
     const cuenta = hechos.cuentas.find((c) => c.nombre === l.cuenta)
@@ -195,8 +235,20 @@ export function proponerCarga(
       let accion: DecisionFila['accion'] = 'ninguna'
       let operacion: OperacionAGrabar | null = null
       let completar: PrecioInferido | null = null
+      let apertura_alternativa: OperacionAGrabar | null = null
+      // Un PPP o un precio de 0 (o negativo) es "sin dato" (D-107): nunca un costo ni un precio.
+      const ppcUnitario = positivo(f.ppc_unitario)
+      const precioHoy = positivo(f.precio_unitario)
+      // Galicia muestra "Bonos en dólares" en U$D: ese precio no es un precio en pesos.
+      const enDolares = f.moneda_precio === 'USD' || (l.origen === 'captura' && f.moneda_emision === 'USD')
 
-      if (qLeida === null) {
+      if (enDolares) {
+        accion = 'revisar'
+        estado = 'error'
+        errores.push(
+          `${l.cuenta} muestra este título en dólares y la 1a guarda los precios en pesos: no se graba. Dejalo pendiente.`,
+        )
+      } else if (qLeida === null) {
         accion = 'revisar'
         estado = 'error'
         errores.push('No se pudo leer la cantidad.')
@@ -214,7 +266,7 @@ export function proponerCarga(
           : undefined
         if (diff.isZero()) {
           // D-19: el PPP de hoy completa una compra que quedó pendiente.
-          const r = precioPendiente(t, hechos.operaciones, fecha, f.ppc_unitario)
+          const r = precioPendiente(t, hechos.operaciones, fecha, ppcUnitario)
           if (r?.ok) {
             accion = 'completar_precio'
             completar = r.completar
@@ -237,25 +289,31 @@ export function proponerCarga(
         } else if (qApp.isZero() && !yaCargada) {
           // Primera carga de la cuenta: tenencia inicial (D-14). Una compra
           // del día (PPP "-", a liquidar) entra como compra pendiente (D-19).
-          if (f.ppc_unitario === null && f.liquidacion === 'liquidar') {
+          if (ppcUnitario === null && f.liquidacion === 'liquidar') {
             accion = 'compra'
             operacion = { ...base, tipo: 'compra', cantidad: qLeida.toFixed(), precio: null, ccl_del_dia: ccl, fecha_origen: null }
             avisos.push('Compra del día: el PPP llega con la próxima carga (D-19).')
             estado = peor(estado, 'advertencia')
           } else {
             accion = 'apertura'
-            operacion = { ...base, tipo: 'apertura', cantidad: qLeida.toFixed(), precio: f.ppc_unitario, ccl_del_dia: null, fecha_origen: null }
-            if (f.ppc_unitario === null) avisos.push('Sin PPP: el costo queda "sin dato" hasta que lo declares.')
+            operacion = { ...base, tipo: 'apertura', cantidad: qLeida.toFixed(), precio: ppcUnitario, ccl_del_dia: null, fecha_origen: null }
+            if (ppcUnitario === null) {
+              avisos.push('Sin PPP: el costo queda "sin dato" hasta que lo declares.')
+              if (f.ppc_unitario !== null) estado = peor(estado, 'advertencia')
+            }
           }
         } else if (diff.gt(0)) {
           // El bróker tiene más que la app: falta una compra (D-15)… o cambió el ratio.
           let precio: string | null = null
           let ratio = false
           let sinExplicar: Decimal | null = null
-          const ppp = f.ppc_unitario !== null ? new Decimal(f.ppc_unitario) : null
+          const ppp = ppcUnitario !== null ? new Decimal(ppcUnitario) : null
           if (ppp !== null && t && t.costo_ars !== null) {
             // Precio implícito por el cambio de PPP: (PPP₁ × q₁ − costo₀) ÷ Δq (D-19).
-            const costo1 = ppp.times(qLeida)
+            // Si la fuente da el costo total exacto (Galicia: valorizado − rendimiento $),
+            // se usa ese: el PPP unitario viene redondeado y multiplicarlo arrastra el error.
+            const costoTotal = positivo(f.costo_total)
+            const costo1 = costoTotal !== null ? new Decimal(costoTotal) : ppp.times(qLeida)
             const p = costo1.minus(t.costo_ars).div(diff)
             const mismoCosto = costo1.minus(t.costo_ars).abs().lte(toleranciaCosto(f, qLeida, qApp, t.costo_ars))
             if (mismoCosto && diff.gte(qApp.times('0.1'))) {
@@ -273,7 +331,7 @@ export function proponerCarga(
               sinExplicar = p
             }
           } else if (ppp !== null && qApp.isZero()) {
-            precio = f.ppc_unitario
+            precio = ppcUnitario
           }
           if (!ratio) {
             accion = sinExplicar ? 'revisar' : 'compra'
@@ -286,15 +344,27 @@ export function proponerCarga(
                     ? ` (precio pendiente): el PPP no la explica, da un precio de ${precioTexto(sinExplicar)}. ¿Cambio de ratio? Revisalo con el bróker.`
                     : ' (precio pendiente).'),
             )
+            // Una tenencia que la app nunca tuvo en esta cuenta, ya cargada: puede ser
+            // una compra de hoy o una tenencia vieja que quedó pendiente en una carga
+            // anterior (el Día cero). La segunda es una apertura con el PPP, sin pago
+            // de hoy (D-14). Se ofrece como otra opción; el dueño elige.
+            if (activo && qApp.isZero() && !opsCuenta.some((o) => o.activo_id === activo.id)) {
+              apertura_alternativa = { ...base, tipo: 'apertura', cantidad: qLeida.toFixed(), precio: ppcUnitario, ccl_del_dia: null, fecha_origen: null }
+              avisos.push(
+                `Si ya la tenías (por ejemplo, quedó pendiente en una carga anterior), elegí "Ya la tenía": entra como apertura ${
+                  ppcUnitario ? `con el PPP de ${precioTexto(ppcUnitario)}` : 'con el costo sin dato'
+                }, sin pago de hoy.`,
+              )
+            }
           }
           estado = peor(estado, 'advertencia')
         } else {
           const q = diff.negated()
           accion = 'venta'
-          operacion = { ...base, tipo: 'venta', cantidad: q.toFixed(), precio: f.precio_unitario, ccl_del_dia: ccl, fecha_origen: null }
+          operacion = { ...base, tipo: 'venta', cantidad: q.toFixed(), precio: precioHoy, ccl_del_dia: ccl, fecha_origen: null }
           avisos.push(
             `El bróker tiene ${cant(qLeida)} y la app ${cant(qApp)}: falta una venta de ${cant(q)}` +
-              (f.precio_unitario ? ` (precio de hoy como referencia; corregilo si vendiste a otro).` : '.'),
+              (precioHoy ? ` (precio de hoy como referencia; corregilo si vendiste a otro).` : '.'),
           )
           estado = peor(estado, 'advertencia')
         }
@@ -310,6 +380,11 @@ export function proponerCarga(
         errores.push('Falta el CCL del día: lo necesita la operación.')
         estado = 'error'
       }
+      if (!enDolares && f.precio_unitario !== null && precioHoy === null) {
+        // Un precio de 0 no es un precio (D-107): no se graba y queda el último.
+        avisos.push(`La fuente muestra el precio en ${precioTexto(f.precio_unitario)}: no se graba (queda "sin dato" hoy).`)
+        estado = peor(estado, 'advertencia')
+      }
       const motivos = f.estado === 'error' ? [...errores, ...f.motivos, ...avisos] : [...errores, ...avisos, ...f.motivos]
       propuesta.filas.push({
         clave: f.clave,
@@ -324,20 +399,32 @@ export function proponerCarga(
         accion,
         operacion,
         completar,
-        cotizacion: f.precio_unitario !== null ? { precio_pesos: f.precio_unitario } : null,
+        cotizacion: !enDolares && precioHoy !== null ? { precio_pesos: precioHoy } : null,
+        ...(apertura_alternativa ? { apertura_alternativa } : {}),
         estado,
         motivos,
         fila: f,
       })
     }
 
-    // Tenencias que la app tenía en esta cuenta al día de la carga y la fuente no trae.
-    if (l.origen === 'excel') {
-      for (const t of tens.values()) {
-        if (t.cuenta_id !== cuenta.id || vistos.has(t.activo_id)) continue
-        const a = hechos.activos.find((x) => x.id === t.activo_id)
-        propuesta.ausentes.push({ cuenta: l.cuenta, ticker: a?.ticker ?? String(t.activo_id), cantidad_app: t.cantidad.toFixed() })
-      }
+    // Tenencias que la app tenía en esta cuenta al día de la carga y la fuente no
+    // trae. El Excel lista todo; una captura, solo lo que cubre: la sección y la
+    // moneda de cada total que cierra (si el total cierra, no falta ninguna fila).
+    const cubiertas =
+      l.origen === 'excel'
+        ? null
+        : new Set(
+            l.controles
+              .filter((c) => c.tipo === 'galicia_total' && c.ok === true && c.cobertura)
+              .map((c) => `${c.cobertura!.seccion}:${c.cobertura!.moneda}`),
+          )
+    for (const t of tens.values()) {
+      if (t.cuenta_id !== cuenta.id || vistos.has(t.activo_id)) continue
+      const a = hechos.activos.find((x) => x.id === t.activo_id)
+      if (!a) continue
+      const moneda = t.operaciones[0]?.moneda ?? 'ARS'
+      if (cubiertas !== null && !cubiertas.has(`${SECCION_DE_TIPO[a.tipo]}:${moneda}`)) continue
+      propuesta.ausentes.push(ausente(l.cuenta, cuenta.id, a, t, hechos, fecha, ccl))
     }
 
     for (const s of l.saldos) {
@@ -360,4 +447,39 @@ export function proponerCarga(
     }
   }
   return propuesta
+}
+
+/**
+ * Una tenencia que la fuente dejó de listar: lo que se propone registrar. Un
+ * bono o una LECAP que ya venció (o sin fecha de vencimiento) vence; lo demás
+ * se vende. El último precio es solo una referencia: el importe o el precio
+ * los tipea el dueño (D-15: nada se aplica solo).
+ */
+function ausente(
+  cuenta: AusentePropuesto['cuenta'],
+  cuenta_id: number,
+  a: Activo,
+  t: Tenencia,
+  hechos: Hechos,
+  fecha: Fecha,
+  ccl: string | null,
+): AusentePropuesto {
+  const ultima = hechos.cotizaciones
+    .filter((c) => c.activo_id === a.id && c.fecha <= fecha)
+    .reduce<Hechos['cotizaciones'][number] | null>((m, c) => (m === null || c.fecha > m.fecha ? c : m), null)
+  const renta = a.tipo === 'bono' || a.tipo === 'lecap'
+  const vencio = a.fecha_vencimiento === null || a.fecha_vencimiento <= fecha
+  const sugerida: AusentePropuesto['sugerida'] = renta && vencio ? 'vencimiento' : 'venta'
+  return {
+    cuenta,
+    cuenta_id,
+    activo_id: a.id,
+    ticker: a.ticker,
+    tipo_activo: a.tipo,
+    cantidad_app: t.cantidad.toFixed(),
+    sugerida,
+    opciones: renta ? [sugerida, sugerida === 'venta' ? 'vencimiento' : 'venta'] : ['venta'],
+    ultimo_precio: ultima ? { fecha: ultima.fecha, precio_pesos: ultima.precio_pesos.toFixed() } : null,
+    ccl_del_dia: ccl,
+  }
 }

@@ -542,3 +542,25 @@ select pg_temp.espera_error_por($$truncate eventos$$, '42501', 'service_role tru
 select pg_temp.espera_error_por($$insert into auditoria (tabla, operacion) values ('cargas', 'INSERT')$$, '42501',
                                 'service_role escribe la auditoría a mano (después de la migración)');
 reset role;
+
+-- ═════════════════════════ Seguridad (migraciones 202610081910* y siguientes) ═════════════════════════
+
+-- ── Toda función de public fija el search_path, con pg_temp explícito y al final ──
+-- Sin pg_temp en la lista, Postgres busca las tablas primero en la temporal de la sesión.
+select pg_temp.espera(bool_and(coalesce((select bool_or(c ~ '^search_path=(.+, )?pg_temp$') from unnest(p.proconfig) c), false)),
+                      'toda función de public fija el search_path con pg_temp al final (' || count(*) || ')')
+from pg_proc p
+where p.pronamespace = 'public'::regnamespace;
+
+-- ── Auditoría: una tabla temporal "auditoria" no se lleva las filas (20261008191000_auditoria_search_path) ──
+set role service_role;
+create temp table auditoria (id bigserial, en timestamptz default now(), tabla text, operacion text,
+                             antes jsonb, despues jsonb, carga_id bigint);
+select count(*) as aud_feriados_antes from public.auditoria where tabla = 'feriados' \gset
+insert into feriados (mercado, fecha, descripcion) values ('AR', '2031-01-02', 'Feriado de prueba');
+delete from feriados where mercado = 'AR' and fecha = '2031-01-02';
+reset role;
+select pg_temp.espera((select count(*) from public.auditoria where tabla = 'feriados') = :aud_feriados_antes + 2
+                      and (select count(*) from pg_temp.auditoria) = 0,
+                      'auditoría: con una tabla temporal "auditoria", el alta y la baja van igual a public.auditoria');
+drop table pg_temp.auditoria;

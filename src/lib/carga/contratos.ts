@@ -74,6 +74,13 @@ export interface FilaLeida {
   lugar: string | null
   /** Campos en los que las dos lecturas de una captura no coinciden. */
   alternativas?: Alternativa[]
+  /**
+   * Moneda en la que la fuente muestra precio, valorizado y PPC. Ausente o
+   * 'ARS': pesos. Galicia muestra en U$D la sección "Bonos en dólares"; la 1a
+   * guarda precios en pesos, así que esa fila no se graba (queda en error).
+   * No confundir con moneda_emision (IEB: moneda de emisión, precio en pesos).
+   */
+  moneda_precio?: Moneda
 }
 
 export interface SaldoLeido {
@@ -82,7 +89,7 @@ export interface SaldoLeido {
   monto: string
   /** Partes que lo componen (IEB USD = Total de Saldos + DOLARUSA). */
   partes: { concepto: string; monto: string }[]
-  /** TNA anunciada, si la captura la muestra (Mercado Pago). */
+  /** TNA anunciada, si la captura la muestra (Mercado Pago), en porcentaje: "27.5" es 27,5 %; "1" es 1 %. */
   tna: string | null
   estado: EstadoFila
   motivos: string[]
@@ -94,6 +101,14 @@ export interface SaldoLeido {
 export interface ControlLeido {
   tipo: 'ieb_b2' | 'ieb_subtotal' | 'galicia_total'
   seccion: string | null
+  /** Moneda de informado y calculado (ausente: pesos). */
+  moneda?: Moneda | null
+  /**
+   * Captura: qué tenencias cubre este total (la sección y la moneda). Si el
+   * total cierra, una tenencia de esa sección y moneda que la captura no
+   * trae es una ausente (venta total o vencimiento).
+   */
+  cobertura?: { seccion: NonNullable<FilaLeida['seccion']>; moneda: Moneda } | null
   informado: string
   /** Lo que da la suma de lo leído (en la misma moneda y escala que la fuente). */
   calculado: string | null
@@ -244,6 +259,13 @@ export interface DecisionFila {
    */
   completar?: PrecioInferido | null
   cotizacion: { precio_pesos: string } | null
+  /**
+   * accion 'compra' de una tenencia que la app nunca tuvo en una cuenta ya
+   * cargada: también puede ser una tenencia vieja que quedó pendiente el Día
+   * cero. Esta es la otra opción, la apertura con el PPP del bróker (D-14), que
+   * el dueño elige de a una ("Ya la tenía"); nunca se aplica sola.
+   */
+  apertura_alternativa?: OperacionAGrabar | null
   estado: EstadoFila
   motivos: string[]
   fila: FilaLeida
@@ -270,12 +292,39 @@ export interface DecisionSaldo {
   saldo: SaldoLeido
 }
 
+/**
+ * Tenencia que la app tiene en la cuenta y la fuente no trae: el Excel de IEB
+ * (que lista todo) o una captura en una sección y moneda cuyo total cierra.
+ * Casi siempre es una venta total o un vencimiento. La bandeja ofrece
+ * registrarlo (el importe o el precio los tipea el dueño: el último precio es
+ * solo una referencia) o dejarlo pendiente, y entonces su valor pasa a "sin
+ * dato" (Hechos.ausentes).
+ */
+export interface AusentePropuesto {
+  cuenta: NombreCuenta
+  cuenta_id: number
+  activo_id: number
+  ticker: string
+  tipo_activo: TipoActivo
+  cantidad_app: string
+  /** Lo que se propone registrar: un bono o una LECAP vence; lo demás se vende. */
+  sugerida: 'venta' | 'vencimiento'
+  /** Las operaciones que se pueden registrar (un bono también se puede vender). */
+  opciones: ('venta' | 'vencimiento')[]
+  /** Último precio conocido por 1 VN, en pesos: solo como referencia. */
+  ultimo_precio: { fecha: Fecha; precio_pesos: string } | null
+  /** CCL del día con el que se registraría (tipeado o el ya cargado ese día). */
+  ccl_del_dia: string | null
+}
+
 export interface PropuestaCarga {
   fecha: Fecha
   filas: DecisionFila[]
   saldos: DecisionSaldo[]
   controles: { cuenta: NombreCuenta; control: ControlLeido }[]
   advertencias: string[]
-  /** Tenencias que la app tiene en una cuenta con listado completo y la fuente no trae. */
-  ausentes: { cuenta: NombreCuenta; ticker: string; cantidad_app: string }[]
+  /** Tenencias que la app tiene y la fuente, que las cubre, no trae (ver AusentePropuesto). */
+  ausentes: AusentePropuesto[]
+  /** CCL que usan las operaciones de la bandeja: el tipeado o, si no, el ya cargado ese día. */
+  ccl?: { valor: string; origen: 'tipeado' | 'cargado' } | null
 }
