@@ -1,44 +1,82 @@
-import type { ReactNode } from 'react';
+import type { ReactNode } from 'react'
+import { etiquetaPrincipal, type CalcVista, type Etiqueta } from '@/lib/domain/calc'
+import type { Par } from '@/lib/vistas/contratos'
+import { MontoTrazado } from './monto'
 
-export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
+// Piezas visuales compartidas (visión §4.0). Sin estado: sirven en Server y
+// Client Components.
+
+export function Tarjeta({
+  children,
+  className = '',
+  as: Tag = 'section',
+  ...resto
+}: {
+  children: ReactNode
+  className?: string
+  as?: 'section' | 'div' | 'article' | 'aside' | 'li'
+} & Record<`aria-${string}` | `data-${string}`, string | undefined>) {
   return (
-    <section className={`rounded-2xl border border-line bg-panel p-4 ${className}`}>
+    <Tag className={`rounded-xl border border-border bg-surface shadow-[var(--shadow)] ${className}`} {...resto}>
       {children}
-    </section>
-  );
+    </Tag>
+  )
 }
 
-export function PageTitle({ title, sub }: { title: string; sub?: string }) {
+/** Rótulo chico de una tarjeta: "PATRIMONIO FINANCIERO". */
+export function Rotulo({ children, className = '', as: Tag = 'h2' }: { children: ReactNode; className?: string; as?: 'h2' | 'h3' | 'p' | 'span' }) {
+  return <Tag className={`text-[11px] font-semibold uppercase tracking-[0.08em] text-muted ${className}`}>{children}</Tag>
+}
+
+const NOMBRE_ETIQUETA: Record<Etiqueta, string> = {
+  viejo: 'viejo',
+  declarado: 'declarado',
+  inferido: 'inferido',
+  pendiente: 'pendiente',
+  parcial: 'suma parcial',
+}
+
+/** Un solo chip gris por número, con la etiqueta más grave (D-67). Lo verificado no lleva nada. */
+export function Chip({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <header className="mb-4">
-      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-      {sub ? <p className="mt-1 text-sm text-mut">{sub}</p> : null}
-    </header>
-  );
+    <span className={`inline-flex items-center whitespace-nowrap rounded-md bg-surface-3 px-1.5 py-px text-[11px] font-medium leading-4 text-muted ${className}`}>
+      {children}
+    </span>
+  )
 }
 
-export function Row({ label, value, hint }: { label: ReactNode; value: ReactNode; hint?: ReactNode }) {
+export function ChipEtiqueta({ calc, omitir = [] }: { calc: CalcVista; omitir?: Etiqueta[] }) {
+  const e = etiquetaPrincipal(calc.etiquetas.filter((x) => !omitir.includes(x)))
+  return e ? <Chip>{NOMBRE_ETIQUETA[e]}</Chip> : null
+}
+
+/** Par ARS/USD: ARS en tinta normal a la izquierda (o arriba), USD en su pastilla (D-68). */
+export function ParMonto({
+  par,
+  titulo,
+  signo = false,
+  color = false,
+  decimalesUsd,
+  vertical = false,
+  className = '',
+}: {
+  par: Par
+  titulo: string
+  signo?: boolean
+  color?: boolean
+  decimalesUsd?: number
+  vertical?: boolean
+  className?: string
+}) {
   return (
-    <div className="flex items-baseline justify-between gap-3 py-1.5">
-      <span className="min-w-0 truncate text-sm text-mut">{label}</span>
-      <span className="tnum shrink-0 text-right text-sm">
-        {value}
-        {hint ? <span className="ml-2 text-xs text-mut">{hint}</span> : null}
-      </span>
-    </div>
-  );
+    <span className={`inline-flex ${vertical ? 'flex-col items-end gap-0.5' : 'flex-wrap items-baseline gap-x-2 gap-y-0.5'} ${className}`}>
+      <MontoTrazado calc={par.ars} moneda="ARS" titulo={`${titulo} · en pesos`} signo={signo} color={color} />
+      <MontoTrazado calc={par.usd} moneda="USD" titulo={`${titulo} · en dólares`} signo={signo} color={color} decimales={decimalesUsd} />
+    </span>
+  )
 }
 
-/** Aviso de configuración faltante. No es un error de la app: falta una env var. */
-export function SetupNotice({ what, children }: { what: string; children?: ReactNode }) {
-  return (
-    <Card className="border-accent/40">
-      <h2 className="text-sm font-semibold text-accent">Falta configurar {what}</h2>
-      <div className="mt-2 space-y-2 text-sm text-mut">{children}</div>
-    </Card>
-  );
-}
-
-export function Empty({ children }: { children: ReactNode }) {
-  return <p className="py-8 text-center text-sm text-mut">{children}</p>;
+/** Aviso en una línea, en tinta neutra (nunca rojo para datos). */
+export function Aviso({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return <p className={`rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-muted ${className}`}>{children}</p>
 }

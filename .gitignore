@@ -1,5 +1,7 @@
 node_modules/
 .next/
+# Segundo servidor o build de prueba (NEXT_DIST_DIR=.next-b, .next-c…).
+.next-*/
 out/
 build/
 
@@ -10,6 +12,12 @@ build/
 .vercel
 *.tsbuildinfo
 next-env.d.ts
+
+# Salida de Playwright (por defecto va a node_modules/.cache; esto por si se cambia).
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
 
 .DS_Store
 *.log
