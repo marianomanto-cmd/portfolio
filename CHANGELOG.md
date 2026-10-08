@@ -4,6 +4,9 @@ Todo cambio de la app se registra acá, el más nuevo primero. Cada entrada dice
 
 ## [Sin publicar]
 
+### 2026-10-08 — Visión de producto
+- **`docs/vision.md`**: cuatro diseños independientes (el hábito, la verdad de los números, toda la vida financiera, decidir mejor), puntuados por tres jueces (fidelidad al dueño, ingeniería, utilidad a largo plazo). Ganó "El hábito" (246 puntos) y se le injertaron las mejores ideas de los otros. Después pasó por una revisión adversarial y un control de coherencia (21 inconsistencias corregidas). Trae mapa de navegación, cada pantalla en desktop y en el teléfono, rituales, plan por fases (1a, 1b, 2, 3, 4 y una 5 propuesta), las decisiones para aprobar, los cambios de schema y los riesgos.
+
 ### 2026-10-08 — Investigación de vida financiera
 - **`docs/investigacion-vida.md`**: diez áreas (seis pedidas y cuatro encontradas por una ronda que buscó lo que faltaba: sucesión, empresa vs. personal, seguros, jubilación), 168 hallazgos con fuente, cuadro de impuestos por tipo de activo (informativo, a confirmar con el contador), cambios de modelo de datos por fase y 22 decisiones para aprobar. El informe original se cortó al redactarse; se reconstruyó sección por sección a partir de las investigaciones guardadas, sin repetirlas.
 - **D-24 actualizada:** el repo es público por decisión del dueño; la documentación se versiona, los datos crudos siguen fuera.

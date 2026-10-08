@@ -20,6 +20,7 @@ Un solo usuario. La app no opera ni recomienda: muestra datos y proyecta supuest
 | Documento | Qué hay |
 |---|---|
 | [`docs/spec.md`](docs/spec.md) | Lo que pidió el dueño. Manda. |
+| [`docs/vision.md`](docs/vision.md) | Visión de producto: pantallas, rituales, plan por fases, decisiones para aprobar, schema y riesgos. Diseñada por competencia (4 diseños, 3 jueces, síntesis y revisión adversarial). |
 | [`docs/decisiones.md`](docs/decisiones.md) | Cada decisión que ajusta el spec, con su porqué. |
 | [`docs/datos.md`](docs/datos.md) | Modelo de datos: tablas, reglas, cómo leer y escribir, cómo cambiar el schema. |
 | [`docs/carga-diaria.md`](docs/carga-diaria.md) | Formatos de entrada (IEB, Galicia, Mercado Pago) y reglas de lectura. |
