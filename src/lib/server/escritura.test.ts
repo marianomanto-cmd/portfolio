@@ -482,7 +482,7 @@ describe('traducirErrorBase', () => {
         { code: 'PGRST202', message: 'Could not find the function public.confirmar_carga(p) in the schema cache' },
         'confirmar la carga',
       ).message,
-    ).toMatch(/public\.confirmar_carga: falta aplicar la migración 20261008120000_carga_transaccional/)
+    ).toMatch(/public\.confirmar_carga: falta aplicar la migración 20261008142244_carga_confirmar/)
     expect(traducirErrorBase({ code: '42501', message: 'permission denied for function confirmar_carga' }, 'confirmar la carga').message).toMatch(
       /no le da permiso/,
     )

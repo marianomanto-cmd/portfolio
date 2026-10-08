@@ -176,6 +176,7 @@ export type Database = {
       cargas: {
         Row: {
           archivo_path: string | null
+          archivo_sha256: string | null
           confirm_token: string | null
           creado_en: string
           cuenta_id: number | null
@@ -183,14 +184,19 @@ export type Database = {
           fecha: string
           grabado: Json | null
           id: number
+          lector: string | null
           lectura_cruda: Json | null
           listado_completo: boolean
+          lote: string | null
+          motivo_reversion: string | null
           origen: string
           reemplaza_a: number | null
           revertida_en: string | null
+          tiempo_activo_ms: number | null
         }
         Insert: {
           archivo_path?: string | null
+          archivo_sha256?: string | null
           confirm_token?: string | null
           creado_en?: string
           cuenta_id?: number | null
@@ -198,14 +204,19 @@ export type Database = {
           fecha: string
           grabado?: Json | null
           id?: never
+          lector?: string | null
           lectura_cruda?: Json | null
           listado_completo?: boolean
+          lote?: string | null
+          motivo_reversion?: string | null
           origen: string
           reemplaza_a?: number | null
           revertida_en?: string | null
+          tiempo_activo_ms?: number | null
         }
         Update: {
           archivo_path?: string | null
+          archivo_sha256?: string | null
           confirm_token?: string | null
           creado_en?: string
           cuenta_id?: number | null
@@ -213,11 +224,15 @@ export type Database = {
           fecha?: string
           grabado?: Json | null
           id?: never
+          lector?: string | null
           lectura_cruda?: Json | null
           listado_completo?: boolean
+          lote?: string | null
+          motivo_reversion?: string | null
           origen?: string
           reemplaza_a?: number | null
           revertida_en?: string | null
+          tiempo_activo_ms?: number | null
         }
         Relationships: [
           {
@@ -370,6 +385,7 @@ export type Database = {
       eventos: {
         Row: {
           activo_id: number | null
+          carga_id: number | null
           fecha: string
           id: number
           tipo: string
@@ -377,6 +393,7 @@ export type Database = {
         }
         Insert: {
           activo_id?: number | null
+          carga_id?: number | null
           fecha: string
           id?: never
           tipo: string
@@ -384,6 +401,7 @@ export type Database = {
         }
         Update: {
           activo_id?: number | null
+          carga_id?: number | null
           fecha?: string
           id?: never
           tipo?: string
@@ -395,6 +413,13 @@ export type Database = {
             columns: ["activo_id"]
             isOneToOne: false
             referencedRelation: "activos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eventos_carga_id_fkey"
+            columns: ["carga_id"]
+            isOneToOne: false
+            referencedRelation: "cargas"
             referencedColumns: ["id"]
           },
         ]
@@ -731,6 +756,7 @@ export type Database = {
           moneda: string
           notas: string | null
           precio: number | null
+          precio_carga_id: number | null
           tipo: string
         }
         Insert: {
@@ -748,6 +774,7 @@ export type Database = {
           moneda?: string
           notas?: string | null
           precio?: number | null
+          precio_carga_id?: number | null
           tipo: string
         }
         Update: {
@@ -765,6 +792,7 @@ export type Database = {
           moneda?: string
           notas?: string | null
           precio?: number | null
+          precio_carga_id?: number | null
           tipo?: string
         }
         Relationships: [
@@ -787,6 +815,13 @@ export type Database = {
             columns: ["cuenta_id"]
             isOneToOne: false
             referencedRelation: "cuentas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operaciones_precio_carga_id_fkey"
+            columns: ["precio_carga_id"]
+            isOneToOne: false
+            referencedRelation: "cargas"
             referencedColumns: ["id"]
           },
         ]
@@ -1021,6 +1056,7 @@ export type Database = {
           fecha: string
           mep: number | null
           oficial: number | null
+          referencia: string | null
         }
         Insert: {
           carga_id: number
@@ -1029,6 +1065,7 @@ export type Database = {
           fecha: string
           mep?: number | null
           oficial?: number | null
+          referencia?: string | null
         }
         Update: {
           carga_id?: number
@@ -1037,6 +1074,7 @@ export type Database = {
           fecha?: string
           mep?: number | null
           oficial?: number | null
+          referencia?: string | null
         }
         Relationships: [
           {
@@ -1154,7 +1192,13 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      alta_activo: { Args: { p: Json }; Returns: number }
+      confirmar_carga: { Args: { p: Json }; Returns: Json }
+      editar_activo: { Args: { p: Json; p_id: number }; Returns: undefined }
+      guardar_manual: { Args: { p: Json }; Returns: number }
+      leer_fecha: { Args: { campo: string; j: Json }; Returns: string }
+      leer_id: { Args: { campo: string; j: Json }; Returns: number }
+      leer_monto: { Args: { campo: string; j: Json }; Returns: number }
     }
     Enums: {
       [_ in never]: never

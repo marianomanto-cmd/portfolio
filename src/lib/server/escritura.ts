@@ -3,7 +3,7 @@ import 'server-only'
 // Capa de escritura (docs/datos.md, reglas 3 y 4; D-17, D-20, D-32).
 //
 // Toda escritura que toca más de una fila pasa por una función de Postgres, que
-// la hace en una sola transacción (migración 20261008120000_carga_transaccional):
+// la hace en una sola transacción (migraciones *_carga_* de supabase/migrations):
 //   confirmar_carga · revertir_lote · guardar_manual · alta_activo · editar_activo.
 // Las altas de una sola fila (bienes, pasivos) van directo a su tabla.
 //
@@ -388,6 +388,15 @@ function restriccion(mensaje: string): string | null {
 }
 
 /** Traduce un error de la base a un mensaje que dice qué corregir. */
+/** Migración que define cada función de escritura (para el mensaje de "falta la función"). */
+const MIGRACION_DE_FUNCION: Record<string, string> = {
+  confirmar_carga: '20261008142244_carga_confirmar',
+  guardar_manual: '20261008151535_carga_manual',
+  alta_activo: '20261008151942_catalogo_activos',
+  editar_activo: '20261008151942_catalogo_activos',
+  revertir_lote: '20261008160000_carga_revertir',
+}
+
 export function traducirErrorBase(e: ErrorBase, accion: string): ErrorEscritura {
   const code = e.code ?? ''
   const msg = (e.message ?? '').trim()
@@ -403,8 +412,9 @@ export function traducirErrorBase(e: ErrorBase, accion: string): ErrorEscritura 
   }
   if (code === 'PGRST202') {
     const fn = /function ([\w.]+)\(/.exec(msg)?.[1] ?? 'de escritura'
+    const migracion = MIGRACION_DE_FUNCION[fn.replace(/^public\./, '')] ?? 'que la define'
     return new ErrorEscritura(
-      `La base no tiene la función ${fn}: falta aplicar la migración 20261008120000_carga_transaccional.`,
+      `La base no tiene la función ${fn}: falta aplicar la migración ${migracion} (supabase/migrations).`,
       { codigo: code, causa: e },
     )
   }

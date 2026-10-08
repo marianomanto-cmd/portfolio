@@ -115,7 +115,7 @@ where n.nspname = 'public' and t.relkind = 'r' and t.relname <> 'auditoria'
 -- Bucket
 select id, public from storage.buckets;
 
--- ═════════════════════════ Carga transaccional (20261008120000) ═════════════════════════
+-- ═════════════════════════ Carga transaccional (migraciones *_carga_* y catalogo_activos) ═════════════════════════
 -- confirmar_carga, revertir_lote, guardar_manual, alta_activo y editar_activo.
 -- Corren como service_role: con postgres (superusuario) un grant faltante no se vería.
 
