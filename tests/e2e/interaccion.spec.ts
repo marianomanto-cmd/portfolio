@@ -1,5 +1,5 @@
 import { devices, expect, test } from '@playwright/test'
-import { esperarHidratacion, sinIndicadorDev } from './ayudas'
+import { esperarHidratacion, montosALaVista, sinIndicadorDev } from './ayudas'
 
 // Interacciones que el layout no ve: Hoy arriba del pliegue en el teléfono,
 // la traza al tocar un número (hoja inferior en el teléfono, panel en
@@ -205,6 +205,43 @@ test.describe('desktop (1280 × 900)', () => {
     expect(await esperarHidratacion(page)).toBe(true)
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
     await expect(page.locator('html')).toHaveAttribute('data-privado', '1')
+  })
+
+  test('con el modo privado no se lee ningún monto, en ninguna pantalla', async ({ page }) => {
+    await page.addInitScript(() => window.localStorage.setItem('portfolio:privado', '1'))
+    const rutas = ['/', '/?demo=express', '/?demo=viejo', '/cartera', '/exposicion', '/exposicion?vista=total', '/registro', '/carga', '/datos/catalogo', '/datos/cuentas', '/datos/bienes', '/datos/leasing', '/datos/movimientos']
+    const vistos: string[] = []
+    for (const ruta of rutas) {
+      await page.goto(ruta)
+      expect(await esperarHidratacion(page), ruta).toBe(true)
+      await expect(page.locator('html')).toHaveAttribute('data-privado', '1')
+      if (ruta === '/carga') {
+        // Cargar muestra montos recién con las fuentes leídas.
+        await page.getByRole('button', { name: 'Probar con un ejemplo' }).click()
+        await expect(page.getByText(/IEB/).first()).toBeVisible()
+        await page.waitForTimeout(300)
+      }
+      vistos.push(...(await montosALaVista(page)).map((m) => `${ruta} · ${m}`))
+    }
+    expect(vistos, `Montos que se leen con el modo privado:\n${vistos.join('\n')}`).toEqual([])
+  })
+
+  test('con el teclado, el foco se ve sin deformar el control', async ({ page }) => {
+    await page.goto('/ajustes')
+    expect(await esperarHidratacion(page)).toBe(true)
+    const interruptor = page.getByRole('switch', { name: 'Modo privado' })
+    for (let i = 0; i < 60 && !(await interruptor.evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press('Tab')
+    const r = await interruptor.evaluate((el) => {
+      const cs = getComputedStyle(el)
+      return { foco: el.matches(':focus-visible'), radio: parseFloat(cs.borderRadius), anillo: `${cs.outlineStyle} ${cs.outlineWidth}` }
+    })
+    expect(r.foco).toBe(true)
+    expect(r.radio, 'el interruptor sigue siendo una pastilla').toBeGreaterThanOrEqual(16)
+    expect(r.anillo).toBe('solid 2px')
+    // Lo que trae su propio indicador de foco (outline-none) no suma un segundo contorno.
+    const principal = page.locator('main')
+    await principal.evaluate((el) => (el as HTMLElement).focus())
+    expect(await principal.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('none')
   })
 
   test('Exposición: el selector dice qué netea y Total muestra "sin dato" con la suma parcial', async ({ page }) => {

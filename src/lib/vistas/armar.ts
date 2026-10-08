@@ -630,7 +630,9 @@ function desgloseFila(i: ItemFoto, f: Foto, costoA: Calc, costoU: Calc, resA: Ca
   const k = moneda === 'ARS' ? 'ars' : 'usd'
   const fm = (d: Decimal) => monto(d, moneda, { decimales: 2, signo: true })
   const res = moneda === 'ARS' ? resA : resU
-  if (res.valor === null) {
+  // Apertura sin CCL de compra: la UI ya explica qué falta y dónde se declara.
+  const sinCclDeCompra = !i.ausente && Boolean(i.tenencia?.apertura_sin_ccl) && costoU.valor === null
+  if (res.valor === null && !sinCclDeCompra) {
     // Las partes de un resultado "sin dato" (compra con precio pendiente,
     // tenencia que la fuente ya no lista) también lo son, con el mismo motivo
     // y sus etiquetas (I-9 de la referencia): mostrarlas sería mostrar cifras
@@ -650,6 +652,7 @@ function desgloseFila(i: ItemFoto, f: Foto, costoA: Calc, costoU: Calc, resA: Ca
     return { moneda, activo: vista(n), tc: vista(n), sin_atribuir: vista(n) }
   }
   if (dc.tipo === 'ok') {
+    if (res.valor === null) return null
     const realizado = dc.resultado[k].minus(res.valor)
     const notaRealizado = realizado.abs().gt('1e-9') ? ` (incluye ${fm(realizado)} que no son de la tenencia vigente)` : ''
     const conVentas = dc.tramos.some((t) => t.descripcion.includes('(venta del '))

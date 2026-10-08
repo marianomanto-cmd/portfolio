@@ -170,10 +170,19 @@ body {
   color: var(--usd-text);
 }
 
-:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-  border-radius: 4px;
+/*
+ * Anillo de foco de teclado. Va en la capa base: así rounded-* y outline-none
+ * (las utilidades) le ganan, y un control conserva su forma con foco (el
+ * interruptor sigue siendo una pastilla) o usa su propio indicador (un campo,
+ * su borde de acento; una fila de la bandeja, su ring). Fuera de las capas le
+ * ganaba a todas las utilidades.
+ */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
 }
 
 /* Elementos tocables de 44 px con puntero grueso (D-30, D-100). */

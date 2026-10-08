@@ -5,6 +5,9 @@ import { aplicarEdiciones, editarFila, toleranciaEditada } from './ediciones'
 import {
   SIN_ELECCIONES,
   alternativasFila,
+  claveAusente,
+  estadoFila,
+  problemaRegistroAusente,
   alternativasSaldo,
   diferenciaDolarIEB,
   enlaceMovimiento,
@@ -295,5 +298,75 @@ describe('escenario demo "compra pendiente" (D-19)', () => {
     expect(spy.accion).toBe('completar_precio')
     expect(spy.completar).toMatchObject({ operacion_id: -2, precio: '35699.84', fecha: '2026-01-05' })
     expect(conCompraPendiente(hechosSinBase([])).operaciones).toEqual([])
+  })
+})
+
+// ───────────── Revisión de la fase 1a (números inventados) ─────────────
+
+describe('saltoDeSaldo: la TNA viene siempre en porcentaje', () => {
+  it('una TNA de 1 % no se toma como 100 %: al 1 % los intereses explican unos $ 123 en 3 días', () => {
+    const r = saltoDeSaldo('1000000', '1010000', '1', 3)
+    // Tope: 1,5 % (medio último dígito de más) × 1.000.000 × 3 ÷ 365.
+    expect(r.explicadoHasta).toBe('123.29')
+    expect(r.sinExplicar).toBe('9876.71')
+  })
+})
+
+describe('tenencias que la fuente ya no lista en la bandeja', () => {
+  // IEB ya cargada con SPY; el Excel de hoy no trae ninguna posición.
+  function propuestaSinSPY(ccl: string | null = '1548.2') {
+    const h = hechosSinBase(catalogoEjemplo())
+    h.cargas.push({ id: 1, lote: null, fecha: '2026-10-13', cuenta_id: 1, origen: 'excel', archivo_path: 'x', estado: 'vigente', creado_en: '', reemplaza_a: null, lector: null, tiempo_activo_ms: null })
+    h.operaciones.push({
+      id: 1, fecha: '2026-10-01', fecha_origen: null, cuenta_id: 1, activo_id: -1, tipo: 'apertura', cantidad: new Decimal(1240), moneda: 'ARS',
+      precio: new Decimal('30145.16'), importe: null, comisiones: new Decimal(0), ccl_del_dia: null, carga_id: 1, notas: null,
+    })
+    return proponerCarga([{ ...lecturaIEBEjemplo(FECHA), filas: [] }], h, FECHA, { ccl: ccl === null ? null : new Decimal(ccl) })
+  }
+
+  it('sin elegir queda a revisar; registrada se guarda; pendiente queda pendiente', () => {
+    const p = propuestaSinSPY()
+    const a = p.ausentes[0]
+    const item = (e: Elecciones) => resumirBandeja(p, e, 1).items.find((i) => i.tipo === 'ausente')!
+    expect(item(SIN_ELECCIONES).estado).toBe('advertencia')
+    expect(item({ ...SIN_ELECCIONES, ausentes: { [claveAusente(a)]: 'pendiente' } }).estado).toBe('pendiente')
+    const venta = { tipo: 'venta' as const, cantidad: '1240', precio: '35150', importe: null }
+    const r = resumirBandeja(p, { ...SIN_ELECCIONES, ausentes: { [claveAusente(a)]: venta } }, 1)
+    expect(r.items.find((i) => i.tipo === 'ausente')?.estado).toBe('aceptada')
+    expect(textoBoton(r, { leyendo: [], proponiendo: false, guardando: false })).toMatchObject({ texto: 'Guardar 4', habilitado: true })
+  })
+
+  it('una registración incompleta es un error que frena el Enter con su porqué', () => {
+    const p = propuestaSinSPY()
+    const a = p.ausentes[0]
+    const sinPrecio = { tipo: 'venta' as const, cantidad: '1240', precio: null, importe: null }
+    const r = resumirBandeja(p, { ...SIN_ELECCIONES, ausentes: { [claveAusente(a)]: sinPrecio } }, 1)
+    expect(r.errores).toBe(1)
+    expect(problemaRegistroAusente(a, sinPrecio)).toBe('la venta necesita el precio o el importe')
+    expect(problemaRegistroAusente(a, { tipo: 'venta', cantidad: '1240', precio: '0', importe: null })).toBe('el precio tiene que ser mayor que cero')
+    // SPY es un CEDEAR: solo se vende (un vencimiento no se ofrece y la elección no vale).
+    expect(a.opciones).toEqual(['venta'])
+    const vto = { tipo: 'vencimiento' as const, cantidad: '1240', precio: null, importe: '43000000' }
+    expect(resumirBandeja(p, { ...SIN_ELECCIONES, ausentes: { [claveAusente(a)]: vto } }, 1).items.find((i) => i.tipo === 'ausente')?.estado).toBe('advertencia')
+  })
+
+  it('sin CCL (ni tipeado ni cargado ese día) no se puede registrar', () => {
+    const p = propuestaSinSPY(null)
+    const a = p.ausentes[0]
+    expect(problemaRegistroAusente(a, { tipo: 'venta', cantidad: '1240', precio: '35150', importe: null })).toBe('la venta necesita el CCL del día: tipealo arriba')
+  })
+})
+
+describe('"Ya la tenía" en la bandeja', () => {
+  it('elegir la apertura destraba una compra cuyo único error era el CCL (la apertura no lo lleva)', () => {
+    const h = hechosSinBase(catalogoEjemplo())
+    h.cargas.push({ id: 1, lote: null, fecha: '2026-10-07', cuenta_id: 1, origen: 'excel', archivo_path: 'x', estado: 'vigente', creado_en: '', reemplaza_a: null, lector: null, tiempo_activo_ms: null })
+    const l = lecturaIEBEjemplo(FECHA)
+    l.filas = l.filas.filter((f) => f.ticker === 'T30J7')
+    const d = proponerCarga([l], h, FECHA, { ccl: null }).filas[0]
+    expect(estadoFila(d, null)).toBe('error')
+    expect(estadoFila(d, { resolucion: 'aceptada', motivo: 'ya la tenía', operacion: null, apertura: true, huella: huellaFila(d) })).toBe('aceptada')
+    // Aceptar la compra sin CCL sigue en error.
+    expect(estadoFila(d, { resolucion: 'aceptada', motivo: 'compra', operacion: null, huella: huellaFila(d) })).toBe('error')
   })
 })

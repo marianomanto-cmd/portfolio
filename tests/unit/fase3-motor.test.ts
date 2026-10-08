@@ -147,7 +147,7 @@ describe('ausentes: la fuente ya no lista una tenencia y la venta no está regis
     const f = armarHoy(ventaTotalSpy(), '2026-10-06').frase!
     const texto = f.partes.map((p) => p.texto).join('')
     expect(texto).toBe(
-      'Desde la carga del lun 05/10: sin dato en pesos y sin dato en dólares. Falta SPY: IEB ya no la lista desde el mar 06/10: registrá la venta o el vencimiento en Cargar.',
+      'Desde la carga del mar 06/10: sin dato en pesos y sin dato en dólares. Falta SPY: IEB ya no la lista desde el mar 06/10: registrá la venta o el vencimiento en Cargar.',
     )
     // Cada "sin dato" se toca y lleva la suma parcial.
     const tocables = f.partes.filter((p) => p.calc)
@@ -285,28 +285,62 @@ function compraEnGalicia(): Hechos {
 }
 
 describe('cuadre: la diferencia en pesos y en dólares, con traza', () => {
-  it('≠: devuelve la diferencia en las dos monedas y el detalle dice por cuánto y qué operación la explica', () => {
+  it('≠: devuelve la diferencia en las dos monedas, con fórmula e insumos, y el detalle dice por cuánto', () => {
     const h = compraEnGalicia()
-    const c = cuadre(variacion(h, '2026-10-05', '2026-10-06'), h)
+    const v = variacion(h, '2026-10-05', '2026-10-06')
+    // Una variación inconsistente (como en revision-motor, B04): $ 1 de más en los activos de S28F7.
+    const roto = { ...v, contribuciones: v.contribuciones.map((c) => (c.clave === `p:${GALICIA}:${S28F7.id}` ? { ...c, activo: { ars: c.activo.ars.plus(1), usd: c.activo.usd } } : c)) }
+    const c = cuadre(roto, h)
     expect(c.ars_ok).toBe(false)
-    expect(c.usd_ok).toBe(false)
-    expect(txt(c.diferencia?.ars.valor?.toFixed())).toBe('1050000.00')
-    expect(txt(c.diferencia?.usd.valor?.toFixed())).toBe('1050.00')
-    expect(c.diferencia?.ars.formula).toContain('= +$ 1.050.000,00')
+    expect(c.usd_ok).toBe(true)
+    expect(txt(c.diferencia?.ars.valor)).toBe('-1.00')
+    expect(txt(c.diferencia?.usd.valor)).toBe('0.00')
+    expect(c.diferencia?.ars.formula).toContain('= −$ 1,00')
     expect(c.diferencia?.ars.insumos.map((i) => i.nombre)).toEqual([
       'Patrimonio financiero del mar 06/10',
       'Patrimonio financiero del lun 05/10',
       'Aportes, retiros y otros flujos externos',
       'Activos + TC + sin atribuir',
     ])
-    expect(c.detalle).toContain('El desglose no cierra por +$ 1.050.000,00 · +US$ 1.050,00')
-    expect(c.detalle).toContain('compra de S28F7 del mar 06/10 en Galicia')
-    expect(c.detalle).toContain('Galicia no tiene saldo en pesos cargado')
-    expect(c.detalle).toContain('explica toda la diferencia')
-    // Hoy la pasa a la pantalla.
-    const v = armarHoy(h, '2026-10-06')
-    expect(v.cuadre.diferencia?.ars.valor).toBe('1050000')
-    expect(v.cuadre.diferencia?.usd.valor).toBe('1050')
+    expect(c.detalle).toMatch(/^El desglose no cierra por −\$ 1,00 · US\$ 0,00: si no tiene explicación, es un bug/)
+  })
+
+  it('Galicia no tiene saldo cargado: la plata de una compra entra de fuera de la app, el cuadre cierra y lo dice (antes: ≠ sin arreglo posible)', () => {
+    const h = compraEnGalicia()
+    const c = cuadre(variacion(h, '2026-10-05', '2026-10-06'), h)
+    expect(c).toMatchObject({ ars_ok: true, usd_ok: true })
+    expect(txt(c.diferencia?.ars.valor)).toBe('0.00')
+    // La plata de la compra cuenta como flujo externo, con su monto en la traza.
+    expect(c.diferencia?.ars.insumos.find((i) => i.nombre === 'Aportes, retiros y otros flujos externos')?.valor).toBe('1050000')
+    expect(c.detalle).toContain('Cuenta como plata que entró o salió de la app: compra de S28F7 del mar 06/10 en Galicia, $ 1.050.000,00 (Galicia no tiene saldo en pesos cargado).')
+    // El resultado del día no cambia: 5.000.000 × (1,05 − 1,04) = $ 50.000; la compra no es ganancia.
+    const hoy = armarHoy(h, '2026-10-06')
+    expect(txt(hoy.financiero.variacion?.ars.valor)).toBe('50000.00')
+    expect(hoy.cuadre.ars_ok).toBe(true)
+    expect(hoy.cuadre.diferencia?.ars.valor).toBe('0')
+    expect(hoy.cuadre.diferencia?.usd.valor).toBe('0')
+    // La traza de la partida lo rotula.
+    const mov = variacion(h, '2026-10-05', '2026-10-06').contribuciones.find((x) => x.clave === `p:${GALICIA}:${S28F7.id}`)!
+    expect(mov.flujos[0]).toMatchObject({ externo: true })
+    expect(mov.flujos[0].descripcion).toContain('plata que entró a la app: Galicia no tiene saldo en pesos cargado')
+  })
+
+  it('un dividendo en dólares a un saldo que nunca cargaste: cierra y lo nombra; cuando aparece el saldo, entra como saldo inicial', () => {
+    const h = hechos({
+      operaciones: [
+        op({ fecha: '2026-10-05', activo_id: XOM.id, tipo: 'compra', cantidad: D(100), precio: D(20000), ccl_del_dia: D(1000) }),
+        op({ fecha: '2026-10-06', activo_id: XOM.id, tipo: 'renta', cantidad: D(0), moneda: 'USD', importe: D(10), ccl_del_dia: D(1100) }),
+      ],
+      tipos_cambio: [tc('2026-10-05', 1000), tc('2026-10-06', 1100), tc('2026-10-07', 1100)],
+      cotizaciones: [cot('2026-10-05', XOM.id, 20000), cot('2026-10-06', XOM.id, 22000), cot('2026-10-07', XOM.id, 22000)],
+      // IEB tiene saldo en pesos, no en dólares, hasta el 07/10.
+      saldos: [saldo('2026-10-05', IEB, 'ARS', 0), saldo('2026-10-06', IEB, 'ARS', 0), saldo('2026-10-07', IEB, 'ARS', 0), saldo('2026-10-07', IEB, 'USD', 10)],
+    })
+    const c1 = cuadre(variacion(h, '2026-10-05', '2026-10-06'), h)
+    expect(c1).toMatchObject({ ars_ok: true, usd_ok: true })
+    expect(c1.detalle).toContain('renta de XOM del mar 06/10 en IEB, US$ 10,00 (IEB no tiene saldo en dólares cargado)')
+    const c2 = cuadre(variacion(h, '2026-10-06', '2026-10-07'), h)
+    expect(c2).toMatchObject({ ars_ok: true, usd_ok: true })
   })
 
   it('✓: la diferencia es 0,00 en las dos monedas (visión §4.1: "Cuadre ✓ 0,00 en $ y en US$")', () => {
@@ -315,12 +349,14 @@ describe('cuadre: la diferencia en pesos y en dólares, con traza', () => {
     expect(v.cuadre.ars_ok).toBe(true)
     expect(v.cuadre.diferencia?.ars.valor).toBe('0')
     expect(v.cuadre.diferencia?.usd.valor).toBe('0')
+    expect(v.cuadre.detalle).not.toContain('fuera de la app')
   })
 
-  it('no verificable: sin diferencia (falta un dato)', () => {
+  it('no verificable: sin diferencia (falta un dato), y el detalle dice cuál', () => {
     const v = armarHoy(ventaTotalSpy(), '2026-10-06')
     expect(v.cuadre.ars_ok).toBeNull()
     expect(v.cuadre.diferencia ?? null).toBeNull()
+    expect(v.cuadre.detalle).toBe('No verificable: 1 partida financiera sin dato (SPY: IEB ya no la lista desde el mar 06/10: registrá la venta o el vencimiento en Cargar).')
   })
 })
 

@@ -182,3 +182,34 @@ export async function revisarAxe(page: Page): Promise<string[]> {
     .filter((v) => v.impact === 'serious' || v.impact === 'critical')
     .map((v) => `axe ${v.impact} · ${v.id}: ${v.help} → ${v.nodes.slice(0, 3).map((n) => n.target.join(' ')).join(' | ')}`)
 }
+
+/**
+ * Modo privado: los montos que se leen en la pantalla (texto visible con "$ " y
+ * un dígito) sin un desenfoque en el camino. Abre antes todos los <details>.
+ * Devuelve cada uno con su contexto; vacío si el modo privado tapa todo.
+ */
+export async function montosALaVista(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    for (const d of Array.from(document.querySelectorAll('details'))) d.open = true
+    const out: string[] = []
+    const caminante = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+    for (let n = caminante.nextNode(); n; n = caminante.nextNode()) {
+      const t = (n.textContent ?? '').replace(/\s+/g, ' ')
+      if (!/\$\s?[−+-]?\d/.test(t)) continue
+      const el = n.parentElement
+      if (!el || el.closest('script, style, title, nextjs-portal, .sr-only, dialog:not([open])')) continue
+      if (typeof el.checkVisibility === 'function' && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue
+      const r = el.getBoundingClientRect()
+      if (r.width === 0 || r.height === 0) continue
+      let tapado = false
+      for (let a: Element | null = el; a; a = a.parentElement) {
+        if (getComputedStyle(a).filter.includes('blur')) {
+          tapado = true
+          break
+        }
+      }
+      if (!tapado) out.push(`"${t.trim().slice(0, 60)}" en <${el.tagName.toLowerCase()}.${(el.getAttribute('class') ?? '').split(' ').slice(0, 3).join('.')}>`)
+    }
+    return out
+  })
+}

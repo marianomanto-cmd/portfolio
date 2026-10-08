@@ -78,7 +78,7 @@ export interface Flujo {
    */
   externo: boolean
   /** La operación de la posición que lo genera (para desglosar solo la tenencia vigente). */
-  operacion?: { id: number; tipo: Operacion['tipo']; cantidad: Decimal }
+  operacion?: { id: number; tipo: Operacion['tipo']; cantidad: Decimal; moneda: Moneda }
 }
 
 /** El intervalo entre observaciones frescas con que se atribuyó una partida. */
@@ -311,6 +311,17 @@ function valores(i: ItemFoto | undefined): Doble | null | 'falta' {
 
 // ───────────── Flujos ─────────────
 
+/**
+ * ¿La app sigue la caja de esa cuenta en esa moneda hasta esa fecha? Sí si hay
+ * algún saldo cargado en o antes: entonces la pata de caja de una operación
+ * cae en ese saldo (o en su saldo inicial, B01). Si no, va a un saldo que no
+ * está en ninguna foto (Galicia no carga saldos).
+ */
+function cajaSeguida(ctx: Contexto, cuenta_id: number, moneda: Moneda, hasta: Fecha): boolean {
+  const fs = ctx.saldoFechas.get(`${cuenta_id}:${moneda}`)
+  return fs !== undefined && fs.length > 0 && fs[0] <= hasta
+}
+
 /** Flujos de una posición en (desde, hasta]. Positivo = entra valor a la partida. */
 function flujosPosicion(ctx: Contexto, cuenta_id: number, activo_id: number, desde: Fecha, hasta: Fecha): Flujo[] | 'falta' {
   const out: Flujo[] = []
@@ -366,7 +377,15 @@ function flujosPosicion(ctx: Contexto, cuenta_id: number, activo_id: number, des
       default:
         continue
     }
-    out.push({ fecha: o.fecha, descripcion, ars, usd: ars.div(ccl), ccl, inferido, carga_id: o.carga_id, externo, operacion: { id: o.id, tipo: o.tipo, cantidad: o.cantidad } })
+    // La plata de la operación va o viene de un saldo que la app no sigue (la
+    // cuenta no tiene saldo cargado en esa moneda, como Galicia): entra o sale
+    // de la app, así que es un flujo externo (fase 3). Si no, el cuadre daría ≠
+    // por un monto que no es un bug y que no hay cómo corregir.
+    if (o.tipo !== 'apertura' && !cajaSeguida(ctx, cuenta_id, o.moneda, hasta)) {
+      externo = true
+      descripcion += ` (${o.tipo === 'compra' ? 'plata que entró a la app' : 'plata que salió de la app'}: ${ctx.ix.cuentas.get(cuenta_id)?.nombre ?? 'la cuenta'} no tiene saldo en ${o.moneda === 'ARS' ? 'pesos' : 'dólares'} cargado)`
+    }
+    out.push({ fecha: o.fecha, descripcion, ars, usd: ars.div(ccl), ccl, inferido, carga_id: o.carga_id, externo, operacion: { id: o.id, tipo: o.tipo, cantidad: o.cantidad, moneda: o.moneda } })
   }
   return out
 }
@@ -857,52 +876,17 @@ export interface Cuadre {
   diferencia?: { ars: Calc; usd: Calc } | null
 }
 
-/** Pata de caja de una operación que va a un saldo que no está en ninguna de las dos fotos. */
-interface PataSinSaldo {
-  descripcion: string
-  cuenta: string
-  moneda: Moneda
-  ars: Decimal
-  usd: Decimal
-}
-
-/**
- * Operaciones de (d0, d1] cuya plata entra o sale de un saldo que la app no
- * tiene (la cuenta nunca cargó saldo en esa moneda): esa plata no aparece en
- * ningún lado y el cuadre no cierra por ese monto (manual §4.1, caso conocido).
- */
-function pataSinSaldo(ctx: Contexto, d0: Fecha, d1: Fecha): PataSinSaldo[] {
-  const conSaldo = new Set<string>()
-  for (const d of [d0, d1]) for (const i of fotoEn(ctx, d).items) if (i.clase === 'saldo') conSaldo.add(i.clave)
-  const out: PataSinSaldo[] = []
-  for (const o of ordenarOps(ctx.h.operaciones)) {
-    if (!enRango(o.fecha, d0, d1) || conSaldo.has(`s:${o.cuenta_id}:${o.moneda}`)) continue
-    let caja: Decimal | null = null
-    if (o.tipo === 'compra') {
-      const c = costoAlta(o)
-      const p = c === null ? precioDia(ctx, o.activo_id, o.fecha) : null
-      caja = c !== null ? c.negated() : p !== null ? o.cantidad.times(p).negated() : null
-    } else if (o.tipo === 'venta' || o.tipo === 'vencimiento') {
-      const c = ingresoBaja(o)
-      const p = c === null ? precioDia(ctx, o.activo_id, o.fecha) : null
-      caja = c !== null ? c : p !== null ? o.cantidad.times(p) : null
-    } else if (o.tipo === 'renta' || o.tipo === 'amortizacion') caja = o.importe
-    const ccl = o.ccl_del_dia ?? cclDe(ctx, o.fecha)
-    if (caja === null || ccl === null) continue
-    const cuenta = ctx.ix.cuentas.get(o.cuenta_id)?.nombre ?? `la cuenta ${o.cuenta_id}`
-    const ticker = ctx.ix.activos.get(o.activo_id)?.ticker ?? `activo ${o.activo_id}`
-    out.push({
-      descripcion: `${o.tipo} de ${ticker} del ${fechaCorta(o.fecha)} en ${cuenta} (${monto(caja.abs(), o.moneda, { decimales: 2 })})`,
-      cuenta,
-      moneda: o.moneda,
-      ars: o.moneda === 'ARS' ? caja : caja.times(ccl),
-      usd: o.moneda === 'USD' ? caja : caja.div(ccl),
-    })
-  }
-  return out
-}
-
 const CIERRA = new Decimal('1e-12')
+
+const NOMBRE_OPERACION: Record<Operacion['tipo'], string> = {
+  apertura: 'apertura',
+  compra: 'compra',
+  venta: 'venta',
+  vencimiento: 'vencimiento',
+  renta: 'renta',
+  amortizacion: 'amortización',
+  ajuste_ratio: 'cambio de ratio',
+}
 
 /**
  * El cuadre que puede fallar (B04): el patrimonio financiero recalculado
@@ -955,7 +939,7 @@ export function cuadre(v: Variacion, h: Hechos, opciones: { hoy?: Fecha } = {}):
       ],
       {
         explicacion:
-          'Lo que el desglose del día no explica del cambio de tu patrimonio financiero, recalculado desde los hechos. Tiene que dar 0: si no, la plata entró o salió por un saldo que la app no tiene, o es un bug (D-66).',
+          'Lo que el desglose del día no explica del cambio de tu patrimonio financiero, recalculado desde los hechos. Tiene que dar 0: si no da, es un bug (D-66).',
       },
     )
   }
@@ -965,31 +949,31 @@ export function cuadre(v: Variacion, h: Hechos, opciones: { hoy?: Fecha } = {}):
     return { ars_ok: null, usd_ok: null, detalle: 'No verificable: falta un valor del patrimonio financiero.', diferencia: null }
   const okA = (difA.valor as Decimal).isZero()
   const okU = (difU.valor as Decimal).isZero()
+  // Lo que entró o salió de la app por una cuenta sin saldo cargado en esa
+  // moneda (flujo externo, ver flujosPosicion): el detalle lo nombra.
+  const fuera = cs.flatMap((c) => c.flujos.filter((f) => f.externo && f.operacion && f.operacion.tipo !== 'apertura').map((f) => ({ c, f })))
+  const notaFuera = fuera.length
+    ? ` Cuenta como plata que entró o salió de la app: ${fuera
+        .map(({ c, f }) => {
+          const ref = refDe(c.clave)
+          const cid = ref.clase === 'posicion' ? ref.cuenta_id : 0
+          const cuenta = ctx.ix.cuentas.get(cid)?.nombre ?? 'la cuenta'
+          const ticker = ref.clase === 'posicion' ? (ctx.ix.activos.get(ref.activo_id)?.ticker ?? c.nombre) : c.nombre
+          const m = f.operacion!.moneda
+          return `${NOMBRE_OPERACION[f.operacion!.tipo]} de ${ticker} del ${fechaCorta(f.fecha)} en ${cuenta}, ${monto((m === 'ARS' ? f.ars : f.usd).abs(), m, { decimales: 2 })} (${cuenta} no tiene saldo en ${m === 'ARS' ? 'pesos' : 'dólares'} cargado)`
+        })
+        .join('; ')}.`
+    : ''
   if (okA && okU)
     return {
       ars_ok: true,
       usd_ok: true,
-      detalle: 'Patrimonio de hoy − patrimonio de la carga anterior − aportes y retiros = activos + TC + sin atribuir, en las dos monedas.',
+      detalle: `Patrimonio de hoy − patrimonio de la carga anterior − aportes y retiros = activos + TC + sin atribuir, en las dos monedas.${notaFuera}`,
       diferencia: { ars: difA, usd: difU },
     }
   const da = difA.valor as Decimal
   const du = difU.valor as Decimal
-  let detalle = `El desglose no cierra por ${monto(da, 'ARS', { decimales: 2, signo: true })} · ${monto(du, 'USD', { decimales: 2, signo: true })}.`
-  const patas = pataSinSaldo(ctx, v.desde, v.hasta)
-  if (patas.length) {
-    const sinSaldo = [...new Set(patas.map((p) => `${p.cuenta} no tiene saldo en ${p.moneda === 'ARS' ? 'pesos' : 'dólares'} cargado`))]
-    // La plata que va a un saldo que no existe falta en el patrimonio: la diferencia es −Σ patas.
-    const restoA = da.plus(patas.reduce((a, p) => a.plus(p.ars), CERO))
-    const restoU = du.plus(patas.reduce((a, p) => a.plus(p.usd), CERO))
-    const explica = restoA.abs().lte('1e-9') && restoU.abs().lte('1e-9')
-    detalle += ` La plata de ${patas.length === 1 ? 'esta operación' : 'estas operaciones'} entró o salió de un saldo que la app no tiene: ${patas.map((p) => p.descripcion).join('; ')} (${sinSaldo.join('; ')}). ${
-      explica
-        ? 'Eso explica toda la diferencia.'
-        : `Lo que queda sin explicar (${monto(restoA, 'ARS', { decimales: 2, signo: true })} · ${monto(restoU, 'USD', { decimales: 2, signo: true })}) es un bug: revisar.`
-    }`
-  } else {
-    detalle += ' Puede faltar un saldo que recibió un cobro o pagó una compra; si no tiene explicación, es un bug: revisar.'
-  }
+  const detalle = `El desglose no cierra por ${monto(da, 'ARS', { decimales: 2, signo: true })} · ${monto(du, 'USD', { decimales: 2, signo: true })}: si no tiene explicación, es un bug (revisalo).${notaFuera}`
   return { ars_ok: okA, usd_ok: okU, detalle, diferencia: { ars: difA, usd: difU } }
 }
 
