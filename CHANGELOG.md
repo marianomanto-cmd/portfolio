@@ -4,6 +4,10 @@ Todo cambio de la app se registra acá, el más nuevo primero. Cada entrada dice
 
 ## [Sin publicar]
 
+### 2026-10-08 — Investigación de vida financiera
+- **`docs/investigacion-vida.md`**: diez áreas (seis pedidas y cuatro encontradas por una ronda que buscó lo que faltaba: sucesión, empresa vs. personal, seguros, jubilación), 168 hallazgos con fuente, cuadro de impuestos por tipo de activo (informativo, a confirmar con el contador), cambios de modelo de datos por fase y 22 decisiones para aprobar. El informe original se cortó al redactarse; se reconstruyó sección por sección a partir de las investigaciones guardadas, sin repetirlas.
+- **D-24 actualizada:** el repo es público por decisión del dueño; la documentación se versiona, los datos crudos siguen fuera.
+
 ### 2026-10-07 — Investigación de mercado
 - **`docs/investigacion-mercado.md`**: seis relevamientos en paralelo (trackers comerciales, patrimonio y proyecciones, herramientas argentinas, DIY y open source, hábito y carga, visualización), con síntesis, crítica y corrección. Unas 60 ideas con fuente, priorizadas por fase. Propone las decisiones D-35 a D-53 (estado P: esperan aprobación del dueño) y 18 cambios de schema.
 

@@ -138,6 +138,8 @@ Además de las posiciones (spec), tampoco se guardan `cuotas_pagadas`, totales d
 ### D-24 · Datos reales fuera de git — D
 Excel, capturas y montos del dueño viven en Supabase (base + Storage privado), no en el repo. Los tests usan fixtures con la misma estructura y números inventados.
 
+*Actualización 2026-10-08:* el repo `marianomanto-cmd/portfolio` es **público**, y el dueño decidió dejarlo así ("No importa que esté público"). Por eso la documentación (spec, decisiones, investigaciones, visión) se versiona aunque describa su situación patrimonial a grandes rasgos. Lo de arriba sigue igual: los archivos crudos (Excel, capturas) y los montos de sus posiciones no van al repo, y los tests usan números inventados. Nunca se suben claves ni credenciales.
+
 ### D-33 · Permisos mínimos para el servidor — D
 En este proyecto, Supabase le otorga por defecto a `service_role` **todos** los privilegios sobre cada tabla nueva, incluido `TRUNCATE`, que vacía una tabla sin pasar por la auditoría. Se encontró al verificar los permisos reales después de aplicar la primera migración (el test local no lo detectaba porque no imitaba ese default). La migración `permisos_servidor` saca los defaults y otorga solo lectura y escritura fila por fila sobre los datos, y solo lectura sobre la auditoría y las vistas. Toda migración futura otorga sus permisos explícitamente. La base local de tests imita el comportamiento real de Supabase.
 
