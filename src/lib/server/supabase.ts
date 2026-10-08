@@ -14,11 +14,13 @@ export class FaltaConfiguracion extends Error {
 
 let cliente: SupabaseClient<Database> | null = null
 
+// La URL del proyecto no es secreta (D-02): queda fija, y SUPABASE_URL solo la pisa.
+const URL_PROYECTO = 'https://zcgynhzddfjzwswekcvl.supabase.co'
+
 export function supabase(): SupabaseClient<Database> {
   if (cliente) return cliente
-  const url = process.env.SUPABASE_URL
+  const url = process.env.SUPABASE_URL || URL_PROYECTO
   const clave = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url) throw new FaltaConfiguracion('SUPABASE_URL')
   if (!clave) throw new FaltaConfiguracion('SUPABASE_SECRET_KEY')
   cliente = createClient<Database>(url, clave, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -28,10 +30,7 @@ export function supabase(): SupabaseClient<Database> {
 }
 
 export function configurado(): boolean {
-  return Boolean(
-    process.env.SUPABASE_URL &&
-      (process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY),
-  )
+  return Boolean(process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY)
 }
 
 const PAGINA = 1000
