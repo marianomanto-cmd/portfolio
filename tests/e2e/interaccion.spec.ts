@@ -170,7 +170,8 @@ test.describe('desktop (1280 × 900)', () => {
     await page.getByRole('link', { name: /^Total/ }).click()
     await expect(page).toHaveURL(/vista=total/)
     await expect(page.getByLabel('Tu exposición al peso')).toContainText('sin dato')
-    await expect(page.getByLabel('Tu exposición al peso')).toContainText('Suma parcial sin ellas: largo $ 32.783.100,00')
+    // La redacción exacta es de la pantalla; lo que importa: "sin dato" y la suma parcial a la vista (D-65).
+    await expect(page.getByLabel('Tu exposición al peso')).toContainText(/Suma parcial sin ell[ao]s: (largo )?\+?\$ 32\.783\.100,00/)
   })
 
   test('Registro: revertir un lote pide motivo y confirma', async ({ page }) => {

@@ -41,6 +41,15 @@ export default async function PaginaHoy({ searchParams }: { searchParams: Promis
       <h1 className="sr-only">
         Hoy, {fechaLarga(v.hoy)}. Datos al cierre del {v.fecha_datos ? fechaCorta(v.fecha_datos) : '—'}
       </h1>
+      {v.fecha_ccl && v.fecha_datos && v.fecha_ccl !== v.fecha_datos ? (
+        <Aviso>
+          El {fechaCorta(v.fecha_datos)} no tiene CCL: los dólares usan el{' '}
+          <Traza calc={v.ccl} titulo="CCL que se usa">
+            <span className="num">CCL del {fechaCorta(v.fecha_ccl)}</span>
+          </Traza>{' '}
+          y el cambio del día queda sin atribuir.
+        </Aviso>
+      ) : null}
       {v.aviso_fin_de_anio ? <Aviso>{v.aviso_fin_de_anio}</Aviso> : null}
 
       <div className="flex flex-col gap-2 md:gap-4 xl:grid xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start min-[112.5rem]:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_24rem]">
@@ -147,6 +156,8 @@ function detalleFrase(f: FraseDelDia, m: Mostrar): FilaDetalle[] {
 
 // ───────────── Las dos tarjetas ─────────────
 
+const esCero = (c: CalcVista) => c.valor !== null && /^-?0(\.0+)?$/.test(c.valor)
+
 function Cifra({ c, moneda, m, titulo, signo = false, color = false, className = '' }: { c: CalcVista; moneda: 'ARS' | 'USD'; m: Mostrar; titulo: string; signo?: boolean; color?: boolean; className?: string }) {
   return (
     <Traza calc={c} titulo={titulo} moneda={moneda}>
@@ -213,6 +224,17 @@ function TarjetaKpi({ t, m, corto, desglose = false }: { t: TarjetaPatrimonio; m
             <dd>
               <Cifra c={t.desglose.tc.usd} moneda="USD" m={m} titulo="Lo que puso el CCL, en dólares" signo />
             </dd>
+            {esCero(t.desglose.sin_atribuir.ars) && esCero(t.desglose.sin_atribuir.usd) ? null : (
+              <>
+                <dt className="text-muted">sin atribuir</dt>
+                <dd>
+                  <Cifra c={t.desglose.sin_atribuir.ars} moneda="ARS" m={m} titulo="Sin atribuir, en pesos" signo />
+                </dd>
+                <dd>
+                  <Cifra c={t.desglose.sin_atribuir.usd} moneda="USD" m={m} titulo="Sin atribuir, en dólares" signo />
+                </dd>
+              </>
+            )}
           </dl>
         ) : null}
         {t.notas.length ? (
@@ -256,8 +278,8 @@ function LineaExposicion({ v }: { v: VistaHoy }) {
         {lado ? <span className="text-muted">{lado}</span> : null}
         <MontoTrazado calc={e.neto_ars} moneda="ARS" titulo="Pesos financieros − deuda del leasing" />
         <span className="text-muted">
-          (<MontoTrazado calc={e.pesos_financieros} moneda="ARS" titulo="Pesos financieros" compacta /> −{' '}
-          <MontoTrazado calc={e.deuda_pesos} moneda="ARS" titulo="Deuda del leasing (capital pendiente)" compacta />)
+          (<MontoTrazado calc={e.pesos_financieros.ars} moneda="ARS" titulo="Pesos financieros" compacta /> −{' '}
+          <MontoTrazado calc={e.deuda_pesos.ars} moneda="ARS" titulo="Deuda del leasing (capital pendiente)" compacta />)
         </span>
         <MontoTrazado calc={e.neto_usd} moneda="USD" titulo="El neto en dólares" decimales={0} />
         {verbo ? (

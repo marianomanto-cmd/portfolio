@@ -35,6 +35,17 @@ export function mimeDeImagen(nombre: string, tipo: string): string {
   return 'image/png'
 }
 
+/**
+ * Mensaje de un archivo que no se pudo leer. Los lectores ya dicen "No pude
+ * leer la captura de Galicia: …": no se repite el prefijo.
+ */
+export function mensajeLectura(clase: ClaseArchivo, pista: NombreCuenta | undefined, motivo: unknown): string {
+  const texto = (motivo instanceof Error ? motivo.message : String(motivo)).trim()
+  if (/^No pude leer\b/i.test(texto)) return texto
+  const que = clase === 'excel' ? 'el Excel' : pista ? `la captura de ${pista}` : 'la captura'
+  return `No pude leer ${que}: ${texto}`
+}
+
 export interface FechaElegida {
   fecha: Fecha
   /** De dónde salió, para mostrarlo: "tomada del Excel de IEB, celda B1". */

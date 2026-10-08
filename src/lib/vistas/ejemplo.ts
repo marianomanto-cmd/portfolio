@@ -11,8 +11,7 @@
 // etiquetas de verdad, y el demo sirve también de prueba del motor contra el
 // Apéndice B (tests/unit/ejemplo.test.ts).
 
-import { calc, deCalc, sinDato, vista, type Calc, type CalcVista } from '@/lib/domain/calc'
-import { CERO, Decimal, monto, porcentaje } from '@/lib/domain/dinero'
+import { CERO, Decimal } from '@/lib/domain/dinero'
 import type {
   Activo,
   Bien,
@@ -29,7 +28,7 @@ import type {
   TipoCambio,
 } from '@/lib/domain/tipos'
 import { armarCartera, armarExposicion, armarHoy } from './armar'
-import type { FilaRegistro, Segmento, VistaCartera, VistaExposicion, VistaHoy, VistaRegistro } from './contratos'
+import type { FilaRegistro, VistaCartera, VistaExposicion, VistaHoy, VistaRegistro } from './contratos'
 
 /** El "hoy" del ejemplo: jueves a la mañana, con la última carga del miércoles. */
 export const HOY_EJEMPLO: Fecha = '2026-10-15'
@@ -298,92 +297,10 @@ export function ejemploCarteraVariante(v: VarianteDemo): VistaCartera {
 }
 
 export function ejemploExposicion(modo: 'financiero' | 'total'): VistaExposicion {
-  const h = hechosEjemplo()
-  const v = armarExposicion(h, HOY_EJEMPLO, modo)
-  if (modo === 'financiero') return v
-  return totalSinMonedaDeRiesgo(v, armarExposicion(h, HOY_EJEMPLO, 'financiero'))
-}
-
-/**
- * Vista Total del ejemplo (D-65, D-73 de la visión): la casa y la camioneta
- * todavía no tienen moneda de riesgo elegida, así que el neto total es "sin
- * dato", con la suma parcial sin ellas a la vista, y en la composición por
- * moneda los bienes van como "sin elegir" en lugar de asumir la moneda en que
- * están valuados.
- */
-function totalSinMonedaDeRiesgo(v: VistaExposicion, fin: VistaExposicion): VistaExposicion {
-  const netoFin = fin.resumen.neto_ars
-  const parcial = netoFin.valor === null ? 'sin dato' : monto(netoFin.valor, 'ARS', { decimales: 2 })
-  const motivo = `A la casa y a la camioneta les falta la moneda de riesgo (la elegís vos en Datos, la app no la asume). Suma parcial sin ellas: largo ${parcial}.`
-  const insumosNeto = [
-    { nombre: 'Pesos financieros − deuda del leasing (suma parcial)', valor: netoFin.valor, unidad: 'ARS' as const, calc: netoFin },
-    { nombre: 'Casa · moneda de riesgo', valor: null, unidad: 'texto' as const },
-    { nombre: 'Camioneta · moneda de riesgo', valor: null, unidad: 'texto' as const },
-  ]
-  const sinDatoVista = (m: string, explicacion: string): CalcVista => ({
-    valor: null,
-    motivo: m,
-    formula: 'sin dato',
-    explicacion,
-    insumos: insumosNeto,
-    etiquetas: ['parcial'],
-  })
-  const neto_ars = sinDatoVista(motivo, 'Tu exposición neta al peso contando tus bienes, cada uno en la moneda de riesgo que le elijas.')
-  const neto_usd = sinDatoVista(motivo, 'El neto total pasado a dólares al CCL de la carga.')
-
-  // Composición por moneda de riesgo: los bienes, "sin elegir".
-  const bienes = v.por_clase.filter((s) => s.clave === 'inmueble' || s.clave === 'vehiculo')
-  const financieros = fin.por_moneda
-  const sumaArs = (ss: Segmento[]) => ss.reduce((a, s) => a.plus(s.valor.ars.valor ?? 0), CERO)
-  const sumaUsd = (ss: Segmento[]) => ss.reduce((a, s) => a.plus(s.valor.usd.valor ?? 0), CERO)
-  const total = sumaArs(financieros).plus(sumaArs(bienes))
-  const peso = (ars: Decimal, nombre: string): CalcVista =>
-    vista(
-      calc(ars.div(total), `${monto(ars, 'ARS')} ÷ ${monto(total, 'ARS')} = ${porcentaje(ars.div(total))}`, [
-        { nombre, valor: ars.toFixed(), unidad: 'ARS' },
-        { nombre: 'Activos de la vista Total (sin restar deudas)', valor: total.toFixed(), unidad: 'ARS' },
-      ], { explicacion: 'Qué parte de la vista representa este grupo.' }),
-    )
-  const conPeso = (s: Segmento): Segmento => ({ ...s, peso: peso(D(s.valor.ars.valor ?? 0), s.nombre) })
-  const arsBienes = sumaArs(bienes)
-  const usdBienes = sumaUsd(bienes)
-  const sinElegir: Segmento = {
-    clave: 'sin_elegir',
-    nombre: 'Sin elegir',
-    color: '#9aa1ac',
-    valor: {
-      ars: vista(sumaPartes(bienes, 'ARS', arsBienes)),
-      usd: vista(sumaPartes(bienes, 'USD', usdBienes)),
-    },
-    peso: peso(arsBienes, 'Bienes sin moneda de riesgo'),
-  }
-  // Sin moneda de riesgo elegida, los bienes no suman ni a los pesos ni a los
-  // dólares: el largo y los activos en dólares son los del financiero.
-  return {
-    ...v,
-    activos_en_pesos: fin.activos_en_pesos,
-    activos_en_dolares: fin.activos_en_dolares,
-    // La concentración se mide sobre el financiero (D-03): la casa no es una posición.
-    concentracion: fin.concentracion,
-    resumen: {
-      ...v.resumen,
-      pesos_financieros: fin.resumen.pesos_financieros,
-      neto_ars,
-      neto_usd,
-      sensibilidad_usd_1pct: vista(sinDato('Sin el neto total no hay sensibilidad.', [deCalc('Neto total', { valor: null, motivo, formula: 'sin dato', insumos: [], etiquetas: ['parcial'] }, 'ARS')], { etiquetas: ['parcial'] })),
-    },
-    neto_pct: sinDatoVista(motivo, 'Tu exposición neta al peso como parte de tus activos.'),
-    por_moneda: [...financieros.map(conPeso), sinElegir],
-  }
-}
-
-function sumaPartes(ss: Segmento[], moneda: 'ARS' | 'USD', total: Decimal): Calc {
-  const partes = ss.map((s) => (moneda === 'ARS' ? s.valor.ars.valor : s.valor.usd.valor) ?? '0')
-  return calc(total, `${partes.map((p) => monto(p, moneda, { decimales: 2 })).join(' + ')} = ${monto(total, moneda, { decimales: 2 })}`, ss.map((s) => ({
-    nombre: s.nombre,
-    valor: (moneda === 'ARS' ? s.valor.ars.valor : s.valor.usd.valor) ?? null,
-    unidad: moneda,
-  })), { explicacion: 'Los bienes a los que todavía no les elegiste moneda de riesgo.' })
+  // La vista Total ya sale del motor con el neto "sin dato" (la casa y la
+  // camioneta no tienen moneda de riesgo elegida, D-73), los bienes como
+  // "sin elegir" y la concentración sobre el financiero (D-03).
+  return armarExposicion(hechosEjemplo(), HOY_EJEMPLO, modo)
 }
 
 // ───────────── Registro ─────────────

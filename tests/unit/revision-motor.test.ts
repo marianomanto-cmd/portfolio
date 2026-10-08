@@ -32,7 +32,7 @@ import type {
   Saldo,
   TipoCambio,
 } from '@/lib/domain/tipos'
-import { parteCalc, variacion } from '@/lib/domain/variacion'
+import { cuadre, observacionFresca, parteCalc, variacion } from '@/lib/domain/variacion'
 import { armarCartera, armarExposicion, armarHoy, fechasDeCarga } from '@/lib/vistas/armar'
 
 // ───────────── Fábrica de hechos ─────────────
@@ -220,8 +220,94 @@ const lecturaIEB = (filas: FilaLeida[], fecha: Fecha): LecturaCuenta => ({
 // BUGS: fallan hasta que se corrija el motor
 // ═════════════════════════════════════════════════════════════════════════
 
+// Carga "media" (D-64) que usan B09 y B10.
+// Carga "media" (D-64): solo el Excel de IEB. Galicia (S13N6) y Mercado Pago
+// quedan con su último dato, y el CCL sube 10%.
+const cargaMedia = () =>
+  hechos({
+    operaciones: [
+      op({ fecha: '2026-10-01', activo_id: 1, tipo: 'apertura', cantidad: D(10), precio: D(10000) }),
+      op({ fecha: '2026-10-01', cuenta_id: GALICIA, activo_id: 2, tipo: 'apertura', cantidad: D(1000000), precio: D(1) }),
+    ],
+    tipos_cambio: [tc('2026-10-05', 1000), tc('2026-10-06', 1100)],
+    cotizaciones: [cot('2026-10-05', 1, 10000), cot('2026-10-05', 2, 1), cot('2026-10-06', 1, 11000)],
+    saldos: [saldo('2026-10-05', MP, 'ARS', 500000), saldo('2026-10-05', IEB, 'USD', 100), saldo('2026-10-06', IEB, 'USD', 100)],
+  })
+
 describe('bugs', () => {
-  // ── variacion.ts: saldos ──
+  // B21–B25 son de conciliar.ts y dinero.ts (la parte de la carga): se dejan como estaban.
+
+  it('B21 · conciliar una carga atrasada compara contra operaciones posteriores y propone una venta que no existió', () => {
+    // Ya cargaste el vie 09/10 (con una compra de 20). Ahora cargás el Excel del jue 08/10, que dice 100.
+    const h = hechos({
+      operaciones: [
+        op({ fecha: '2026-10-01', activo_id: 1, tipo: 'apertura', cantidad: D(100), precio: D(20000) }),
+        op({ fecha: '2026-10-09', activo_id: 1, tipo: 'compra', cantidad: D(20), precio: D(21000), ccl_del_dia: D(1525) }),
+      ],
+      cargas: [carga(1, '2026-10-01', IEB), carga(2, '2026-10-09', IEB)],
+    })
+    const p = proponerCarga([lecturaIEB([filaIEB('SPY', '100', { precio_unitario: '20500' })], '2026-10-08')], h, '2026-10-08', { ccl: D(1519) })
+    expect(p.filas[0].accion).toBe('ninguna')
+  })
+
+  it('B22 · conciliar un cambio de ratio propone una compra a precio 0, que la base rechaza (precio > 0)', () => {
+    // El bróker duplica la cantidad y parte el PPP: (10.000 × 200 − 2.000.000) ÷ 100 = 0.
+    const h = hechos({
+      operaciones: [op({ fecha: '2026-10-01', activo_id: 1, tipo: 'apertura', cantidad: D(100), precio: D(20000) })],
+      cargas: [carga(1, '2026-10-01', IEB)],
+    })
+    const p = proponerCarga([lecturaIEB([filaIEB('SPY', '200', { ppc_unitario: '10000', precio_unitario: '10500' })], '2026-10-08')], h, '2026-10-08', { ccl: D(1500) })
+    const o = p.filas[0].operacion
+    expect(o === null || o.precio === null || D(o.precio).gt(0)).toBe(true)
+  })
+
+  it('B23 · D-19: la carga siguiente no completa el precio de la compra pendiente (queda "pendiente" para siempre)', () => {
+    const h = hechos({
+      operaciones: [
+        op({ fecha: '2026-10-01', activo_id: 1, tipo: 'apertura', cantidad: D(100), precio: D(10000) }),
+        op({ fecha: '2026-10-07', activo_id: 1, tipo: 'compra', cantidad: D(10), ccl_del_dia: D(1500) }), // PPP "-"
+      ],
+      cargas: [carga(1, '2026-10-01', IEB), carga(2, '2026-10-07', IEB)],
+    })
+    const p = proponerCarga([lecturaIEB([filaIEB('SPY', '110', { ppc_unitario: '10200', precio_unitario: '12300' })], '2026-10-08')], h, '2026-10-08', { ccl: D(1510) })
+    // (PPP₁ × q₁ − PPP₀ × q₀) ÷ Δq = (10.200 × 110 − 10.000 × 100) ÷ 10 = 12.200. Hoy: acción "ninguna", sin rastro.
+    expect(JSON.stringify(p.filas[0])).toContain('12200')
+  })
+
+  it('B24 · leerNumeroAR acepta agrupaciones imposibles y lee mal por 10.000 o por 1.000', () => {
+    expect(['1.0852', null]).toContain(leerNumeroAR('1.0852')) // hoy: '10852'
+    expect(['1548.2', null]).toContain(leerNumeroAR('1,548.20')) // hoy: '1.5482'
+  })
+
+  it('B25 · compacto redondea a "1.000,0k" en lugar de pasar a millones', () => {
+    expect(compacto(D('999960'), 'ARS')).toBe('$ 1,0 M') // hoy: '$ 1.000,0k'
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════
+// REGRESIONES: bugs del motor ya corregidos (fase 1a, informe fase2-motor)
+// ═════════════════════════════════════════════════════════════════════════
+
+describe('regresiones', () => {
+  it('B15 · Cartera: el desglose desde la compra no es la suma de los intervalos entre cargas (D-35, visión 4.5)', () => {
+    // Compra el 01/10 a CCL 1.000; el CCL va a 1.100 y vuelve a 1.000; el CEDEAR sube 10% en dólares.
+    const h = hechos({
+      operaciones: [op({ fecha: '2026-10-01', activo_id: 1, tipo: 'compra', cantidad: D(10), precio: D(10000), ccl_del_dia: D(1000) })],
+      tipos_cambio: [tc('2026-10-01', 1000), tc('2026-10-02', 1100), tc('2026-10-05', 1000)],
+      cotizaciones: [cot('2026-10-01', 1, 10000), cot('2026-10-02', 1, 12100), cot('2026-10-05', 1, 11000)],
+    })
+    const diario = (
+      [
+        ['2026-10-01', '2026-10-02'],
+        ['2026-10-02', '2026-10-05'],
+      ] as const
+    )
+      .map(([a, b]) => variacion(h, a, b).contribuciones[0].tc.ars)
+      .reduce((a, b) => a.plus(b), D(0))
+    const fila = armarCartera(h, '2026-10-05').filas[0]
+    // Suma de los intervalos: TC −$1.000 y activo +$11.000. Cartera: TC $0 y activo +$10.000.
+    expect(D(fila.desglose!.tc.valor!).toFixed()).toBe(diario.toFixed())
+  })
 
   it('B01 · un saldo que se carga por primera vez entra como ganancia (Día cero repartido en dos días)', () => {
     // 01/10: CCL y Excel de IEB. 02/10: misma cartera, mismo precio, mismo CCL, y
@@ -249,8 +335,6 @@ describe('bugs', () => {
     const act = parteCalc(variacion(h, '2026-10-06', '2026-10-07'), h, 'financiero', 'activo', 'ARS')
     expect(act.valor!.toFixed()).toBe('300')
   })
-
-  // ── variacion.ts: flujos internos ──
 
   it('B03 · un cobro en USD un día sin carga: el título y el saldo lo pasan a pesos con CCL distintos y el resultado no es la variación del patrimonio', () => {
     // Dividendo de US$ 50 el mar 06/10 (CCL de la operación 1.050), sin carga ese día.
@@ -328,8 +412,6 @@ describe('bugs', () => {
     expect({ usd: c.resultado.usd.toFixed(), ars: c.resultado.ars.toFixed() }).toEqual({ usd: '0', ars: '-100000' })
   })
 
-  // ── foto.ts ──
-
   it('B07 · cambio de ratio sin precio nuevo: valúa la cantidad nueva con el precio viejo y duplica el valor', () => {
     const h = hechos({
       operaciones: [
@@ -356,21 +438,6 @@ describe('bugs', () => {
     // Sin CCL del 06/10 no hay con qué separar activo de TC: "sin dato" o "sin atribuir", nunca TC = 0.
     expect(v.faltantes.length > 0 || (c.activo.ars.isZero() && c.tc.ars.isZero())).toBe(true)
   })
-
-  // ── armar.ts: Hoy ──
-
-  // Carga "media" (D-64): solo el Excel de IEB. Galicia (S13N6) y Mercado Pago
-  // quedan con su último dato, y el CCL sube 10%.
-  const cargaMedia = () =>
-    hechos({
-      operaciones: [
-        op({ fecha: '2026-10-01', activo_id: 1, tipo: 'apertura', cantidad: D(10), precio: D(10000) }),
-        op({ fecha: '2026-10-01', cuenta_id: GALICIA, activo_id: 2, tipo: 'apertura', cantidad: D(1000000), precio: D(1) }),
-      ],
-      tipos_cambio: [tc('2026-10-05', 1000), tc('2026-10-06', 1100)],
-      cotizaciones: [cot('2026-10-05', 1, 10000), cot('2026-10-05', 2, 1), cot('2026-10-06', 1, 11000)],
-      saldos: [saldo('2026-10-05', MP, 'ARS', 500000), saldo('2026-10-05', IEB, 'USD', 100), saldo('2026-10-06', IEB, 'USD', 100)],
-    })
 
   it('B09 · carga media (solo IEB): la frase oculta el "sin atribuir" en USD y sus partes no suman', () => {
     const f = armarHoy(cargaMedia(), '2026-10-06').frase!
@@ -419,8 +486,6 @@ describe('bugs', () => {
     expect(hoy.atencion.some((p) => p.id.startsWith('ccl-compra:'))).toBe(true)
   })
 
-  // ── armar.ts: Cartera ──
-
   it('B14 · Cartera: el total "Res. USD" sin dato muestra la suma parcial del costo, no la del resultado (D-65, visión 4.5)', () => {
     const h = hechos({
       operaciones: [
@@ -436,26 +501,6 @@ describe('bugs', () => {
     expect(v.totales.resultado.usd.valor).toBeNull()
     // Hoy el motivo dice "Suma parcial (1 de 2): US$ 20.935,25" (el costo de SPY).
     expect(v.totales.resultado.usd.motivo).toContain(parcial)
-  })
-
-  it('B15 · Cartera: el desglose desde la compra no es la suma de los intervalos entre cargas (D-35, visión 4.5)', () => {
-    // Compra el 01/10 a CCL 1.000; el CCL va a 1.100 y vuelve a 1.000; el CEDEAR sube 10% en dólares.
-    const h = hechos({
-      operaciones: [op({ fecha: '2026-10-01', activo_id: 1, tipo: 'compra', cantidad: D(10), precio: D(10000), ccl_del_dia: D(1000) })],
-      tipos_cambio: [tc('2026-10-01', 1000), tc('2026-10-02', 1100), tc('2026-10-05', 1000)],
-      cotizaciones: [cot('2026-10-01', 1, 10000), cot('2026-10-02', 1, 12100), cot('2026-10-05', 1, 11000)],
-    })
-    const diario = (
-      [
-        ['2026-10-01', '2026-10-02'],
-        ['2026-10-02', '2026-10-05'],
-      ] as const
-    )
-      .map(([a, b]) => variacion(h, a, b).contribuciones[0].tc.ars)
-      .reduce((a, b) => a.plus(b), D(0))
-    const fila = armarCartera(h, '2026-10-05').filas[0]
-    // Suma de los intervalos: TC −$1.000 y activo +$11.000. Cartera: TC $0 y activo +$10.000.
-    expect(D(fila.desglose!.tc.valor!).toFixed()).toBe(diario.toFixed())
   })
 
   it('B16 · una amortización devuelve capital y Cartera la muestra como pérdida (el costo no baja)', () => {
@@ -493,8 +538,6 @@ describe('bugs', () => {
     expect(fila.ganas_pesos_perdes_dolares).toBe(false)
   })
 
-  // ── armar.ts: Exposición ──
-
   it('B19 · Exposición, vista Total: la concentración la encabeza la casa (D-03: se calcula sobre el financiero)', () => {
     const h = hechos({
       operaciones: [op({ fecha: '2026-10-01', activo_id: 1, tipo: 'apertura', cantidad: D(100), precio: D(20000) })],
@@ -523,58 +566,6 @@ describe('bugs', () => {
     // Apéndice B: "Vista Total: sin dato, porque la casa y la camioneta no tienen moneda de riesgo elegida".
     expect(tot.resumen.neto_ars.valor).toBeNull()
   })
-
-  // ── conciliar.ts ──
-
-  it('B21 · conciliar una carga atrasada compara contra operaciones posteriores y propone una venta que no existió', () => {
-    // Ya cargaste el vie 09/10 (con una compra de 20). Ahora cargás el Excel del jue 08/10, que dice 100.
-    const h = hechos({
-      operaciones: [
-        op({ fecha: '2026-10-01', activo_id: 1, tipo: 'apertura', cantidad: D(100), precio: D(20000) }),
-        op({ fecha: '2026-10-09', activo_id: 1, tipo: 'compra', cantidad: D(20), precio: D(21000), ccl_del_dia: D(1525) }),
-      ],
-      cargas: [carga(1, '2026-10-01', IEB), carga(2, '2026-10-09', IEB)],
-    })
-    const p = proponerCarga([lecturaIEB([filaIEB('SPY', '100', { precio_unitario: '20500' })], '2026-10-08')], h, '2026-10-08', { ccl: D(1519) })
-    expect(p.filas[0].accion).toBe('ninguna')
-  })
-
-  it('B22 · conciliar un cambio de ratio propone una compra a precio 0, que la base rechaza (precio > 0)', () => {
-    // El bróker duplica la cantidad y parte el PPP: (10.000 × 200 − 2.000.000) ÷ 100 = 0.
-    const h = hechos({
-      operaciones: [op({ fecha: '2026-10-01', activo_id: 1, tipo: 'apertura', cantidad: D(100), precio: D(20000) })],
-      cargas: [carga(1, '2026-10-01', IEB)],
-    })
-    const p = proponerCarga([lecturaIEB([filaIEB('SPY', '200', { ppc_unitario: '10000', precio_unitario: '10500' })], '2026-10-08')], h, '2026-10-08', { ccl: D(1500) })
-    const o = p.filas[0].operacion
-    expect(o === null || o.precio === null || D(o.precio).gt(0)).toBe(true)
-  })
-
-  it('B23 · D-19: la carga siguiente no completa el precio de la compra pendiente (queda "pendiente" para siempre)', () => {
-    const h = hechos({
-      operaciones: [
-        op({ fecha: '2026-10-01', activo_id: 1, tipo: 'apertura', cantidad: D(100), precio: D(10000) }),
-        op({ fecha: '2026-10-07', activo_id: 1, tipo: 'compra', cantidad: D(10), ccl_del_dia: D(1500) }), // PPP "-"
-      ],
-      cargas: [carga(1, '2026-10-01', IEB), carga(2, '2026-10-07', IEB)],
-    })
-    const p = proponerCarga([lecturaIEB([filaIEB('SPY', '110', { ppc_unitario: '10200', precio_unitario: '12300' })], '2026-10-08')], h, '2026-10-08', { ccl: D(1510) })
-    // (PPP₁ × q₁ − PPP₀ × q₀) ÷ Δq = (10.200 × 110 − 10.000 × 100) ÷ 10 = 12.200. Hoy: acción "ninguna", sin rastro.
-    expect(JSON.stringify(p.filas[0])).toContain('12200')
-  })
-
-  // ── dinero.ts ──
-
-  it('B24 · leerNumeroAR acepta agrupaciones imposibles y lee mal por 10.000 o por 1.000', () => {
-    expect(['1.0852', null]).toContain(leerNumeroAR('1.0852')) // hoy: '10852'
-    expect(['1548.2', null]).toContain(leerNumeroAR('1,548.20')) // hoy: '1.5482'
-  })
-
-  it('B25 · compacto redondea a "1.000,0k" en lugar de pasar a millones', () => {
-    expect(compacto(D('999960'), 'ARS')).toBe('$ 1,0 M') // hoy: '$ 1.000,0k'
-  })
-
-  // ── Trazabilidad ──
 
   it('B26 · traza: la fórmula del costo después de una venta parcial no suma ("$ 10.000,00 = $ 6.000,00")', () => {
     const t = tenencias([
@@ -876,7 +867,7 @@ describe('cobertura', () => {
       })
       const hoy = armarHoy(h, '2026-10-06')
       expect(D(hoy.financiero.valor.ars.valor!).toFixed()).toBe('990000')
-      expect(D(hoy.exposicion.pesos_financieros.valor!).toFixed()).toBe('990000')
+      expect(D(hoy.exposicion.pesos_financieros.ars.valor!).toFixed()).toBe('990000')
       const ieb = variacion(h, '2026-10-05', '2026-10-06').contribuciones.find((c) => c.clave === 's:1:ARS')!
       expect(ieb.tc.usd.toDecimalPlaces(20).toFixed()).toBe('10') // −110.000 × (1/1.100 − 1/1.000) = +10
     })
@@ -903,7 +894,7 @@ describe('cobertura', () => {
       const v = armarHoy(h, '2026-10-05')
       expect(D(v.financiero.valor.ars.valor!).toFixed()).toBe('1000000') // D-03: sin la casa
       expect(D(v.total.valor.ars.valor!).toFixed()).toBe(D(1000000).plus(200000000).plus(38000000).minus(21400000).toFixed())
-      expect(D(v.exposicion.deuda_pesos.valor!).toFixed()).toBe('21400000')
+      expect(D(v.exposicion.deuda_pesos.ars.valor!).toFixed()).toBe('21400000')
     })
 
     it('bono o letra: el valor es cantidad × precio por 1 VN, sin dividir por 100 (D-12)', () => {
@@ -1084,5 +1075,303 @@ describe('cobertura', () => {
         { numRuns: 400 },
       )
     })
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════
+// ATRIBUCIÓN ANCLADA (decisión A de la fase 1a, provisoria; visión 4.2, D-35)
+// y decisiones B, C y D. Números inventados.
+// ═════════════════════════════════════════════════════════════════════════
+
+const PARTES = ['resultado', 'activo', 'tc', 'sin_atribuir'] as const
+const MONEDAS = ['ars', 'usd'] as const
+const cerca18 = (a: Decimal, b: Decimal) => a.minus(b).abs().lte('1e-18')
+
+/** Historia aleatoria de 6 días hábiles con cargas completas, medias, express y sin CCL. */
+function historia(
+  tipos: ('completa' | 'media' | 'express' | 'sin_ccl')[],
+  ccls: number[],
+  pSpy: number[],
+  pLecap: number[],
+  sIeb: number[],
+  sMp: number[],
+  compra: { dia: number; q: number; precio: number } | null,
+  aporte: { dia: number; monto: number } | null,
+): Hechos {
+  const DIAS = ['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09', '2026-10-12']
+  const h = hechos({
+    operaciones: [
+      op({ fecha: DIAS[0], activo_id: 1, tipo: 'apertura', cantidad: D(100), precio: D(pSpy[0]) }),
+      op({ fecha: DIAS[0], cuenta_id: GALICIA, activo_id: 2, tipo: 'apertura', cantidad: D(1000000), precio: D(pLecap[0]).div(1000) }),
+    ],
+  })
+  tipos.forEach((t, i) => {
+    const d = DIAS[i]
+    const tipo = i === 0 ? 'completa' : t
+    if (tipo !== 'sin_ccl') h.tipos_cambio.push(tc(d, ccls[i]))
+    if (tipo === 'completa' || tipo === 'media' || tipo === 'sin_ccl') {
+      h.cotizaciones.push(cot(d, 1, pSpy[i]))
+      h.saldos.push(saldo(d, IEB, 'ARS', sIeb[i]))
+    }
+    if (tipo === 'completa' || tipo === 'sin_ccl') {
+      h.cotizaciones.push(cot(d, 2, D(pLecap[i]).div(1000).toFixed()))
+      h.saldos.push(saldo(d, MP, 'ARS', sMp[i]))
+    }
+  })
+  if (compra) {
+    const d = DIAS[compra.dia]
+    h.operaciones.push(op({ fecha: d, activo_id: 1, tipo: 'compra', cantidad: D(compra.q), precio: D(compra.precio), ccl_del_dia: D(ccls[compra.dia]) }))
+  }
+  if (aporte) {
+    h.movimientos.push(mov({ fecha: DIAS[aporte.dia], tipo: 'aporte', cuenta_destino_id: MP, moneda_destino: 'ARS', monto_destino: D(aporte.monto) }))
+  }
+  return h
+}
+
+const arbHistoria = fc
+  .record({
+    tipos: fc.array(fc.constantFrom('completa' as const, 'media' as const, 'express' as const, 'sin_ccl' as const), { minLength: 6, maxLength: 6 }),
+    ccls: fc.array(fc.integer({ min: 900, max: 1300 }), { minLength: 6, maxLength: 6 }),
+    pSpy: fc.array(fc.integer({ min: 8000, max: 14000 }), { minLength: 6, maxLength: 6 }),
+    pLecap: fc.array(fc.integer({ min: 900, max: 1300 }), { minLength: 6, maxLength: 6 }),
+    sIeb: fc.array(fc.integer({ min: -200000, max: 2000000 }), { minLength: 6, maxLength: 6 }),
+    sMp: fc.array(fc.integer({ min: 0, max: 5000000 }), { minLength: 6, maxLength: 6 }),
+    compra: fc.option(fc.record({ dia: fc.integer({ min: 1, max: 5 }), q: fc.integer({ min: 1, max: 50 }), precio: fc.integer({ min: 8000, max: 14000 }) }), { nil: null }),
+    aporte: fc.option(fc.record({ dia: fc.integer({ min: 1, max: 5 }), monto: fc.integer({ min: 1, max: 1000000 }) }), { nil: null }),
+  })
+  .map((r) => historia(r.tipos, r.ccls, r.pSpy, r.pLecap, r.sIeb, r.sMp, r.compra, r.aporte))
+
+describe('atribución anclada (decisión A)', () => {
+  it('propiedad: activo + TC + sin atribuir = resultado, por partida y en las dos monedas', () => {
+    fc.assert(
+      fc.property(arbHistoria, (h) => {
+        const fs = fechasDeCarga(h)
+        for (let i = 1; i < fs.length; i++) {
+          for (const c of variacion(h, fs[i - 1], fs[i]).contribuciones)
+            for (const k of MONEDAS) if (!cerca18(c.activo[k].plus(c.tc[k]).plus(c.sin_atribuir[k]), c.resultado[k])) return false
+        }
+        return true
+      }),
+      { numRuns: 150 },
+    )
+  })
+
+  it('propiedad: el desglose de un período es la suma exacta de sus días', () => {
+    fc.assert(
+      fc.property(arbHistoria, (h) => {
+        const fs = fechasDeCarga(h)
+        const periodo = variacion(h, fs[0], fs.at(-1)!)
+        const dias = fs.slice(1).map((d, i) => variacion(h, fs[i], d))
+        for (const parte of PARTES)
+          for (const m of ['ARS', 'USD'] as const) {
+            const p = parteCalc(periodo, h, 'financiero', parte, m).valor
+            const s = dias.map((v) => parteCalc(v, h, 'financiero', parte, m).valor)
+            if (p === null || s.some((x) => x === null)) continue
+            if (!cerca18(p, suma(s as Decimal[]))) return false
+          }
+        return true
+      }),
+      { numRuns: 100 },
+    )
+  })
+
+  it('propiedad: una carga express entre dos completas no cambia el desglose del período', () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.integer({ min: 900, max: 1300 }), { minLength: 3, maxLength: 3 }),
+        fc.array(fc.integer({ min: 8000, max: 14000 }), { minLength: 3, maxLength: 3 }),
+        fc.array(fc.integer({ min: 900, max: 1300 }), { minLength: 3, maxLength: 3 }),
+        fc.array(fc.integer({ min: -200000, max: 2000000 }), { minLength: 3, maxLength: 3 }),
+        fc.array(fc.integer({ min: 0, max: 5000000 }), { minLength: 3, maxLength: 3 }),
+        (ccls, pSpy, pLecap, sIeb, sMp) => {
+          // Días 0 y 2 completos, día 1 express (solo CCL). Sin ese CCL, el día 1 no es una carga.
+          const con = historia(['completa', 'express', 'completa'], ccls, pSpy, pLecap, sIeb, sMp, null, null)
+          const sin = historia(['completa', 'express', 'completa'], ccls, pSpy, pLecap, sIeb, sMp, null, null)
+          sin.tipos_cambio = sin.tipos_cambio.filter((t) => t.fecha !== '2026-10-06')
+          const a = variacion(con, '2026-10-05', '2026-10-07')
+          const b = variacion(sin, '2026-10-05', '2026-10-07')
+          for (const ca of a.contribuciones) {
+            const cb = b.contribuciones.find((x) => x.clave === ca.clave)!
+            for (const parte of PARTES) for (const k of MONEDAS) if (!cerca18(ca[parte][k], cb[parte][k])) return false
+          }
+          return true
+        },
+      ),
+      { numRuns: 150 },
+    )
+  })
+
+  it('propiedad: sin atribuir de un período = pendiente al final − pendiente al principio (cero si las dos puntas son completas)', () => {
+    fc.assert(
+      fc.property(arbHistoria, (h) => {
+        const fs = fechasDeCarga(h)
+        const d0 = fs[0]
+        const d1 = fs.at(-1)!
+        const v = variacion(h, d0, d1)
+        // Pendiente de una partida en d = resultado desde su última observación fresca hasta d.
+        const pendiente = (clave: string, d: Fecha, k: 'ars' | 'usd'): Decimal => {
+          const anclas = fs.filter((x) => x <= d && observacionFresca(h, clave, x, d1))
+          const a = anclas.at(-1)
+          if (!a || a === d) return D(0)
+          return variacion(h, a, d).contribuciones.find((c) => c.clave === clave)?.resultado[k] ?? D(0)
+        }
+        for (const c of v.contribuciones) {
+          if (c.clase !== 'posicion' && c.clase !== 'saldo') continue
+          for (const k of MONEDAS) {
+            const esperado = pendiente(c.clave, d1, k).minus(pendiente(c.clave, d0, k))
+            if (!c.sin_atribuir[k].minus(esperado).abs().lte('1e-12')) return false
+          }
+        }
+        return true
+      }),
+      { numRuns: 60 },
+    )
+  })
+
+  it('visión 4.2: el viernes completo devuelve lo que el jueves express dejó sin atribuir (hallazgo 4 de la referencia)', () => {
+    const h = hechos({
+      operaciones: [op({ fecha: '2026-10-07', activo_id: 1, tipo: 'apertura', cantidad: D(100), precio: D(10000) })],
+      tipos_cambio: [tc('2026-10-07', 1000), tc('2026-10-08', 1100), tc('2026-10-09', 1120)],
+      cotizaciones: [cot('2026-10-07', 1, 10000), cot('2026-10-09', 1, 11000)],
+    })
+    const jue = variacion(h, '2026-10-07', '2026-10-08').contribuciones[0]
+    expect(jue.arrastrado).toBe(true)
+    expect(a4(jue.sin_atribuir.usd)).toBe('-90.9091')
+    const vie = variacion(h, '2026-10-08', '2026-10-09').contribuciones[0]
+    // D-35 sobre mié → vie: activo −$20.000 y TC +$120.000; en dólares activo −US$ 17,86 y vuelven +US$ 90,91.
+    expect(vie.activo.ars.toDecimalPlaces(12).toFixed()).toBe('-20000')
+    expect(vie.tc.ars.toDecimalPlaces(12).toFixed()).toBe('120000')
+    expect(a4(vie.activo.usd)).toBe('-17.8571')
+    expect(a4(vie.sin_atribuir.usd)).toBe('90.9091')
+    expect(vie.ancla?.desde).toBe('2026-10-07')
+    // La frase del viernes lo dice.
+    const f = armarHoy(h, '2026-10-09').frase!
+    expect(f.partes.map((p) => p.texto).join('')).toMatch(/había quedado sin atribuir/)
+    // La semana entera: nada sin atribuir.
+    const sem = variacion(h, '2026-10-07', '2026-10-09').contribuciones[0]
+    expect(sem.sin_atribuir.ars.isZero() && sem.sin_atribuir.usd.abs().lt('1e-18')).toBe(true)
+  })
+
+  it('B02 con la decisión A: el miércoles los activos son el interés (+$300) y vuelve el −$500.000 del martes', () => {
+    const h = hechos({
+      tipos_cambio: [tc('2026-10-05', 1000), tc('2026-10-06', 1000), tc('2026-10-07', 1000)],
+      saldos: [saldo('2026-10-05', MP, 'ARS', 1000000), saldo('2026-10-07', MP, 'ARS', 1500300)],
+      movimientos: [mov({ fecha: '2026-10-06', tipo: 'aporte', cuenta_destino_id: MP, moneda_destino: 'ARS', monto_destino: D(500000) })],
+    })
+    const mar = variacion(h, '2026-10-05', '2026-10-06').contribuciones[0]
+    expect(mar.sin_atribuir.ars.toFixed()).toBe('-500000')
+    const mie = variacion(h, '2026-10-06', '2026-10-07').contribuciones[0]
+    expect(mie.activo.ars.toFixed()).toBe('300')
+    expect(mie.sin_atribuir.ars.toFixed()).toBe('500000')
+    const periodo = variacion(h, '2026-10-05', '2026-10-07').contribuciones[0]
+    expect(periodo.activo.ars.toFixed()).toBe('300')
+    expect(periodo.sin_atribuir.ars.toFixed()).toBe('0')
+  })
+
+  it('hallazgo 3 de la referencia: una posición nueva valuada a un precio viejo queda sin atribuir', () => {
+    const h = hechos({
+      tipos_cambio: [tc('2026-10-05', 1000), tc('2026-10-06', 1100)],
+      cotizaciones: [cot('2026-10-01', 1, 10000)],
+      operaciones: [op({ fecha: '2026-10-06', activo_id: 1, tipo: 'compra', cantidad: D(10), precio: D(10500), ccl_del_dia: D(1100) })],
+    })
+    const c = variacion(h, '2026-10-05', '2026-10-06').contribuciones.find((x) => x.clave === 'p:1:1')!
+    expect(c.activo.ars.isZero() && c.tc.ars.isZero() && c.activo.usd.isZero()).toBe(true)
+    expect(c.sin_atribuir.ars.toFixed()).toBe('-5000')
+  })
+
+  it('B08 con la decisión A: sin CCL tipeado el día, nada se atribuye y la frase lo dice', () => {
+    const h = hechos({
+      operaciones: [op({ fecha: '2026-10-01', activo_id: 1, tipo: 'apertura', cantidad: D(10), precio: D(10000) })],
+      tipos_cambio: [tc('2026-10-05', 1000), tc('2026-10-06', null, 1050)],
+      cotizaciones: [cot('2026-10-05', 1, 10000), cot('2026-10-06', 1, 11000)],
+    })
+    const hoy = armarHoy(h, '2026-10-06')
+    expect(hoy.frase!.sin_ccl_nuevo).toBe(true)
+    expect(hoy.frase!.partes.map((p) => p.texto).join('')).toMatch(/no tiene CCL/)
+    expect(D(hoy.frase!.sin_atribuir!.ars.valor!).toFixed()).toBe('10000')
+  })
+
+  it('carga express: la frase dice "Cargaste solo tipos de cambio" (visión 4.2)', () => {
+    const f = armarHoy(apendiceB(true), '2026-10-15').frase!
+    expect(f.solo_tipos_de_cambio).toBe(true)
+    expect(f.partes.map((p) => p.texto).join('')).toMatch(/Cargaste solo tipos de cambio: ningún precio ni saldo es nuevo, así que todo el cambio queda sin atribuir/)
+    // Visión 4.2: "en dólares, −US$ 213 de SPY, −US$ 242 de tus posiciones en pesos y −US$ 23 de tus pesos en efectivo; en pesos, +$49.560 de tus US$ 4.200".
+    expect(f.partes.map((p) => p.texto).join('')).toMatch(
+      /Es lo que da valuar al CCL nuevo lo que tenías el miércoles: en dólares, −US\$ 212,95 de SPY, −US\$ 241,63 de tus posiciones en pesos y −US\$ 23,10 de tus pesos en efectivo; en pesos, \+\$ 49\.560 de tus US\$ 4\.200\./,
+    )
+  })
+})
+
+describe('decisiones B, C y D', () => {
+  it('B: sin CCL del día se usa el último tipeado, la traza muestra su fecha, "viejo" a los 2 días hábiles y Hoy dice cuál usa', () => {
+    const h = hechos({
+      operaciones: [op({ fecha: '2026-10-01', activo_id: 1, tipo: 'apertura', cantidad: D(10), precio: D(10000) })],
+      tipos_cambio: [tc('2026-10-05', 1000)],
+      cotizaciones: [cot('2026-10-05', 1, 10000), cot('2026-10-06', 1, 11000), cot('2026-10-09', 1, 11000)],
+    })
+    const f6 = foto(h, '2026-10-06')
+    expect(f6.ccl.valor!.toFixed()).toBe('1000')
+    expect(f6.ccl.formula).toMatch(/CCL del lun 05\/10/)
+    expect(f6.ccl.etiquetas).not.toContain('viejo')
+    expect(f6.items[0].valor_usd.valor!.toFixed()).toBe('110')
+    expect(foto(h, '2026-10-09').ccl.etiquetas).toContain('viejo')
+    const hoy = armarHoy(h, '2026-10-09')
+    expect(hoy.fecha_ccl).toBe('2026-10-05')
+    expect(hoy.atencion.some((p) => p.id.startsWith('ccl-arrastrado:'))).toBe(true)
+  })
+
+  it('C: la compra con precio pendiente se valúa al precio del día y lleva "inferido" hasta los totales', () => {
+    const h = hechos({
+      operaciones: [
+        op({ fecha: '2026-10-01', activo_id: 1, tipo: 'apertura', cantidad: D(100), precio: D(10000) }),
+        op({ fecha: '2026-10-06', activo_id: 1, tipo: 'compra', cantidad: D(10), ccl_del_dia: D(1100) }),
+      ],
+      tipos_cambio: [tc('2026-10-05', 1000), tc('2026-10-06', 1100)],
+      cotizaciones: [cot('2026-10-05', 1, 10000), cot('2026-10-06', 1, 11000)],
+      saldos: [saldo('2026-10-05', IEB, 'ARS', 500000), saldo('2026-10-06', IEB, 'ARS', 390000)],
+    })
+    const v = variacion(h, '2026-10-05', '2026-10-06')
+    const spy = v.contribuciones.find((c) => c.clave === 'p:1:1')!
+    expect(spy.inferido).toBe(true)
+    expect(spy.flujos[0].ars.toFixed()).toBe('110000') // 10 × $11.000 del día
+    const res = parteCalc(v, h, 'financiero', 'resultado', 'ARS')
+    expect(res.etiquetas).toContain('inferido')
+    expect(res.explicacion).toMatch(/precio pendiente: se usó el precio del día hasta que llegue el PPP \(D-19\)/)
+    // El total del portafolio es exacto: la pata de caja cancela la compra.
+    expect(res.valor!.toFixed()).toBe('100000') // 100 × (11.000 − 10.000)
+    const hoy = armarHoy(h, '2026-10-06')
+    expect(hoy.financiero.variacion!.ars.etiquetas).toContain('inferido')
+  })
+
+  it('D: con bienes, la vista Total no inventa moneda de riesgo: neto "sin dato" con la suma parcial, bienes "sin elegir"', () => {
+    const e = armarExposicion(apendiceB(), '2026-10-14', 'total')
+    expect(e.resumen.neto_ars.valor).toBeNull()
+    expect(e.resumen.neto_ars.motivo).toMatch(/Suma parcial sin ellas: largo \$ 32\.783\.100,00/)
+    expect(e.resumen.neto_ars.etiquetas).toContain('parcial')
+    expect(e.sin_moneda_de_riesgo).toEqual(['Casa', 'Camioneta'])
+    expect(e.por_moneda.some((s) => s.clave === 'sin_elegir')).toBe(true)
+    expect(D(e.activos_en_dolares.ars.valor!).toFixed()).toBe('50088440') // sin la casa
+    expect(e.concentracion.top1_nombre).toBe('SPY')
+    // Lo que convertía la pantalla ahora viene del motor, con traza.
+    expect(D(e.resumen.pesos_financieros.usd.valor!).toFixed(2)).toBe(D(54183100).div('1548.2').toFixed(2))
+    expect(e.ccl.valor).toBe('1548.2')
+  })
+})
+
+describe('cuadre (D-66, B04)', () => {
+  it('falla con una variación inconsistente', () => {
+    const h = apendiceB()
+    const v = variacion(h, '2026-10-13', '2026-10-14')
+    expect(cuadre(v, h)).toMatchObject({ ars_ok: true, usd_ok: true })
+    const roto = { ...v, contribuciones: v.contribuciones.map((c, i) => (i === 0 ? { ...c, activo: { ars: c.activo.ars.plus(1), usd: c.activo.usd } } : c)) }
+    expect(cuadre(roto, h)).toMatchObject({ ars_ok: false, usd_ok: true })
+    expect(cuadre(roto, h).detalle).toMatch(/no cierra/)
+  })
+
+  it('una partida financiera sin dato lo deja "no verificable"; un bien sin valuación, no', () => {
+    const h = apendiceB()
+    const sinPrecio = { ...h, cotizaciones: h.cotizaciones.filter((c) => !(c.activo_id === 1 && c.fecha === '2026-10-14')) }
+    sinPrecio.cotizaciones = sinPrecio.cotizaciones.filter((c) => c.activo_id !== 1)
+    expect(cuadre(variacion(sinPrecio, '2026-10-13', '2026-10-14'), sinPrecio).ars_ok).toBeNull()
   })
 })

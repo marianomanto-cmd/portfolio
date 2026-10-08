@@ -4,16 +4,21 @@ import { proponerCarga } from '@/lib/carga/conciliar'
 import { aplicarEdiciones, editarFila, toleranciaEditada } from './ediciones'
 import {
   SIN_ELECCIONES,
+  alternativasFila,
   alternativasSaldo,
+  diferenciaDolarIEB,
+  enlaceMovimiento,
   huellaFila,
   huellaSaldo,
+  precioACompletar,
   resumirBandeja,
   saltoDeSaldo,
   textoBoton,
   type Elecciones,
 } from './bandeja'
+import type { DecisionFila, FilaLeida } from '@/lib/carga/contratos'
 import { catalogoEjemplo, lecturaGaliciaEjemplo, lecturaIEBEjemplo, lecturaMPEjemplo } from './ejemplos'
-import { hechosSinBase } from './demo'
+import { conCompraPendiente, hechosSinBase } from './demo'
 
 const FECHA = '2026-10-14'
 const propuestaEjemplo = (ccl: string | null = '1548.2') =>
@@ -149,28 +154,146 @@ describe('saltoDeSaldo', () => {
     expect(Number(r.sinExplicar)).toBeGreaterThan(499_000)
   })
   it('sin TNA solo muestra la diferencia', () => {
-    expect(saltoDeSaldo('100', '50', null, 1)).toEqual({ suba: '-50', explicadoHasta: null, sinExplicar: null })
+    // Sin TNA (el efectivo de IEB baja con cada compra), una baja no pregunta nada.
+    expect(saltoDeSaldo('100', '50', null, 1)).toEqual({ suba: '-50', explicadoHasta: null, sinExplicar: null, baja: null })
   })
 })
 
 describe('alternativasSaldo', () => {
-  const base = lecturaMPEjemplo().saldos[0]
-  it('toma las partes rotuladas como lecturas', () => {
-    expect(alternativasSaldo(base)).toEqual([
-      { concepto: 'lectura 1', monto: '4912300' },
-      { concepto: 'lectura 2', monto: '4912800' },
+  const base = { ...lecturaMPEjemplo().saldos[0], alternativas: undefined }
+  it('toma las partes rotuladas como lecturas (lecturas viejas)', () => {
+    const conPartes = {
+      ...base,
+      partes: [
+        { concepto: 'lectura 1', monto: '4912300' },
+        { concepto: 'lectura 2', monto: '4912800' },
+      ],
+    }
+    expect(alternativasSaldo(conPartes)).toEqual([
+      { concepto: 'lectura 1', monto: '4912300', propuesta: true },
+      { concepto: 'lectura 2', monto: '4912800', propuesta: false },
     ])
   })
   it('lee el motivo del lector de capturas', () => {
     const s = { ...base, partes: [], motivos: ['Saldo — Lectura A: $ 4.912.300,00 · Lectura B: $ 4.912.800 (se propone la A).'] }
     expect(alternativasSaldo(s)).toEqual([
-      { concepto: 'lectura A', monto: '4912300' },
-      { concepto: 'lectura B', monto: '4912800' },
+      { concepto: 'lectura A', monto: '4912300', propuesta: true },
+      { concepto: 'lectura B', monto: '4912800', propuesta: false },
     ])
+  })
+  it('usa las alternativas estructuradas del lector cuando las hay (y su propuesta)', () => {
+    const s = { ...base, partes: [], motivos: ['texto libre'], alternativas: [{ campo: 'monto', a: '4912300.00', b: '4912800', propuesta: 'B' as const }] }
+    expect(alternativasSaldo(s)).toEqual([
+      { concepto: 'lectura A', monto: '4912300', propuesta: false },
+      { concepto: 'lectura B', monto: '4912800', propuesta: true },
+    ])
+    expect(alternativasSaldo({ ...s, alternativas: [{ campo: 'monto', a: '4912300', b: '"49l2" (ilegible)', propuesta: 'A' as const }] })).toEqual([])
   })
   it('si una lectura es ilegible, no ofrece elegir', () => {
     const s = { ...base, partes: [], motivos: ['Saldo — Lectura A: $ 4.912.300 · Lectura B: "49l2" (ilegible) (se propone la A).'] }
     expect(alternativasSaldo(s)).toEqual([])
     expect(alternativasSaldo({ ...base, partes: [{ concepto: 'Total de la hoja Saldos', monto: '1' }], motivos: [] })).toEqual([])
+  })
+})
+
+describe('D-19 en la bandeja: completar el precio de una compra pendiente', () => {
+  const d = {
+    accion: 'completar_precio',
+    completar: { operacion_id: 31, precio: '12200', fecha: '2026-10-07', cantidad: '10', formula: 'f' },
+  } as unknown as DecisionFila
+  it('sin elegir, usa el precio propuesto; tipeado, el tuyo; null, no completa', () => {
+    expect(precioACompletar(d, null)).toBe('12200')
+    const e = { resolucion: 'aceptada' as const, motivo: null, operacion: null, huella: 'h' }
+    expect(precioACompletar(d, e)).toBe('12200')
+    expect(precioACompletar(d, { ...e, precio_completar: '12250.5' })).toBe('12250.5')
+    expect(precioACompletar(d, { ...e, precio_completar: null })).toBeNull()
+    expect(precioACompletar(d, { ...e, precio_completar: '0' })).toBeNull()
+    expect(precioACompletar(d, { ...e, precio_completar: 'abc' })).toBeNull()
+    expect(precioACompletar({ ...d, accion: 'ninguna' } as DecisionFila, e)).toBeNull()
+  })
+  it('la huella cambia si cambia el precio propuesto: la elección vieja se cae', () => {
+    const base = { estado: 'advertencia', activo_id: 1, accion: 'completar_precio', operacion: null, cotizacion: null } as unknown as DecisionFila
+    const h1 = huellaFila({ ...base, completar: { ...d.completar!, precio: '12200' } })
+    const h2 = huellaFila({ ...base, completar: { ...d.completar!, precio: '12300' } })
+    expect(h1).not.toBe(h2)
+  })
+})
+
+describe('las dos lecturas de una fila (4.2.1)', () => {
+  const f: FilaLeida = {
+    ...lecturaGaliciaEjemplo().filas[0],
+    estado: 'advertencia',
+    alternativas: [
+      { campo: 'cantidad', a: '11500000', b: '11800000', propuesta: 'A' },
+      { campo: 'precio', a: '108.52', b: '108.25', propuesta: 'A' },
+      { campo: 'rendimiento_monto', a: '489900', b: '"48990O" (ilegible)', propuesta: 'A' },
+    ],
+    escala: '0.01',
+    precio_mostrado: '108.52',
+  }
+  it('la propuesta acepta la fila; la otra corrige el número (el precio, con la escala de la fila)', () => {
+    const [q, p, r] = alternativasFila(f, null)
+    expect(q.etiqueta).toBe('Cantidad')
+    expect(q.opciones[0]).toMatchObject({ lectura: 'A', propuesta: true, edicion: 'aceptar' })
+    expect(q.opciones[1].edicion).toEqual({ cantidad: '11800000', precio_unitario: null, valorizado: null })
+    expect(p.opciones[1].edicion).toEqual({ cantidad: null, precio_unitario: '1.0825', valorizado: null })
+    // Rendimiento: se muestra, pero no se elige con un toque (y la ilegible nunca).
+    expect(r.opciones[0].edicion).toBe('aceptar')
+    expect(r.opciones[1].edicion).toBeNull()
+  })
+  it('elegir otra lectura respeta lo que ya corregiste en otro campo', () => {
+    const [q] = alternativasFila(f, { cantidad: null, precio_unitario: '1.0825', valorizado: null })
+    expect(q.opciones[1].edicion).toEqual({ cantidad: '11800000', precio_unitario: '1.0825', valorizado: null })
+    // Volver a la propuesta de la cantidad deja solo la corrección del precio.
+    expect(q.opciones[0].edicion).toEqual({ cantidad: null, precio_unitario: '1.0825', valorizado: null })
+  })
+  it('sin escala conocida, el precio no se elige con un toque', () => {
+    const [, p] = alternativasFila({ ...f, escala: null }, null)
+    expect(p.opciones[1].edicion).toBeNull()
+  })
+  it('una fila sin alternativas no muestra nada', () => {
+    expect(alternativasFila(lecturaGaliciaEjemplo().filas[0], null)).toEqual([])
+  })
+  it('elegir el valorizado de la otra lectura se controla contra la cuenta', () => {
+    const g = { ...lecturaGaliciaEjemplo().filas[0], alternativas: [{ campo: 'valorizado', a: '12479800', b: '12497800', propuesta: 'A' as const }] }
+    const [v] = alternativasFila(g, null)
+    const e = v.opciones[1].edicion
+    expect(e).toEqual({ cantidad: null, precio_unitario: null, valorizado: '12497800' })
+    const editada = editarFila(g, e as { cantidad: null; precio_unitario: null; valorizado: string })
+    expect(editada.valorizado).toBe('12497800')
+    expect(editada.estado).toBe('error')
+    expect(editada.motivos[0]).toMatch(/valorizado/)
+  })
+})
+
+describe('¿entró o salió plata? → Datos › Movimientos', () => {
+  it('una baja también se marca (los intereses no restan)', () => {
+    expect(saltoDeSaldo('1000000', '700000', '27.5', 1).baja).toBe('300000')
+    expect(saltoDeSaldo('1000000', '1000200', '27.5', 1).baja).toBeNull()
+  })
+  it('el enlace precarga tipo, cuenta, moneda, monto y fecha', () => {
+    const u = enlaceMovimiento({ tipo: 'aporte', cuenta_id: 3, moneda: 'ARS', monto: '499650.25', fecha: '2026-10-14' })
+    expect(u).toBe('/datos/movimientos?tipo=aporte&cuenta=3&moneda=ARS&monto=499650.25&fecha=2026-10-14')
+  })
+})
+
+describe('D-66: DOLARUSA al dólar de IEB vs tu CCL', () => {
+  it('diferencia con nombre, en pesos y en proporción del CCL', () => {
+    expect(diferenciaDolarIEB('1540', '1548.2')).toEqual({ dolar: '1540', ccl: '1548.2', diferencia: '-8.2', fraccion: new Decimal('-8.2').div('1548.2').toFixed() })
+  })
+  it('sin uno de los dos, no hay diferencia (nunca cero)', () => {
+    expect(diferenciaDolarIEB(null, '1548.2')).toBeNull()
+    expect(diferenciaDolarIEB('1540', null)).toBeNull()
+    expect(diferenciaDolarIEB('1540', '0')).toBeNull()
+  })
+})
+
+describe('escenario demo "compra pendiente" (D-19)', () => {
+  it('con el ejemplo de IEB, SPY propone completar el precio de la compra pendiente', () => {
+    const p = proponerCarga([lecturaIEBEjemplo(FECHA)], conCompraPendiente(hechosSinBase(catalogoEjemplo())), FECHA, { ccl: new Decimal('1548.2') })
+    const spy = p.filas.find((f) => f.ticker === 'SPY')!
+    expect(spy.accion).toBe('completar_precio')
+    expect(spy.completar).toMatchObject({ operacion_id: -2, precio: '35699.84', fecha: '2026-01-05' })
+    expect(conCompraPendiente(hechosSinBase([])).operaciones).toEqual([])
   })
 })

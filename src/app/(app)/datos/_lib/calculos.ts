@@ -100,3 +100,59 @@ export interface SaldoPasivo {
 export function ultimoSaldoPasivo(ss: readonly SaldoPasivo[], pasivoId: number): SaldoPasivo | null {
   return ss.filter((s) => s.pasivo_id === pasivoId).sort((a, b) => (a.fecha < b.fecha ? -1 : 1)).at(-1) ?? null
 }
+
+/** El CCL cargado para una fecha: el de ese día o el último anterior. null si no hay ninguno. */
+export function cclAl(ccls: readonly CCL[], fecha: Fecha): CCL | null {
+  let mejor: CCL | null = null
+  for (const c of ccls) if (c.fecha <= fecha && (mejor === null || c.fecha > mejor.fecha)) mejor = c
+  return mejor
+}
+
+export type TipoMovimiento = 'aporte' | 'retiro' | 'transferencia'
+
+export interface PrecargaMovimiento {
+  tipo: TipoMovimiento
+  /** Cuenta de destino (aporte) o de origen (retiro). */
+  cuenta_id: number | null
+  moneda: Moneda | null
+  /** Monto para editar, en formato argentino ("499650,25"). */
+  monto: string
+  fecha: Fecha | null
+}
+
+/**
+ * Lo que trae el enlace "¿Entró o salió plata?" de la bandeja
+ * (/datos/movimientos?tipo=aporte&cuenta=3&moneda=ARS&monto=499650.25&fecha=…).
+ * Lo que no se entiende se ignora: el formulario arranca vacío en ese campo.
+ */
+export function precargaMovimiento(q: Record<string, string | string[] | undefined>, hoy: Fecha): PrecargaMovimiento {
+  const uno = (k: string) => {
+    const v = q[k]
+    return typeof v === 'string' ? v.trim() : Array.isArray(v) ? (v[0] ?? '').trim() : ''
+  }
+  const tipo = uno('tipo')
+  const cuenta = uno('cuenta')
+  const moneda = uno('moneda')
+  const monto = uno('monto')
+  const fecha = uno('fecha')
+  return {
+    tipo: tipo === 'retiro' || tipo === 'transferencia' ? tipo : 'aporte',
+    cuenta_id: /^[1-9]\d{0,4}$/.test(cuenta) ? Number(cuenta) : null,
+    moneda: moneda === 'ARS' || moneda === 'USD' ? moneda : null,
+    monto: /^\d{1,15}(\.\d{1,6})?$/.test(monto) && new Decimal(monto).gt(0) ? monto.replace('.', ',') : '',
+    fecha: /^\d{4}-\d{2}-\d{2}$/.test(fecha) && fecha <= hoy ? fecha : null,
+  }
+}
+
+const NOMBRE_TIPO_MOVIMIENTO: Record<TipoMovimiento, string> = { aporte: 'Aporte', retiro: 'Retiro', transferencia: 'Transferencia' }
+
+/** "Aporte a Mercado Pago", "Retiro de IEB", "Transferencia de Mercado Pago a IEB". */
+export function describirMovimiento(
+  m: { tipo: TipoMovimiento; cuenta_origen_id: number | null; cuenta_destino_id: number | null },
+  cuentas: readonly { id: number; nombre: string }[],
+): string {
+  const nombre = (id: number | null) => (id === null ? '?' : (cuentas.find((c) => c.id === id)?.nombre ?? `cuenta #${id}`))
+  if (m.tipo === 'aporte') return `${NOMBRE_TIPO_MOVIMIENTO.aporte} a ${nombre(m.cuenta_destino_id)}`
+  if (m.tipo === 'retiro') return `${NOMBRE_TIPO_MOVIMIENTO.retiro} de ${nombre(m.cuenta_origen_id)}`
+  return `${NOMBRE_TIPO_MOVIMIENTO.transferencia} de ${nombre(m.cuenta_origen_id)} a ${nombre(m.cuenta_destino_id)}`
+}

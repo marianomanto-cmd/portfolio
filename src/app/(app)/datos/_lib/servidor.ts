@@ -37,6 +37,24 @@ export interface PasivoFila {
   notas: string | null
 }
 
+/** Un aporte, retiro o transferencia (D-06), con sus montos como texto (D-32). */
+export interface MovimientoFila {
+  id: number
+  fecha: Fecha
+  fecha_acreditacion: Fecha | null
+  tipo: 'aporte' | 'retiro' | 'transferencia'
+  cuenta_origen_id: number | null
+  cuenta_destino_id: number | null
+  moneda_origen: Moneda | null
+  monto_origen: string | null
+  moneda_destino: Moneda | null
+  monto_destino: string | null
+  tc_aplicado: string | null
+  impuesto: string
+  carga_id: number | null
+  notas: string | null
+}
+
 export interface DatosPantalla {
   modo: ModoDatos
   aviso: string | null
@@ -48,6 +66,10 @@ export interface DatosPantalla {
   pasivos: PasivoFila[]
   saldosPasivo: SaldoPasivo[]
   ccl: CCL | null
+  /** Movimientos de capital, del más nuevo al más viejo. */
+  movimientos: MovimientoFila[]
+  /** CCL de cada día cargado (para pasar un movimiento a la otra moneda al CCL de su fecha). */
+  ccls: CCL[]
 }
 
 type Fila = Record<string, string | number | boolean | null>
@@ -70,7 +92,7 @@ async function ultimoCcl(): Promise<CCL | null> {
 export async function leerDatos(): Promise<DatosPantalla> {
   if (modoDemo()) return { ...ejemploDatos(), modo: 'demo', aviso: 'Modo demo: datos de ejemplo inventados; los cambios no se guardan.' }
   try {
-    const [activos, ratios, cuentas, bienes, valuaciones, pasivos, saldos, ccl] = await Promise.all([
+    const [activos, ratios, cuentas, bienes, valuaciones, pasivos, saldos, ccl, movimientos, ccls] = await Promise.all([
       leerTodo<Fila>('activos', 'id,ticker,nombre,tipo,moneda_riesgo,geografia,indexacion,ticker_subyacente,fecha_vencimiento,color,activo_bool', ['ticker']),
       leerTodo<Fila>('ratios_cedear', 'activo_id,vigente_desde,ratio::text', ['activo_id', 'vigente_desde']),
       leerTodo<Fila>('cuentas', 'id,nombre,tipo,formato_carga,activa', ['id']),
@@ -83,6 +105,12 @@ export async function leerDatos(): Promise<DatosPantalla> {
       ),
       leerTodo<Fila>('pasivo_saldos', 'pasivo_id,fecha,capital_pendiente::text,carga_id', ['pasivo_id', 'fecha']),
       ultimoCcl(),
+      leerTodo<Fila>(
+        'movimientos_capital',
+        'id,fecha,fecha_acreditacion,tipo,cuenta_origen_id,cuenta_destino_id,moneda_origen,monto_origen::text,moneda_destino,monto_destino::text,tc_aplicado::text,impuesto::text,carga_id,notas',
+        ['fecha', 'id'],
+      ),
+      leerTodo<Fila>('tipo_cambio', 'fecha,ccl::text', ['fecha'], (q) => q.not('ccl', 'is', null)),
     ])
     return {
       modo: 'real',
@@ -134,6 +162,25 @@ export async function leerDatos(): Promise<DatosPantalla> {
       })),
       saldosPasivo: saldos.map((r) => ({ pasivo_id: n(r.pasivo_id), fecha: String(r.fecha), capital_pendiente: String(r.capital_pendiente), carga_id: n(r.carga_id) })),
       ccl,
+      movimientos: movimientos
+        .map((r) => ({
+          id: n(r.id),
+          fecha: String(r.fecha),
+          fecha_acreditacion: s(r.fecha_acreditacion),
+          tipo: r.tipo as MovimientoFila['tipo'],
+          cuenta_origen_id: r.cuenta_origen_id === null ? null : n(r.cuenta_origen_id),
+          cuenta_destino_id: r.cuenta_destino_id === null ? null : n(r.cuenta_destino_id),
+          moneda_origen: (r.moneda_origen as Moneda | null) ?? null,
+          monto_origen: s(r.monto_origen),
+          moneda_destino: (r.moneda_destino as Moneda | null) ?? null,
+          monto_destino: s(r.monto_destino),
+          tc_aplicado: s(r.tc_aplicado),
+          impuesto: s(r.impuesto) ?? '0',
+          carga_id: r.carga_id === null ? null : n(r.carga_id),
+          notas: s(r.notas),
+        }))
+        .reverse(),
+      ccls: ccls.filter((r) => r.ccl !== null).map((r) => ({ fecha: String(r.fecha), valor: String(r.ccl) })),
     }
   } catch (e) {
     if (e instanceof FaltaConfiguracion) {
@@ -154,6 +201,8 @@ export async function leerDatos(): Promise<DatosPantalla> {
       pasivos: [],
       saldosPasivo: [],
       ccl: null,
+      movimientos: [],
+      ccls: [],
     }
   }
 }

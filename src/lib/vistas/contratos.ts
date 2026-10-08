@@ -47,8 +47,16 @@ export interface FraseDelDia {
   variacion: Par
   activos: Par
   tc: Par
-  /** Lo que no se puede atribuir porque no hubo precio o saldo nuevo. */
+  /**
+   * Lo que no se puede atribuir porque no hubo precio o saldo nuevo, o lo que
+   * vuelve atribuido de cargas anteriores (D-35 anclado). null si es 0 en las
+   * dos monedas.
+   */
   sin_atribuir: Par | null
+  /** Carga express: solo tipos de cambio, ningún precio ni saldo nuevo (D-64). */
+  solo_tipos_de_cambio: boolean
+  /** La carga de hoy no tiene CCL tipeado: no se atribuye nada (decisión A). */
+  sin_ccl_nuevo: boolean
 }
 
 export interface TarjetaPatrimonio {
@@ -56,13 +64,16 @@ export interface TarjetaPatrimonio {
   valor: Par
   variacion: Par | null
   variacion_pct: { ars: CalcVista; usd: CalcVista } | null
-  desglose: { activos: Par; tc: Par } | null
+  /** activos + tc + sin_atribuir = variacion, en las dos monedas (B10). */
+  desglose: { activos: Par; tc: Par; sin_atribuir: Par } | null
   notas: string[]
 }
 
 export interface ExposicionResumen {
-  pesos_financieros: CalcVista
-  deuda_pesos: CalcVista
+  /** Lo que arriesga pesos (sin deudas), en pesos y en dólares al CCL de la foto. */
+  pesos_financieros: Par
+  /** Deuda en pesos (capital pendiente), positiva, en pesos y en dólares. */
+  deuda_pesos: Par
   neto_ars: CalcVista
   neto_usd: CalcVista
   /** Cuánto cambia el neto en USD si el CCL sube 1%. */
@@ -74,6 +85,8 @@ export interface VistaHoy {
   hay_datos: boolean
   fecha_datos: Fecha | null
   ccl: CalcVista
+  /** Fecha del CCL que se usa: distinta de fecha_datos si ese día no se tipeó (decisión B). */
+  fecha_ccl: Fecha | null
   frase: FraseDelDia | null
   financiero: TarjetaPatrimonio
   total: TarjetaPatrimonio
@@ -110,13 +123,28 @@ export interface FilaCartera {
   fecha_precio: Fecha | null
   precio_viejo: boolean
   ppc: Par
+  /** Costo de la tenencia actual (null en la liquidez: no tiene costo). */
+  costo: Par | null
   valor: Par
   resultado: Par
   resultado_pct: Par
-  /** Desglose del resultado en la moneda en que NO arriesga: activo y TC. */
-  desglose: { moneda: Moneda; activo: CalcVista; tc: CalcVista } | null
+  /**
+   * Desglose del resultado desde la compra en la moneda en que NO arriesga
+   * (decisión E, D-35): suma de los intervalos entre cargas desde la primera
+   * observación fresca, más un intervalo por lote antes de ella al CCL de
+   * compra. sin_atribuir es lo pendiente hoy (partida sin precio o CCL nuevo).
+   * activo + tc + sin_atribuir = resultado, salvo que haya habido ventas desde
+   * la primera observación: entonces incluye lo realizado (la traza lo dice).
+   */
+  desglose: { moneda: Moneda; activo: CalcVista; tc: CalcVista; sin_atribuir: CalcVista } | null
   peso: CalcVista
   dias_en_posicion: number | null
+  /**
+   * De dónde se cuentan los días: 'compra' (primera compra registrada),
+   * 'declarada' (fecha de compra que declaraste en la apertura) o 'apertura'
+   * (la apertura en la app, sin fecha de compra real).
+   */
+  dias_desde: 'compra' | 'declarada' | 'apertura' | null
   /** Badge único cuando los signos de ARS y USD difieren. */
   ganas_pesos_perdes_dolares: boolean
   pendiente: string | null
@@ -125,6 +153,7 @@ export interface FilaCartera {
 export interface VistaCartera {
   fecha_datos: Fecha | null
   ccl: CalcVista
+  fecha_ccl: Fecha | null
   filas: FilaCartera[]
   totales: {
     valor: Par
@@ -153,10 +182,15 @@ export interface PuntoExposicion {
 export interface VistaExposicion {
   fecha_datos: Fecha | null
   vista: 'financiero' | 'total'
+  /** CCL de la foto, con su fecha (decisión B). */
+  ccl: CalcVista
+  fecha_ccl: Fecha | null
   resumen: ExposicionResumen
-  activos_en_pesos: CalcVista
+  activos_en_pesos: Par
   activos_en_dolares: Par
-  pasivos_en_pesos: CalcVista
+  pasivos_en_pesos: Par
+  /** Bienes sin moneda de riesgo elegida (D-73): con alguno, el neto de la vista Total es "sin dato". */
+  sin_moneda_de_riesgo: string[]
   neto_pct: CalcVista
   por_clase: Segmento[]
   por_moneda: Segmento[]

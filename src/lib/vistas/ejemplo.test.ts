@@ -39,8 +39,8 @@ describe('ejemplo (Apéndice B)', () => {
   })
 
   it('exposición: pesos financieros − deuda del leasing', () => {
-    expect(D(hoy.exposicion.pesos_financieros.valor).toFixed(2)).toBe('54183100.00')
-    expect(D(hoy.exposicion.deuda_pesos.valor).toFixed(2)).toBe('21400000.00')
+    expect(D(hoy.exposicion.pesos_financieros.ars.valor).toFixed(2)).toBe('54183100.00')
+    expect(D(hoy.exposicion.deuda_pesos.ars.valor).toFixed(2)).toBe('21400000.00')
     expect(D(hoy.exposicion.neto_ars.valor).toFixed(2)).toBe('32783100.00')
     expect(cerca(hoy.exposicion.neto_usd.valor, '21174.98')).toBe(true)
     expect(cerca(hoy.exposicion.sensibilidad_usd_1pct.valor, '-209.65')).toBe(true)

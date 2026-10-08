@@ -323,8 +323,8 @@ describe('armado de pantallas', () => {
   it('Exposición: los pasivos en pesos netean contra los pesos', () => {
     const v = armarExposicion(cartera(), '2026-10-02', 'financiero')
     const pesos = D(1000000).times('1.071').plus(1001000).minus(5000)
-    expect(D(v.resumen.pesos_financieros.valor!).eq(pesos)).toBe(true)
-    expect(D(v.resumen.deuda_pesos.valor!).eq(30000000)).toBe(true)
+    expect(D(v.resumen.pesos_financieros.ars.valor!).eq(pesos)).toBe(true)
+    expect(D(v.resumen.deuda_pesos.ars.valor!).eq(30000000)).toBe(true)
     expect(D(v.resumen.neto_ars.valor!).eq(pesos.minus(30000000))).toBe(true)
     expect(v.por_clase.length).toBeGreaterThan(0)
   })

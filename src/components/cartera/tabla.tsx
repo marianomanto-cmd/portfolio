@@ -387,7 +387,8 @@ export function TablaCartera({ v }: { v: VistaCartera }) {
         {v.fecha_datos ? ` · al cierre del ${fechaCorta(v.fecha_datos)}` : ''} · CCL{' '}
         <Traza calc={v.ccl} titulo="CCL de la foto">
           {v.ccl.valor === null ? <SinDato /> : <span className="num">{numero(v.ccl.valor, 2)}</span>}
-        </Traza>{' '}
+        </Traza>
+        {v.fecha_ccl && v.fecha_datos && v.fecha_ccl !== v.fecha_datos ? ` del ${fechaCorta(v.fecha_ccl)} (ese día no cargaste CCL)` : ''}{' '}
         <ChipEtiqueta calc={v.ccl} />
       </p>
 
@@ -653,6 +654,17 @@ function Detalle({ f, forzadas }: { f: FilaCartera; forzadas: Set<Clave> }) {
           </div>
         ))}
       </dl>
+      {f.desglose && f.desglose.sin_atribuir.valor !== null && !/^-?0(\.0+)?$/.test(f.desglose.sin_atribuir.valor) ? (
+        <p className="text-[13px] text-muted">
+          Sin atribuir hoy (sin precio o CCL nuevo):{' '}
+          <MontoTrazado calc={f.desglose.sin_atribuir} moneda={f.desglose.moneda} titulo={`${f.ticker} · sin atribuir`} signo />
+        </p>
+      ) : null}
+      {f.dias_desde === 'declarada' ? (
+        <p className="text-[13px] text-muted">Los días se cuentan desde la fecha de compra que declaraste.</p>
+      ) : f.dias_desde === 'apertura' ? (
+        <p className="text-[13px] text-muted">Los días se cuentan desde la apertura en la app: no declaraste la fecha de compra.</p>
+      ) : null}
       {f.pendiente ? <p className="text-[13px] text-muted">{f.pendiente}</p> : null}
     </div>
   )

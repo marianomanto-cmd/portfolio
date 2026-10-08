@@ -18,7 +18,8 @@
   --border-strong: #c6ccd5;
   --text: #121722;
   --text-muted: #5b6474;
-  --text-faint: #8a93a3;
+  /* Texto tenue (placeholders): llega a AA, 4,5:1, sobre blanco, el fondo y surface-2. */
+  --text-faint: #656e80;
   --accent: #2f5bd3;
   --accent-soft: #e6ecfb;
   --positive: #0f7a43;
@@ -46,7 +47,7 @@
     --border-strong: #3a4556;
     --text: #e6eaf0;
     --text-muted: #9aa4b4;
-    --text-faint: #6c7686;
+    --text-faint: #808a99;
     --accent: #7ea2ff;
     --accent-soft: #1c2a4a;
     --positive: #4cc38a;
@@ -74,7 +75,7 @@
   --border-strong: #3a4556;
   --text: #e6eaf0;
   --text-muted: #9aa4b4;
-  --text-faint: #6c7686;
+  --text-faint: #808a99;
   --accent: #7ea2ff;
   --accent-soft: #1c2a4a;
   --positive: #4cc38a;
@@ -91,11 +92,15 @@
   --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
 }
 
-/* Paleta daltónica: positivo azul, negativo naranja (MO-5). */
+/*
+ * Paleta daltónica: positivo azul, negativo naranja (MO-5). Los dos llegan a
+ * AA para texto (4,5:1) sobre blanco, el fondo, surface-2 y su fondo suave;
+ * el naranja es tostado porque uno más vivo no llega sobre blanco.
+ */
 :root[data-paleta="daltonica"] {
-  --positive: #1f6fd1;
+  --positive: #1d69c6;
   --positive-soft: #e3eefb;
-  --negative: #c8650a;
+  --negative: #a95608;
   --negative-soft: #fbeedd;
 }
 

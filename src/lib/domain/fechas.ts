@@ -62,9 +62,14 @@ export function diasHabilesEntre(desde: Fecha, hasta: Fecha, feriados: ReadonlyS
   return n
 }
 
-/** Un dato es viejo si tiene más de 2 días hábiles (D-16). */
+/** Un dato es viejo si tiene más de 2 días hábiles (D-16). Corta al tercer día hábil. */
 export function esViejo(fechaDato: Fecha, hoy: Fecha, feriados: ReadonlySet<Fecha>): boolean {
-  return diasHabilesEntre(fechaDato, hoy, feriados) > 2
+  if (hoy <= fechaDato) return false
+  let n = 0
+  for (let f = sumarDias(fechaDato, 1); f <= hoy; f = sumarDias(f, 1)) {
+    if (esHabil(f, feriados) && ++n > 2) return true
+  }
+  return false
 }
 
 /** Días corridos entre dos fechas. */

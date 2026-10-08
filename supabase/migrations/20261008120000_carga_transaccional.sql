@@ -4,7 +4,8 @@
 -- Con supabase-js cada insert es un pedido HTTP separado, sin atomicidad. Por
 -- eso toda escritura que toca más de una fila pasa por una función de Postgres:
 --   * confirmar_carga(p): un Enter de la pantalla de carga = un lote, con una
---     carga por cuenta y otra para el tipo de cambio tipeado.
+--     carga por cuenta y otra para el tipo de cambio tipeado. También completa
+--     el precio de una compra que había quedado pendiente (D-19).
 --   * revertir_lote(lote, motivo): deshace un lote entero y restaura, desde la
 --     auditoría, lo que había pisado. Las cargas quedan en el registro.
 --   * guardar_manual(p): valuaciones de bienes, capital pendiente de pasivos y
@@ -65,6 +66,27 @@ alter table eventos
 create index eventos_carga on eventos (carga_id);
 
 comment on column eventos.carga_id is 'Carga de la que salió el evento (la nota del día va con la primera carga del lote)';
+
+-- ═════════════════════════ operaciones: el precio que completó una carga (D-19) ═════════════════════════
+-- El día de una compra IEB muestra PPP "-": la compra se graba con el precio
+-- vacío (pendiente). Una carga posterior lo completa a partir del PPP nuevo,
+-- solo si el dueño acepta la propuesta. precio_carga_id dice qué carga lo
+-- completó: revertir ese lote deja la compra pendiente otra vez. La auditoría
+-- guarda el cambio (antes: precio null; después: el precio y su carga).
+alter table operaciones
+  add column precio_carga_id bigint references cargas(id);
+alter table operaciones
+  add constraint operaciones_precio_carga check (
+    precio_carga_id is null or (tipo = 'compra' and precio is not null and importe is null));
+create index operaciones_precio_carga on operaciones (precio_carga_id) where precio_carga_id is not null;
+
+comment on column operaciones.precio_carga_id is 'Carga que completó el precio de esta compra pendiente (D-19); null si el precio vino con la compra';
+
+-- ═════════════════════════ tipo_cambio: de dónde salió el CCL ═════════════════════════
+alter table tipo_cambio
+  add column referencia text check (referencia is null or (btrim(referencia) <> '' and char_length(referencia) <= 200));
+
+comment on column tipo_cambio.referencia is 'De dónde sacó el dueño el CCL tipeado ("Ámbito, cierre"); hasta 200 caracteres';
 
 -- ═════════════════════════ auditoria: buscar la historia de una fila ═════════════════════════
 -- revertir_lote recorre la historia de cada fila que deshace (por su clave
@@ -174,6 +196,9 @@ declare
   v_estado    text;
   v_mensaje   text;
   v_restr     text;
+  v_ref       text;
+  v_op        bigint;
+  v_precio    numeric;
 begin
   if p is null or jsonb_typeof(p) <> 'object' then
     raise exception 'La confirmación llegó vacía o con otra forma';
@@ -210,6 +235,13 @@ begin
   if v_tc is not null then
     if jsonb_typeof(v_tc) <> 'object' then
       raise exception 'El tipo de cambio llegó con otra forma';
+    end if;
+    if coalesce(jsonb_typeof(v_tc->'referencia'), 'null') not in ('string','null') then
+      raise exception 'La referencia del CCL tiene que ser texto';
+    end if;
+    v_ref := nullif(btrim(v_tc->>'referencia'), '');
+    if char_length(v_ref) > 200 then
+      raise exception 'La referencia del CCL tiene más de 200 caracteres';
     end if;
     -- Un tipo de cambio sin ningún valor no es un dato: no se graba ni pisa nada.
     if leer_monto(v_tc->'ccl', 'el CCL') is null
@@ -280,16 +312,17 @@ begin
 
     begin
       -- El día queda con lo tipeado ahora: la fila entera pasa a esta carga.
-      insert into tipo_cambio (fecha, ccl, mep, cripto_venta, oficial, carga_id)
+      insert into tipo_cambio (fecha, ccl, mep, cripto_venta, oficial, referencia, carga_id)
       values (v_fecha,
               leer_monto(v_tc->'ccl', 'el CCL'),
               leer_monto(v_tc->'mep', 'el MEP'),
               leer_monto(v_tc->'cripto_venta', 'el dólar cripto'),
               leer_monto(v_tc->'oficial', 'el dólar oficial'),
+              v_ref,
               v_carga)
       on conflict (fecha) do update
         set ccl = excluded.ccl, mep = excluded.mep, cripto_venta = excluded.cripto_venta,
-            oficial = excluded.oficial, carga_id = excluded.carga_id;
+            oficial = excluded.oficial, referencia = excluded.referencia, carga_id = excluded.carga_id;
     exception when others then
       get stacked diagnostics v_estado = returned_sqlstate, v_mensaje = message_text,
                               v_restr = constraint_name;
@@ -432,6 +465,46 @@ begin
       end;
     end loop;
 
+    -- Precios que completan compras pendientes de esta cuenta (D-19). Solo una
+    -- compra que sigue pendiente (precio e importe vacíos), de esta cuenta y de
+    -- una fecha que no sea posterior a la carga: nunca se pisa un precio.
+    if jsonb_typeof(coalesce(v_c->'completar_precios', '[]'::jsonb)) not in ('array','null') then
+      raise exception 'Los precios a completar de % tienen que ser una lista', v_nombre;
+    end if;
+    if exists (select 1 from jsonb_array_elements(coalesce(nullif(v_c->'completar_precios', 'null'::jsonb), '[]'::jsonb)) e
+                group by leer_id(e->'operacion_id', 'la compra a completar') having count(*) > 1) then
+      raise exception 'Una compra aparece dos veces entre los precios a completar de %', v_nombre;
+    end if;
+    for v_x, v_n in
+      select e.x, e.n from jsonb_array_elements(coalesce(nullif(v_c->'completar_precios', 'null'::jsonb), '[]'::jsonb))
+             with ordinality as e(x, n) order by e.n
+    loop
+      v_op := leer_id(v_x->'operacion_id', format('la compra a completar %s de %s', v_n, v_nombre));
+      if v_op is null then
+        raise exception 'Falta la compra a completar % de %', v_n, v_nombre;
+      end if;
+      v_ctx := format('%s · precio de la compra #%s', v_nombre, v_op);
+      v_precio := leer_monto(v_x->'precio', v_ctx);
+      if v_precio is null then
+        raise exception 'Falta el precio para completar la compra #% de %', v_op, v_nombre;
+      end if;
+      begin
+        update operaciones
+           set precio = v_precio, precio_carga_id = v_carga
+         where id = v_op and cuenta_id = v_cuenta and tipo = 'compra'
+           and precio is null and importe is null and fecha <= v_fecha;
+        if not found then
+          raise exception 'La compra #% ya no está pendiente en % (tiene precio, no es una compra de esa cuenta o es posterior a la carga): volvé a armar la bandeja',
+            v_op, v_nombre;
+        end if;
+      exception when others then
+        get stacked diagnostics v_estado = returned_sqlstate, v_mensaje = message_text,
+                                v_restr = constraint_name;
+        if v_estado = 'P0001' then raise; end if;
+        raise exception using errcode = v_estado, message = v_mensaje, constraint = v_restr, detail = v_ctx;
+      end;
+    end loop;
+
     v_res := v_res || jsonb_build_array(jsonb_build_object('carga_id', v_carga, 'cuenta_id', v_cuenta));
     v_primera := coalesce(v_primera, v_carga);
   end loop;
@@ -479,6 +552,7 @@ declare
   v_carga_ver   bigint;
   v_borradas    integer := 0;
   v_restauradas integer := 0;
+  v_n           integer;
 begin
   if p_lote is null then
     raise exception 'Falta el lote a revertir';
@@ -537,6 +611,12 @@ begin
       raise exception 'No se puede revertir: el lote tiene filas en % y la reversión no sabe deshacerlas', v_ref.tabla;
     end if;
   end loop;
+
+  -- Precios que este lote completó (D-19): la compra vuelve a quedar pendiente.
+  update operaciones set precio = null, precio_carga_id = null
+   where precio_carga_id = any(v_cargas);
+  get diagnostics v_n = row_count;
+  v_restauradas := v_restauradas + v_n;
 
   foreach v_tabla in array c_tablas loop
     select array_agg(a.attname::text order by k.n) into v_pk
@@ -835,8 +915,8 @@ end $$;
 comment on function leer_monto(jsonb, text) is 'Monto de la entrada JSON: texto decimal; falla con número JSON, NaN, Infinity o formato no normalizado (D-32)';
 comment on function leer_fecha(jsonb, text) is 'Fecha AAAA-MM-DD de la entrada JSON';
 comment on function leer_id(jsonb, text) is 'Identificador entero positivo de la entrada JSON';
-comment on function confirmar_carga(jsonb) is 'Confirma un lote de la carga diaria en una transacción: tipo de cambio, cargas por cuenta, cotizaciones, saldos, operaciones y nota. Idempotente por lote';
-comment on function revertir_lote(uuid, text) is 'Revierte un lote: borra sus hechos, restaura desde la auditoría lo pisado y marca sus cargas como revertidas, con motivo';
+comment on function confirmar_carga(jsonb) is 'Confirma un lote de la carga diaria en una transacción: tipo de cambio (con su referencia), cargas por cuenta, cotizaciones, saldos, operaciones, precios que completan compras pendientes (D-19) y nota. Idempotente por lote';
+comment on function revertir_lote(uuid, text) is 'Revierte un lote: borra sus hechos, restaura desde la auditoría lo pisado, deja pendientes las compras cuyo precio completó y marca sus cargas como revertidas, con motivo';
 comment on function guardar_manual(jsonb) is 'Graba valuaciones de bienes, capital pendiente de pasivos y movimientos de capital con una carga manual. Idempotente por lote';
 comment on function alta_activo(jsonb) is 'Da de alta un activo y, si es CEDEAR con ratio, su ratio, en una transacción';
 comment on function editar_activo(integer, jsonb) is 'Cambia los campos presentes de un activo y, opcionalmente, agrega o corrige un ratio';

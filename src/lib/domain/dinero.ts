@@ -123,34 +123,82 @@ export function porcentaje(
   return `${numero(d.times(100), opciones.decimales ?? 2, { signo: opciones.signo })}%`
 }
 
-/** Formato compacto para tarjetas en el teléfono: "US$ 67,4k", "$ 104,3 M". */
+/**
+ * Formato compacto para tarjetas en el teléfono: "US$ 67,4k", "$ 104,3 M".
+ * La unidad se elige después de redondear: 999.960 es "$ 1,0 M", no
+ * "$ 1.000,0k" (B25).
+ */
 export function compacto(v: Decimal | string, moneda: Moneda): string {
   const d = typeof v === 'string' ? new Decimal(v) : v
   const abs = d.abs()
   const simbolo = moneda === 'ARS' ? '$' : 'US$'
-  const s = d.isNegative() ? MENOS : ''
-  if (abs.gte(1_000_000)) return `${s}${simbolo} ${numero(abs.div(1_000_000), 1)} M`
-  if (abs.gte(1_000)) return `${s}${simbolo} ${numero(abs.div(1_000), 1)}k`
-  return `${s}${simbolo} ${numero(abs, moneda === 'ARS' ? 0 : 2)}`
+  const decimales = moneda === 'ARS' ? 0 : 2
+  const red = (x: Decimal, n: number) => x.toDecimalPlaces(n, Decimal.ROUND_HALF_EVEN)
+  const enMiles = red(abs.div(1_000), 1)
+  let cuerpo: string
+  let cero = false
+  if (abs.gte(1_000_000) || enMiles.gte(1_000)) {
+    cuerpo = `${numero(red(abs.div(1_000_000), 1), 1)} M`
+  } else if (abs.gte(1_000) || red(abs, decimales).gte(1_000)) {
+    cuerpo = `${numero(enMiles, 1)}k`
+  } else {
+    cero = red(abs, decimales).isZero()
+    cuerpo = numero(abs, decimales)
+  }
+  const s = d.isNegative() && !cero ? MENOS : ''
+  return `${s}${simbolo} ${cuerpo}`
 }
 
 /**
  * Lee un número escrito en formato argentino ("1.234,56", "1234,5", "1548.2").
- * Devuelve el texto decimal normalizado ("1234.56") o null si no es un número.
- * Regla: si hay coma, la coma es el decimal y los puntos son miles. Si no hay
- * coma, un solo punto seguido de 1 o 2 dígitos es decimal; si no, son miles.
+ * Devuelve el texto decimal normalizado ("1234.56") o null si no es un número
+ * o si es ambiguo. Reglas (B24):
+ * - Con coma: la coma es el decimal y los puntos, separadores de miles, solo
+ *   en grupos válidos ("1.234.567,8"). Un punto después de la coma ("1,548.20")
+ *   o dos comas: null.
+ * - Sin coma: un solo punto seguido de 1 o 2 dígitos es decimal ("1548.2");
+ *   seguido de 3, son miles si el grupo es válido ("1.548", no "1234.567");
+ *   seguido de 4 o más ("1.0852"): null, nunca miles. Con un entero 0 ("0.125")
+ *   el punto solo puede ser decimal. Varios puntos: miles en grupos válidos
+ *   ("12.345.678"); si no ("12.34.56"), null.
  */
 export function leerNumeroAR(entrada: string): string | null {
   let t = entrada.trim().replace(/\s/g, '').replace(/^\$|^US\$|^U\$S/i, '')
   t = t.replace(/[−–]/g, '-')
   if (t === '' || t === '-') return null
-  if (t.includes(',')) {
-    t = t.replace(/\./g, '').replace(',', '.')
+  const negativo = t.startsWith('-')
+  const cuerpo = negativo ? t.slice(1) : t
+  const miles = /^\d{1,3}(\.\d{3})+$/
+  // Un grupo de miles no empieza con 0 (salvo el número 0 mismo, que no los lleva).
+  const milesValidos = (x: string) => miles.test(x) && !x.startsWith('0')
+  let normal: string
+  const comas = cuerpo.split(',').length - 1
+  if (comas > 1) return null
+  if (comas === 1) {
+    const [entero, fraccion] = cuerpo.split(',')
+    if (fraccion.includes('.') || !/^\d+$/.test(fraccion)) return null
+    if (entero.includes('.')) {
+      if (!milesValidos(entero)) return null
+      normal = `${entero.replace(/\./g, '')}.${fraccion}`
+    } else {
+      if (!/^\d+$/.test(entero)) return null
+      normal = `${entero}.${fraccion}`
+    }
   } else {
-    const puntos = t.split('.').length - 1
-    if (puntos > 1) t = t.replace(/\./g, '')
-    else if (puntos === 1 && !/\.\d{1,2}$/.test(t)) t = t.replace('.', '')
+    const puntos = cuerpo.split('.').length - 1
+    if (puntos === 0) {
+      normal = cuerpo
+    } else if (puntos === 1) {
+      const [entero, fraccion] = cuerpo.split('.')
+      if (!/^\d+$/.test(entero) || !/^\d+$/.test(fraccion)) return null
+      if (fraccion.length <= 2 || /^0+$/.test(entero)) normal = cuerpo
+      else if (fraccion.length === 3 && milesValidos(cuerpo)) normal = entero + fraccion
+      else return null
+    } else {
+      if (!milesValidos(cuerpo)) return null
+      normal = cuerpo.replace(/\./g, '')
+    }
   }
-  if (!/^-?\d+(\.\d+)?$/.test(t)) return null
-  return new Decimal(t).toFixed()
+  if (!/^\d+(\.\d+)?$/.test(normal)) return null
+  return new Decimal(negativo ? `-${normal}` : normal).toFixed()
 }

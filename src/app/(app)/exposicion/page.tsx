@@ -1,13 +1,13 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import type { CalcVista } from '@/lib/domain/calc'
+import { numero } from '@/lib/domain/dinero'
 import { fechaCorta } from '@/lib/domain/fechas'
 import { vistaExposicion } from '@/lib/vistas'
-import type { Segmento, VistaExposicion, VistaHoy } from '@/lib/vistas/contratos'
-import { aDolares, porSubaDeCcl } from '@/components/calculos'
+import type { Segmento, VistaExposicion } from '@/lib/vistas/contratos'
+import { porSubaDeCcl } from '@/components/calculos'
 import { ErrorVista } from '@/components/error-vista'
 import { Monto, MontoTrazado, Porcentaje } from '@/components/monto'
-import { hoyDelPedido } from '@/components/shell/datos'
 import { Traza } from '@/components/traza'
 import { Aviso, ParMonto, Rotulo, Tarjeta } from '@/components/ui'
 
@@ -25,9 +25,8 @@ export default async function PaginaExposicion({ searchParams }: { searchParams:
   const sp = await searchParams
   const modo: Modo = sp.vista === 'total' ? 'total' : 'financiero'
   let v: VistaExposicion
-  let hoy: VistaHoy | null = null
   try {
-    ;[v, hoy] = await Promise.all([vistaExposicion(modo), hoyDelPedido().catch(() => null)])
+    v = await vistaExposicion(modo)
   } catch (e) {
     return (
       <>
@@ -36,10 +35,9 @@ export default async function PaginaExposicion({ searchParams }: { searchParams:
       </>
     )
   }
-  const ccl: CalcVista = hoy?.ccl ?? { valor: null, motivo: 'No pude leer el CCL.', formula: 'sin dato', insumos: [], etiquetas: [] }
   const r = v.resumen
-  const pesosUsd = aDolares(r.pesos_financieros, ccl, 'Pesos financieros', 'Tus activos con riesgo en pesos, pasados a dólares al CCL de la carga.')
-  const deudaUsd = aDolares(r.deuda_pesos, ccl, 'Deuda en pesos', 'Lo que debés del leasing, en dólares al CCL de la carga. Si el CCL sube, en dólares se achica (se licúa).')
+  const pesosUsd = r.pesos_financieros.usd
+  const deudaUsd = r.deuda_pesos.usd
   const sensPesos = porSubaDeCcl(v.activos_en_dolares.ars, '1', 'ARS', 'Cuánto suman en pesos tus activos en dólares si el CCL sube 1%. Es una sensibilidad, no un pronóstico.')
 
   return (
@@ -67,7 +65,15 @@ export default async function PaginaExposicion({ searchParams }: { searchParams:
 
       <Tarjeta className="p-4 md:p-5" aria-label="Tu exposición al peso">
         <FraseExposicion v={v} pesosUsd={pesosUsd} sensPesos={sensPesos} />
-        {v.fecha_datos ? <p className="mt-2 text-[13px] text-muted">Al cierre del {fechaCorta(v.fecha_datos)} · tomador del leasing: sin confirmar</p> : null}
+        {v.fecha_datos ? (
+          <p className="mt-2 text-[13px] text-muted">
+            Al cierre del {fechaCorta(v.fecha_datos)} · CCL{' '}
+            <Traza calc={v.ccl} titulo="CCL de la foto">
+              <span className="num">{v.ccl.valor === null ? 'sin dato' : numero(v.ccl.valor, 2)}</span>
+            </Traza>
+            {v.fecha_ccl && v.fecha_ccl !== v.fecha_datos ? ` del ${fechaCorta(v.fecha_ccl)} (ese día no cargaste CCL)` : ''} · tomador del leasing: sin confirmar
+          </p>
+        ) : null}
       </Tarjeta>
 
       <div className="grid gap-3 md:gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] min-[112.5rem]:grid-cols-3">
@@ -134,8 +140,8 @@ function FraseExposicion({ v, pesosUsd, sensPesos }: { v: VistaExposicion; pesos
       Estás <span className="font-semibold">{largo ? 'largo' : 'corto'} en pesos</span> por{' '}
       <MontoTrazado calc={r.neto_ars} moneda="ARS" titulo="Pesos financieros − deuda del leasing" className="font-semibold" />{' '}
       <MontoTrazado calc={r.neto_usd} moneda="USD" titulo="El neto en dólares" decimales={0} />: tus pesos financieros (
-      <MontoTrazado calc={r.pesos_financieros} moneda="ARS" titulo="Pesos financieros" compacta />, <MontoTrazado calc={pesosUsd} moneda="USD" titulo="Pesos financieros en dólares" decimales={0} />){' '}
-      {largo ? 'superan' : 'no llegan a'} lo que debés del leasing (<MontoTrazado calc={r.deuda_pesos} moneda="ARS" titulo="Deuda del leasing" compacta />).{' '}
+      <MontoTrazado calc={r.pesos_financieros.ars} moneda="ARS" titulo="Pesos financieros" compacta />, <MontoTrazado calc={pesosUsd} moneda="USD" titulo="Pesos financieros en dólares" decimales={0} />){' '}
+      {largo ? 'superan' : 'no llegan a'} lo que debés del leasing (<MontoTrazado calc={r.deuda_pesos.ars} moneda="ARS" titulo="Deuda del leasing" compacta />).{' '}
       <span className="font-semibold">Por cada +1% de CCL:</span> en dólares, ese neto {sens !== null && sens.startsWith('-') ? 'pierde' : 'gana'}{' '}
       <Traza calc={r.sensibilidad_usd_1pct} titulo="Si el CCL sube 1%: el neto en dólares" moneda="USD">
         <Monto valor={sens === null ? null : sens.replace(/^-/, '')} moneda="USD" decimales={0} />
@@ -148,8 +154,8 @@ function FraseExposicion({ v, pesosUsd, sensPesos }: { v: VistaExposicion; pesos
 
 function LargoCorto({ v, pesosUsd, deudaUsd }: { v: VistaExposicion; pesosUsd: CalcVista; deudaUsd: CalcVista }) {
   const r = v.resumen
-  const pesos = r.pesos_financieros.valor
-  const deuda = r.deuda_pesos.valor
+  const pesos = r.pesos_financieros.ars.valor
+  const deuda = r.deuda_pesos.ars.valor
   // Solo para el largo de las barras (no es una cifra que se muestre).
   const max = Math.max(Math.abs(Number(pesos ?? 0)), Math.abs(Number(deuda ?? 0)), 1)
   const ancho = (x: string | null) => `${Math.max(2, Math.round((Math.abs(Number(x ?? 0)) / max) * 100))}%`
@@ -174,8 +180,8 @@ function LargoCorto({ v, pesosUsd, deudaUsd }: { v: VistaExposicion; pesosUsd: C
   )
   return (
     <div className="divide-y divide-border">
-      {fila('Tus pesos financieros', 'largo', r.pesos_financieros, pesosUsd, pesos, '')}
-      {fila('Capital pendiente del leasing', 'corto', r.deuda_pesos, deudaUsd, deuda, '−')}
+      {fila('Tus pesos financieros', 'largo', r.pesos_financieros.ars, pesosUsd, pesos, '')}
+      {fila('Capital pendiente del leasing', 'corto', r.deuda_pesos.ars, deudaUsd, deuda, '−')}
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 py-2.5">
         <span className="text-sm font-semibold">Neto {v.vista === 'total' ? 'total' : '(pesos financieros − deuda del leasing)'}</span>
         <span className="flex flex-wrap items-baseline gap-x-2 font-semibold">
@@ -189,8 +195,12 @@ function LargoCorto({ v, pesosUsd, deudaUsd }: { v: VistaExposicion; pesosUsd: C
         </span>
         <ParMonto par={v.activos_en_dolares} titulo="Activos que arriesgan dólares" decimalesUsd={0} />
       </div>
-      {v.vista === 'total' && v.resumen.neto_ars.valor === null ? (
-        <Aviso className="mt-3">La casa y la camioneta no entran en silencio: les falta la moneda de riesgo, que elegís vos en Datos.</Aviso>
+      {v.vista === 'total' && v.sin_moneda_de_riesgo.length > 0 ? (
+        <Aviso className="mt-3">
+          {v.sin_moneda_de_riesgo.length === 1
+            ? `${v.sin_moneda_de_riesgo[0]} no entra en silencio: le falta la moneda de riesgo, que elegís vos en Datos.`
+            : `${v.sin_moneda_de_riesgo.slice(0, -1).join(', ')} y ${v.sin_moneda_de_riesgo.at(-1)} no entran en silencio: les falta la moneda de riesgo, que elegís vos en Datos.`}
+        </Aviso>
       ) : null}
     </div>
   )

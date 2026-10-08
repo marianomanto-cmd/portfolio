@@ -8,11 +8,24 @@
 
 import { useId, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { ChevronRight } from 'lucide-react'
-import type { DecisionFila, DecisionSaldo, PropuestaCarga } from '@/lib/carga/contratos'
-import { monto, numero } from '@/lib/domain/dinero'
+import Link from 'next/link'
+import type { DecisionFila, DecisionSaldo, FilaLeida, PropuestaCarga } from '@/lib/carga/contratos'
+import { monto, numero, porcentaje } from '@/lib/domain/dinero'
 import { diasEntre, fechaCorta } from '@/lib/domain/fechas'
 import type { Fecha } from '@/lib/domain/tipos'
-import { alternativasSaldo, saltoDeSaldo, type EleccionFila, type EleccionSaldo, type EstadoItem, type ItemBandeja, type ResumenBandeja } from '../_lib/bandeja'
+import {
+  alternativasFila,
+  alternativasSaldo,
+  diferenciaDolarIEB,
+  enlaceMovimiento,
+  precioACompletar,
+  saltoDeSaldo,
+  type EleccionFila,
+  type EleccionSaldo,
+  type EstadoItem,
+  type ItemBandeja,
+  type ResumenBandeja,
+} from '../_lib/bandeja'
 import type { ActivoLocal } from '../_lib/demo'
 import type { EdicionFila } from '../_lib/ediciones'
 import { leerMonto } from '../_lib/entrada'
@@ -47,8 +60,20 @@ const NOMBRE_ACCION: Record<DecisionFila['accion'], string> = {
   apertura: 'apertura (primera carga)',
   compra: 'compra',
   venta: 'venta',
+  completar_precio: 'completar el precio de una compra pendiente',
   revisar: 'a revisar',
 }
+
+const NOMBRE_OPERACION: Record<string, string> = {
+  apertura: 'apertura',
+  compra: 'compra',
+  venta: 'venta',
+  vencimiento: 'vencimiento',
+  renta: 'renta',
+  amortizacion: 'amortización',
+  ajuste_ratio: 'ajuste de ratio',
+}
+const nombreOperacion = (t: string) => NOMBRE_OPERACION[t] ?? t
 
 // ───────────── Teclado ─────────────
 
@@ -87,16 +112,68 @@ function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode })
   )
 }
 
-function Motivos({ motivos }: { motivos: string[] }) {
+/** Los motivos de una fila; el primero es el principal (en un error, el que frena). */
+function Motivos({ motivos, principal = false }: { motivos: string[]; principal?: boolean }) {
   if (!motivos.length) return null
   return (
     <ul className="mt-1 space-y-0.5 text-sm text-muted">
       {motivos.map((m, i) => (
-        <li key={i} className="break-words">
+        <li key={i} className={`break-words ${principal && i === 0 ? 'font-medium text-negative' : ''}`}>
           {m}
         </li>
       ))}
     </ul>
+  )
+}
+
+/**
+ * Las dos lecturas de una captura que no coinciden, lado a lado: un toque
+ * elige una (4.2.1). La propuesta (la que cierra la cuenta) acepta la fila;
+ * la otra corrige ese número y la fila se vuelve a controlar.
+ */
+function DosLecturas({
+  campos,
+}: {
+  campos: { etiqueta: string; opciones: { lectura: 'A' | 'B'; texto: string; propuesta: boolean; elegida: boolean; onElegir: (() => void) | null }[] }[]
+}) {
+  if (!campos.length) return null
+  return (
+    <div className="mt-2 space-y-2" onKeyDown={(e) => e.stopPropagation()}>
+      {campos.map((c) => (
+        <fieldset key={c.etiqueta} className="min-w-0">
+          <legend className="text-xs text-muted">{c.etiqueta}: las dos lecturas no coinciden</legend>
+          <div className="mt-1 grid grid-cols-2 gap-2">
+            {c.opciones.map((o) =>
+              o.onElegir ? (
+                <button
+                  key={o.lectura}
+                  type="button"
+                  aria-pressed={o.elegida}
+                  onClick={o.onElegir}
+                  className={`tocable min-h-11 min-w-0 rounded-lg border px-2 py-1.5 text-left text-sm lg:min-h-9 ${
+                    o.elegida ? 'border-accent bg-accent-soft text-text' : 'border-border bg-surface text-text hover:bg-surface-2'
+                  }`}
+                >
+                  <span className="block text-xs text-muted">
+                    Lectura {o.lectura}
+                    {o.propuesta ? ' · cierra' : ''}
+                  </span>
+                  <span className="num block break-words">{o.texto}</span>
+                </button>
+              ) : (
+                <div key={o.lectura} className="min-w-0 rounded-lg border border-dashed border-border px-2 py-1.5 text-sm">
+                  <span className="block text-xs text-muted">
+                    Lectura {o.lectura}
+                    {o.propuesta ? ' · propuesta' : ''}
+                  </span>
+                  <span className="num block break-words text-text">{o.texto}</span>
+                </div>
+              ),
+            )}
+          </div>
+        </fieldset>
+      ))}
+    </div>
   )
 }
 
@@ -133,8 +210,11 @@ function Fila({
   )
 }
 
-function Acciones({ children }: { children: ReactNode }) {
-  return <div className="mt-2 flex flex-wrap gap-2 [&>*]:max-sm:flex-1">{children}</div>
+/** Botones de una fila. `dosPorFila`: en el teléfono van de a dos (cuando son cuatro). */
+function Acciones({ children, dosPorFila = false }: { children: ReactNode; dosPorFila?: boolean }) {
+  return (
+    <div className={`mt-2 flex flex-wrap gap-2 [&>*]:max-sm:flex-1 ${dosPorFila ? '[&>*]:max-sm:basis-[calc(50%-0.25rem)]' : ''}`}>{children}</div>
+  )
 }
 
 // ───────────── Fila leída (posición) ─────────────
@@ -154,11 +234,14 @@ function EditorOperacion({
   const [p, setP] = useState(aEditable(op.precio))
   const [error, setError] = useState<string | null>(null)
   const puedeSinPrecio = op.tipo === 'compra' || op.tipo === 'apertura'
+  const sinPrecio = op.tipo === 'ajuste_ratio'
   function aceptar() {
     const cq = leerMonto(q, { positivo: true })
     if (cq.error) return setError(`Cantidad: ${cq.error}`)
     let precioFinal: string | null = null
-    if (p.trim() !== '') {
+    if (sinPrecio) {
+      precioFinal = null
+    } else if (p.trim() !== '') {
       const cp = leerMonto(p, { positivo: true })
       if (cp.error) return setError(`Precio: ${cp.error}`)
       precioFinal = cp.valor
@@ -171,13 +254,83 @@ function EditorOperacion({
     <div className="mt-3 grid gap-3 rounded-xl border border-border bg-surface-2 p-3 sm:grid-cols-[1fr_1fr_auto]" onKeyDown={(e) => e.stopPropagation()}>
       <div className="min-w-0 space-y-1">
         <label htmlFor={`${id}-q`} className="text-sm font-medium">
-          Cantidad de la {op.tipo}
+          Cantidad {sinPrecio ? 'que agrega el ajuste de ratio' : `de la ${nombreOperacion(op.tipo)}`}
         </label>
-        <Entrada id={`${id}-q`} inputMode="decimal" value={q} onChange={(e) => setQ(e.target.value)} className="num" autoFocus />
+        <Entrada
+          id={`${id}-q`}
+          inputMode="decimal"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className="num"
+          autoFocus
+          onKeyDown={(e) => {
+            if (sinPrecio && e.key === 'Enter') {
+              e.preventDefault()
+              aceptar()
+            }
+          }}
+        />
       </div>
+      {sinPrecio ? (
+        <p className="min-w-0 self-end text-sm text-muted">Un ajuste de ratio no lleva precio: el costo total no cambia.</p>
+      ) : (
+        <div className="min-w-0 space-y-1">
+          <label htmlFor={`${id}-p`} className="text-sm font-medium">
+            Precio por 1 VN / unidad {puedeSinPrecio ? <span className="font-normal text-muted">(vacío = pendiente)</span> : null}
+          </label>
+          <Entrada
+            id={`${id}-p`}
+            inputMode="decimal"
+            value={p}
+            onChange={(e) => setP(e.target.value)}
+            className="num"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                aceptar()
+              }
+            }}
+          />
+        </div>
+      )}
+      <div className="flex items-end gap-2 [&>*]:max-sm:flex-1">
+        <Boton variante="primario" onClick={aceptar}>
+          Aceptar así
+        </Boton>
+        <Boton variante="fantasma" onClick={onCancelar}>
+          Cancelar
+        </Boton>
+      </div>
+      {error ? <p role="alert" className="text-sm text-negative sm:col-span-3">{error}</p> : null}
+    </div>
+  )
+}
+
+/** D-19: corregir el precio inferido de la compra pendiente antes de completarla. */
+function EditorPrecioCompra({
+  d,
+  inicial,
+  onAceptar,
+  onCancelar,
+}: {
+  d: DecisionFila
+  inicial: string
+  onAceptar: (precio: string) => void
+  onCancelar: () => void
+}) {
+  const id = useId()
+  const [p, setP] = useState(aEditable(inicial))
+  const [error, setError] = useState<string | null>(null)
+  function aceptar() {
+    const cp = leerMonto(p, { positivo: true })
+    if (cp.error || cp.valor === null) return setError(`Precio: ${cp.error ?? 'falta'}`)
+    onAceptar(cp.valor)
+  }
+  return (
+    <div className="mt-3 grid gap-3 rounded-xl border border-border bg-surface-2 p-3 sm:grid-cols-[1fr_auto]" onKeyDown={(e) => e.stopPropagation()}>
       <div className="min-w-0 space-y-1">
         <label htmlFor={`${id}-p`} className="text-sm font-medium">
-          Precio por 1 VN / unidad {puedeSinPrecio ? <span className="font-normal text-muted">(vacío = pendiente)</span> : null}
+          Precio de la compra del {d.completar ? fechaCorta(d.completar.fecha) : ''}, por 1 VN / unidad
         </label>
         <Entrada
           id={`${id}-p`}
@@ -185,6 +338,7 @@ function EditorOperacion({
           value={p}
           onChange={(e) => setP(e.target.value)}
           className="num"
+          autoFocus
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault()
@@ -195,13 +349,13 @@ function EditorOperacion({
       </div>
       <div className="flex items-end gap-2 [&>*]:max-sm:flex-1">
         <Boton variante="primario" onClick={aceptar}>
-          Aceptar así
+          Completar así
         </Boton>
         <Boton variante="fantasma" onClick={onCancelar}>
           Cancelar
         </Boton>
       </div>
-      {error ? <p role="alert" className="text-sm text-negative sm:col-span-3">{error}</p> : null}
+      {error ? <p role="alert" className="text-sm text-negative sm:col-span-2">{error}</p> : null}
     </div>
   )
 }
@@ -283,14 +437,19 @@ function EditorLectura({
   )
 }
 
+const mismaEdicion = (a: EdicionFila, b: EdicionFila | null) =>
+  b !== null && a.cantidad === b.cantidad && a.precio_unitario === b.precio_unitario && (a.valorizado ?? null) === (b.valorizado ?? null)
+
 function textoOperacion(d: DecisionFila, el: EleccionFila | null): string | null {
   const op = el?.operacion ? { ...d.operacion!, ...el.operacion } : d.operacion
   if (!op) return null
   const q = cantidad(op.cantidad)
   const p = op.precio ? ` a ${precio(op.precio)}` : op.tipo === 'apertura' ? ' (costo sin dato)' : ' (precio pendiente)'
+
   const ccl = op.tipo !== 'apertura' && op.ccl_del_dia ? ` · CCL ${numero(op.ccl_del_dia, 2)}` : ''
-  const nombre = op.tipo === 'apertura' ? 'Apertura' : op.tipo === 'compra' ? 'Compra' : op.tipo === 'venta' ? 'Venta' : op.tipo
-  return `${nombre} de ${q}${p}${ccl}${el?.operacion ? ' (corregida)' : ''}`
+  const nombre = nombreOperacion(op.tipo)
+  const sinPrecio = op.tipo === 'ajuste_ratio' ? ' (sin precio: el costo no cambia)' : p
+  return `${nombre.charAt(0).toUpperCase()}${nombre.slice(1)} de ${op.tipo === 'ajuste_ratio' ? '+' : ''}${q}${sinPrecio}${ccl}${el?.operacion ? ' (corregida)' : ''}`
 }
 
 function ItemFila({
@@ -298,24 +457,32 @@ function ItemFila({
   estado,
   eleccion,
   edicion,
+  original,
   onElegir,
   onEditar,
   onAlta,
   onIrAlCcl,
+  onAceptarAlVolver,
 }: {
   d: DecisionFila
   estado: EstadoItem
   eleccion: EleccionFila | null
   edicion: EdicionFila | null
+  /** La fila tal como la leyó el lector, sin ediciones (para elegir entre lecturas). */
+  original: FilaLeida | null
+  /** Aceptar la fila cuando vuelva sin la edición (elegir la lectura propuesta después de otra). */
+  onAceptarAlVolver?: (clave: string, motivo: string) => void
   onElegir: (d: DecisionFila, e: Omit<EleccionFila, 'huella'> | null) => void
   onEditar: (clave: string, e: EdicionFila | null) => void
   onAlta: (a: ActivoLocal) => void
   onIrAlCcl: () => void
 }) {
-  const [modo, setModo] = useState<'ver' | 'operacion' | 'lectura' | 'alta'>('ver')
+  const [modo, setModo] = useState<'ver' | 'operacion' | 'lectura' | 'alta' | 'precio'>('ver')
   const f = d.fila
   const faltaCcl = d.motivos.some((m) => m.startsWith('Falta el CCL'))
   const operacion = textoOperacion(d, eleccion)
+  const completa = d.accion === 'completar_precio' && d.completar ? d.completar : null
+  const precioElegido = completa ? precioACompletar(d, eleccion) : null
 
   const aceptar = () => {
     if (estado === 'sin_alta') return setModo('alta')
@@ -323,18 +490,60 @@ function ItemFila({
     if (estado === 'advertencia') {
       onElegir(d, {
         resolucion: 'aceptada',
-        motivo: d.operacion ? `acepté la ${d.operacion.tipo} propuesta` : 'acepté la fila leída',
+        motivo: completa
+          ? `completé el precio de la compra del ${fechaCorta(completa.fecha)} con el inferido del PPP`
+          : d.operacion
+            ? `acepté la ${nombreOperacion(d.operacion.tipo)} propuesta`
+            : 'acepté la fila leída',
         operacion: null,
       })
     }
   }
   const pendiente = () => onElegir(d, { resolucion: 'pendiente', motivo: 'la dejé pendiente', operacion: null })
-  const editar = () => setModo(d.operacion && estado !== 'error' ? 'operacion' : 'lectura')
+  const editar = () => setModo(completa && estado !== 'error' ? 'precio' : d.operacion && estado !== 'error' ? 'operacion' : 'lectura')
 
   const escala =
     f.escala && f.escala !== '1' && f.precio_mostrado
       ? `La fuente muestra ${numero(f.precio_mostrado, 4, { min: 2 })} cada ${f.escala === '0.01' ? '100' : '1.000'} VN`
       : ''
+
+  // Las dos lecturas de una captura, para elegir con un toque.
+  const fuente = original ?? f
+  const lecturas = alternativasFila(fuente, edicion).map((a) => ({
+    etiqueta: a.etiqueta,
+    opciones: a.opciones.map((o) => {
+      const decimal = /^-?\d+(\.\d+)?$/.test(o.valor)
+      const texto = !decimal
+        ? o.valor
+        : a.campo === 'cantidad'
+          ? cantidad(o.valor)
+          : a.campo === 'rendimiento_porcentaje'
+            ? `${numero(o.valor, 2)}%`
+            : precio(o.valor)
+      const editada = o.edicion !== null && o.edicion !== 'aceptar'
+      // Elegida: la que coincide con lo que hoy usa la fila.
+      const elegida =
+        o.edicion === 'aceptar'
+          ? !edicion && (estado === 'aceptada' || estado === 'verificada')
+          : editada && mismaEdicion(o.edicion as EdicionFila, edicion)
+      const onElegirLectura =
+        o.edicion === null || estado === 'pendiente'
+          ? null
+          : o.edicion === 'aceptar'
+            ? () => {
+                const motivo = `elegí la lectura ${o.lectura} (${a.etiqueta.toLowerCase()})`
+                if (edicion) {
+                  // Volver a lo leído: la fila se vuelve a armar y recién ahí se acepta.
+                  onEditar(d.clave, null)
+                  onAceptarAlVolver?.(d.clave, motivo)
+                } else if (d.estado === 'advertencia') {
+                  onElegir(d, { resolucion: 'aceptada', motivo, operacion: null })
+                }
+              }
+            : () => onEditar(d.clave, o.edicion as EdicionFila)
+      return { lectura: o.lectura, texto, propuesta: o.propuesta, elegida, onElegir: onElegirLectura }
+    }),
+  }))
 
   return (
     <Fila
@@ -359,7 +568,20 @@ function ItemFila({
           {f.chequeo.ok ? '✓' : '≠'} {f.chequeo.regla}: {pesos(f.chequeo.calculado)} {f.chequeo.ok ? '≈' : 'contra'} {pesos(f.chequeo.esperado)} (±{pesos(f.chequeo.tolerancia)})
         </p>
       ) : null}
-      {operacion ? (
+      {completa ? (
+        <p className="mt-1 text-sm text-text">
+          <span className="text-muted">Propuesta: </span>
+          {precioElegido !== null || estado !== 'aceptada' ? (
+            <>
+              completar el precio de la compra del {fechaCorta(completa.fecha)}: <span className="num">{precio(precioElegido ?? completa.precio)}</span>
+              {eleccion?.precio_completar ? ' (corregido)' : ', inferido del PPP'}
+            </>
+          ) : (
+            'grabar la fila sin completar el precio (la compra sigue pendiente)'
+          )}
+          <span className="num block break-words text-xs text-muted">{completa.formula}</span>
+        </p>
+      ) : operacion ? (
         <p className="mt-1 text-sm text-text">
           <span className="text-muted">Propuesta: </span>
           {operacion}
@@ -367,17 +589,38 @@ function ItemFila({
       ) : d.accion === 'ninguna' ? null : (
         <p className="mt-1 text-sm text-muted">{NOMBRE_ACCION[d.accion]}</p>
       )}
-      <Motivos motivos={estado === 'pendiente' || estado === 'aceptada' ? [] : d.motivos} />
+      <Motivos
+        // La propuesta de completar ya está arriba, con su fórmula: no se repite.
+        motivos={estado === 'pendiente' || estado === 'aceptada' ? [] : completa ? d.motivos.filter((m) => !m.startsWith('Completar el precio')) : d.motivos}
+        principal={estado === 'error'}
+      />
       {eleccion?.motivo && (estado === 'pendiente' || estado === 'aceptada') ? (
         <p className="mt-1 text-sm text-muted">Elegiste: {eleccion.motivo}.</p>
       ) : null}
+      {modo === 'ver' ? <DosLecturas campos={lecturas} /> : null}
 
       {modo === 'operacion' && d.operacion ? (
         <EditorOperacion
           d={d}
           onCancelar={() => setModo('ver')}
           onAceptar={(op) => {
-            onElegir(d, { resolucion: 'aceptada', motivo: `acepté la ${d.operacion!.tipo} corregida`, operacion: op })
+            onElegir(d, { resolucion: 'aceptada', motivo: `acepté la ${nombreOperacion(d.operacion!.tipo)} corregida`, operacion: op })
+            setModo('ver')
+          }}
+        />
+      ) : null}
+      {modo === 'precio' && completa ? (
+        <EditorPrecioCompra
+          d={d}
+          inicial={precioElegido ?? completa.precio}
+          onCancelar={() => setModo('ver')}
+          onAceptar={(p) => {
+            onElegir(d, {
+              resolucion: 'aceptada',
+              motivo: `completé el precio de la compra del ${fechaCorta(completa.fecha)} a mano`,
+              operacion: null,
+              precio_completar: p,
+            })
             setModo('ver')
           }}
         />
@@ -409,10 +652,17 @@ function ItemFila({
       ) : null}
 
       {modo === 'ver' ? (
-        <Acciones>
-          {estado === 'advertencia' ? (
+        <Acciones dosPorFila={Boolean(completa)}>
+          {estado === 'advertencia' && completa ? (
+            <Boton variante="primario" onClick={aceptar} title="Completar (A)">
+              Completar<span className="max-sm:hidden">
+                {' '}
+                a <span className="num">{precio(completa.precio)}</span>
+              </span>
+            </Boton>
+          ) : estado === 'advertencia' ? (
             <Boton variante="primario" onClick={aceptar} title="Aceptar (A)">
-              Aceptar{d.operacion ? ` ${d.operacion.tipo}` : ''}
+              {d.operacion ? `Aceptar ${nombreOperacion(d.operacion.tipo)}` : d.accion === 'revisar' ? 'Grabar solo el precio' : 'Aceptar'}
             </Boton>
           ) : null}
           {estado === 'sin_alta' ? (
@@ -430,12 +680,29 @@ function ItemFila({
               Editar
             </Boton>
           ) : null}
+          {(estado === 'advertencia' || estado === 'aceptada') && completa ? (
+            <>
+              <Boton variante="secundario" onClick={() => setModo('precio')} title="Editar (E)">
+                Editar precio
+              </Boton>
+              {estado === 'advertencia' ? (
+                <Boton
+                  variante="secundario"
+                  onClick={() =>
+                    onElegir(d, { resolucion: 'aceptada', motivo: 'grabé la fila sin completar el precio', operacion: null, precio_completar: null })
+                  }
+                >
+                  Grabar sin completar
+                </Boton>
+              ) : null}
+            </>
+          ) : null}
           {(estado === 'advertencia' || estado === 'aceptada') && d.operacion ? (
             <Boton variante="secundario" onClick={() => setModo('operacion')} title="Editar (E)">
-              Editar {d.operacion.tipo}
+              Editar {nombreOperacion(d.operacion.tipo)}
             </Boton>
           ) : null}
-          {estado !== 'pendiente' && estado !== 'error' && !d.operacion ? (
+          {estado !== 'pendiente' && estado !== 'error' && !d.operacion && !completa ? (
             <Boton variante="secundario" onClick={() => setModo('lectura')} title="Editar (E)">
               Corregir lectura
             </Boton>
@@ -487,7 +754,8 @@ function ItemSaldo({
 
   const elegirPrimera = () => {
     if (alternativas.length) {
-      onElegir(d, { resolucion: 'aceptada', monto: alternativas[0].monto, motivo: `elegí la ${alternativas[0].concepto}` })
+      const a = alternativas.find((x) => x.propuesta) ?? alternativas[0]
+      onElegir(d, { resolucion: 'aceptada', monto: a.monto, motivo: `elegí la ${a.concepto}` })
     } else if (estado === 'error') {
       setTipeando(true)
     } else if (estado === 'advertencia') {
@@ -536,15 +804,48 @@ function ItemSaldo({
           = {partes.map((p) => `${p.concepto} ${montoMoneda(p.monto, moneda)}`).join(' + ')}
         </p>
       ) : null}
-      {salto?.sinExplicar ? (
+      {salto?.sinExplicar || salto?.baja ? (
         <p className="mt-2 rounded-lg bg-accent-soft px-3 py-2 text-sm text-text">
-          <span className="font-medium">¿Entró o salió plata?</span> Subió {montoMoneda(salto.sinExplicar, moneda)} más de lo que explica
-          la TNA de la captura. Por ahora solo te lo marco: anotalo en la nota del día si fue un movimiento.
+          <span className="font-medium">¿Entró o salió plata?</span>{' '}
+          {salto.sinExplicar
+            ? `Subió ${montoMoneda(salto.sinExplicar, moneda)} más de lo que explica la TNA de la captura.`
+            : `Bajó ${montoMoneda(salto.baja!, moneda)}, y los intereses no restan.`}{' '}
+          Sin registrar el movimiento, se lee como {salto.sinExplicar ? 'ganancia' : 'pérdida'} (D-06).{' '}
+          <Link
+            href={enlaceMovimiento({
+              tipo: salto.sinExplicar ? 'aporte' : 'retiro',
+              cuenta_id: d.cuenta_id,
+              moneda,
+              monto: (salto.sinExplicar ?? salto.baja)!,
+              fecha,
+            })}
+            target="_blank"
+            rel="noopener"
+            className="tocable inline-flex min-h-11 items-center font-medium text-accent underline underline-offset-2 lg:min-h-0"
+          >
+            Registrar el {salto.sinExplicar ? 'aporte' : 'retiro'} en Datos › Movimientos (se abre aparte)
+          </Link>
         </p>
       ) : null}
       <Motivos motivos={estado === 'pendiente' || estado === 'aceptada' ? [] : d.motivos} />
       {eleccion?.motivo && (estado === 'pendiente' || estado === 'aceptada') ? (
         <p className="mt-1 text-sm text-muted">Elegiste: {eleccion.motivo}.</p>
+      ) : null}
+      {!tipeando && alternativas.length >= 2 && estado !== 'pendiente' ? (
+        <DosLecturas
+          campos={[
+            {
+              etiqueta: 'Saldo',
+              opciones: alternativas.slice(0, 2).map((a, i) => ({
+                lectura: i === 0 ? ('A' as const) : ('B' as const),
+                texto: montoMoneda(a.monto, moneda),
+                propuesta: a.propuesta,
+                elegida: eleccion?.monto === a.monto,
+                onElegir: () => onElegir(d, { resolucion: 'aceptada', monto: a.monto, motivo: `elegí la ${a.concepto}` }),
+              })),
+            },
+          ]}
+        />
       ) : null}
       {tipeando ? (
         <div className="mt-3 grid gap-2 rounded-xl border border-border bg-surface-2 p-3 sm:grid-cols-[1fr_auto]" onKeyDown={(e) => e.stopPropagation()}>
@@ -579,13 +880,7 @@ function ItemSaldo({
         </div>
       ) : (
         <Acciones>
-          {(estado === 'advertencia' || estado === 'error') && alternativas.length
-            ? alternativas.map((a, i) => (
-                <Boton key={a.concepto} variante={i === 0 ? 'primario' : 'secundario'} onClick={() => onElegir(d, { resolucion: 'aceptada', monto: a.monto, motivo: `elegí la ${a.concepto}` })}>
-                  Elegir <span className="num">{montoMoneda(a.monto, moneda)}</span>
-                </Boton>
-              ))
-            : null}
+
           {estado === 'advertencia' && !alternativas.length ? (
             <Boton variante="primario" onClick={elegirPrimera} title="Aceptar (A)">
               Aceptar saldo
@@ -629,8 +924,19 @@ export function Bandeja({
   onAlta,
   onIrAlCcl,
   tiposTipeados,
+  originalDe,
+  dolarIEB,
+  ccl,
+  onAceptarAlVolver,
 }: {
+  onAceptarAlVolver?: (clave: string, motivo: string) => void
   tiposTipeados: string[]
+  /** La fila tal como la leyó el lector (sin ediciones), por clave. */
+  originalDe?: (clave: string) => FilaLeida | null
+  /** Precio de DOLARUSA del Excel de IEB (D-66). */
+  dolarIEB?: string | null
+  /** CCL tipeado (decimal normalizado). */
+  ccl?: string | null
   resumen: ResumenBandeja
   propuesta: PropuestaCarga | null
   eleccionDe: { fila: (d: DecisionFila) => EleccionFila | null; saldo: (d: DecisionSaldo) => EleccionSaldo | null }
@@ -660,6 +966,8 @@ export function Bandeja({
           estado={i.estado}
           eleccion={eleccionDe.fila(i.fila)}
           edicion={edicionDe(i.clave)}
+          original={originalDe?.(i.clave) ?? null}
+          onAceptarAlVolver={onAceptarAlVolver}
           onElegir={onFila}
           onEditar={onEditar}
           onAlta={onAlta}
@@ -766,6 +1074,17 @@ export function Bandeja({
         </p>
       ) : null}
 
+      {(() => {
+        const dif = diferenciaDolarIEB(dolarIEB, ccl ?? null)
+        if (!dif) return null
+        return (
+          <p className="num break-words text-sm text-muted">
+            <Chip tono="neutro">≠</Chip> DOLARUSA al dólar de IEB {pesos(dif.dolar)} vs tu CCL {pesos(dif.ccl)}: diferencia{' '}
+            {monto(dif.diferencia, 'ARS', { decimales: 2, signo: true })} ({porcentaje(dif.fraccion, { signo: true })}). IEB valúa tus dólares con el suyo; la
+            app, con tu CCL.
+          </p>
+        )
+      })()}
       {propuesta?.controles.length ? (
         <div className="space-y-1">
           <h3 className="text-sm font-medium text-muted">Controles</h3>

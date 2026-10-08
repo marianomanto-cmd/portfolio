@@ -4,6 +4,116 @@ Todo cambio de la app se registra acá, el más nuevo primero. Cada entrada dice
 
 ## [Sin publicar]
 
+### 2026-10-08 — Fase 1a: la primera versión usable
+La app nueva reemplaza a Corte (D-01): carga diaria, Hoy, Cartera, Exposición, Registro, Datos y Ajustes, con todo número en pesos y en dólares y su traza. Cómo se usa: `docs/manual.md`. Cómo está hecha: `docs/arquitectura.md`.
+
+- **Entrada y seguridad** (D-21, D-112):
+  - una sola clave (`APP_PASSWORD`) y una sesión de 30 días firmada con claves derivadas (PBKDF2, o `SESSION_SECRET`), una por propósito; cambiar la clave cierra todas las sesiones;
+  - `src/proxy.ts` protege toda ruta, y cada Server Action y la ruta de lectura vuelven a verificar la sesión (un test estático lo controla);
+  - freno a los intentos de clave: 800 ms por error y, desde el tercero seguido, una espera que se duplica hasta 5 minutos;
+  - Content-Security-Policy con nonce por pedido, rechazo de todo POST que no venga de la propia app y encabezados de seguridad en toda respuesta (sin iframes, HSTS, `nosniff`, sin cámara ni ubicación, `noindex`);
+  - la vuelta después de entrar solo va a rutas propias;
+  - modo demo (`PORTFOLIO_DEMO=1`) solo en desarrollo, imposible en producción;
+  - la base sigue cerrada al navegador (D-20);
+  - un solo "Salir", en Ajustes.
+- **Shell:**
+  - barra lateral colapsable en la compu y barra inferior en el teléfono, con Cargar al centro;
+  - solo las secciones de la 1a (D-69);
+  - chip de estado de los datos ("Datos al cierre del mié 14/10 · 5 de 5 fuentes"), modo privado, tema y paleta daltónica;
+  - atajos `c` (Cargar) y `h` (modo privado);
+  - colores tenues y paleta daltónica con contraste AA;
+  - una sola lectura de la base por pantalla.
+- **Hoy:**
+  - la frase del día, con cada cifra tocable;
+  - patrimonio financiero y total en pesos y en dólares (D-03);
+  - la línea "pesos financieros − deuda del leasing" con su sensibilidad al +1% de CCL (D-101);
+  - Atención, "Todavía no cargaste hoy", quién movió tu financiero, el cuadre y el aviso de diciembre;
+  - el Día cero y "Primera carga guardada".
+- **Cartera:**
+  - tabla en la compu, con prioridad de columnas, orden por cualquier columna, totales fijos y filtros;
+  - tarjetas en el teléfono, con "ganás en pesos, perdés en dólares";
+  - desglose activo/TC en pesos y en dólares desde la compra, con la misma suma de intervalos que Hoy (D-35);
+  - totales "sin dato" con la suma parcial (D-65);
+  - la liquidez en un bloque aparte.
+- **Exposición:**
+  - selector Financiero · Total con lo que netea cada vista;
+  - largo, corto y neto en pesos y en dólares, y la sensibilidad al +1% de CCL;
+  - composición por clase, moneda de riesgo y geografía, y concentración top 1 y top 3, sin umbral;
+  - la vista Total es "sin dato" mientras los bienes no tengan moneda de riesgo (D-73), y la concentración se mide sobre el financiero (D-03).
+- **Cargar** (D-104 a D-106):
+  - CCL y cripto con eco en formato es-AR, y la referencia del CCL;
+  - una zona para soltar o pegar el Excel y las capturas, leídos en paralelo por `POST /carga/leer`, con el archivo guardado al leer y la lectura firmada;
+  - bandeja con las verificadas plegadas, advertencias que se aceptan de a una, errores que frenan el Enter, las dos lecturas de una captura para elegir con un toque, alta de tickers en la misma pantalla, conciliación editable, saldos con su valor anterior y controles ✓/≠;
+  - completar el precio de una compra pendiente (D-110): la carga siguiente que trae el PPP propone el precio con su fórmula, y se acepta ("Completar"), se corrige ("Editar precio"), se graba la fila sin completarlo o se deja pendiente; nunca se aplica solo, y revertir esa carga lo deja pendiente otra vez;
+  - conciliación (D-115): una carga atrasada se compara contra lo que la app tenía ese día y avisa que hay una carga posterior; más cantidad con el mismo costo total pregunta "¿Cambio de ratio?" y propone un ajuste sin precio; un precio inferido nunca es cero ni negativo;
+  - las dos lecturas de una captura que no coinciden, lado a lado: la que cierra la cuenta acepta la fila y la otra corrige ese número, que se vuelve a controlar;
+  - cada control con su tolerancia, y la diferencia "DOLARUSA al dólar de IEB vs tu CCL" con nombre (D-66);
+  - números tipeados a mano: lo ambiguo ("1.0852", "1,548.20", "12.34.56") no se lee como miles, se pide corregir;
+  - "No pude leer…" sale una sola vez, y una fila con error muestra primero el motivo que frena;
+  - tiempo activo (D-62), Enter que guarda solo lo verificado, "Guardar sin …" y Deshacer.
+- **Registro:** una tarjeta por lote con sus cargas, archivo, conteos, estado y tiempo activo, y "Revertir el lote" con motivo obligatorio.
+- **Datos:**
+  - catálogo, con el ratio y su historia;
+  - cuentas;
+  - bienes, con valuaciones fechadas y su valor en las dos monedas;
+  - leasing, con su capital pendiente;
+  - movimientos de capital: aportes, retiros y transferencias con sus monedas, montos, tipo de cambio aplicado, impuesto y fechas, y los últimos movimientos en las dos monedas al CCL de su fecha (D-111);
+  - `/datos?seccion=…` lleva a cada subpantalla.
+- **Lector del Excel de IEB** (`ieb-excel@1`, D-107):
+  - lee el Portafolio sin IA, con su chequeo por fila `cantidad × precio × escala ≈ posición` (D-11) y la escala detectada por fila (D-12);
+  - toma el saldo Total en pesos y en dólares, más DOLARUSA (D-13);
+  - controla B2 y los Subtotales, con tolerancia según el formato de cada celda (D-37, D-38);
+  - guarda la lectura cruda de cada celda.
+- **Lector de capturas de Galicia y Mercado Pago** (`captura-claude@1`, D-108):
+  - dos lecturas en paralelo con Claude (Opus 5.5 y Sonnet 5.5, configurables), con salida estructurada, sin herramientas y con la imagen intacta;
+  - verificación aritmética con escala y tolerancia por decimales mostrados;
+  - el PPC preciso, reconstruido y controlado;
+  - el total de la captura como control;
+  - las lecturas que difieren quedan en advertencia, con las dos a la vista;
+  - errores en castellano.
+- **Motor** (`src/lib/domain`, `src/lib/vistas`):
+  - posiciones derivadas de las operaciones;
+  - PPC en pesos y en dólares;
+  - valuación diaria en las dos monedas;
+  - desglose activo/TC anclado en observaciones frescas, con "sin atribuir" (D-35, provisoria);
+  - un saldo nuevo, la primera valuación de un bien y el primer capital de una deuda entran como apertura, nunca como ganancia;
+  - la amortización baja el costo y la renta no lo toca (D-114);
+  - el cuadre de Hoy compara contra el patrimonio recalculado desde los hechos y ahora puede fallar (D-66);
+  - CCL de un día sin observación: el último tipeado, con su fecha y "viejo" a los 2 días hábiles (D-109);
+  - compra pendiente valuada "inferida" (D-110);
+  - etiquetas viejo, declarado, inferido, pendiente y parcial;
+  - traza en cada cifra (D-67).
+- **Base:** migración `carga_transaccional` (`supabase/migrations/`):
+  - `cargas` con lote, lector, `archivo_sha256`, `tiempo_activo_ms` y `motivo_reversion`;
+  - `tipo_cambio` con la referencia del CCL;
+  - `operaciones` con la carga que completó el precio de una compra pendiente;
+  - `eventos` con la nota del día;
+  - las funciones `confirmar_carga`, `revertir_lote`, `guardar_manual`, `alta_activo` y `editar_activo`, cada una en una sola transacción;
+  - índices para recorrer la auditoría al revertir.
+- **Escritura** (`src/lib/server/escritura.ts`): valida los montos como texto (D-32), traduce los errores de la base al castellano y sube los archivos nombrados por su sha256.
+- **Verificación:**
+  - tests unitarios y de propiedades (Vitest y fast-check), entre ellas las del desglose anclado: un período es la suma exacta de sus días y una carga express entre dos completas no lo cambia;
+  - implementación de referencia en Python que cruza el motor con 310 casos;
+  - revisión adversarial del motor con un test por hallazgo;
+  - tests del schema: 143 controles, todos como `service_role` (antes 40);
+  - layout D-30 con Playwright (9 anchos, claro y oscuro, axe-core), más interacción y entrada;
+  - estado de cada control y sus comandos: `docs/calidad.md`, "Estado de la 1a".
+- **Documentación:**
+  - `docs/manual.md`, el manual de uso, nuevo;
+  - `docs/arquitectura.md`, el mapa para quien mantenga la app, nuevo;
+  - decisiones D-104 a D-115;
+  - las propuestas que la 1a implementa en forma provisoria (`docs/decisiones.md`);
+  - lectores y bandeja en `docs/carga-diaria.md`;
+  - objetos nuevos del schema en `docs/datos.md`;
+  - README al día.
+- **CI** (`.github/workflows/ci.yml`): tipos, tests, build de producción y tests del schema en cada pull request y en `main`.
+- **Falta para cerrar la 1a** (`docs/calidad.md`):
+  - validar con tus archivos reales;
+  - el respaldo nocturno restaurado;
+  - Playwright y lint en CI;
+  - el test cronometrado de la carga;
+  - Lighthouse.
+
 ### 2026-10-08 — Visión de producto
 - **`docs/vision.md`**: cuatro diseños independientes (el hábito, la verdad de los números, toda la vida financiera, decidir mejor), puntuados por tres jueces (fidelidad al dueño, ingeniería, utilidad a largo plazo). Ganó "El hábito" (246 puntos) y se le injertaron las mejores ideas de los otros. Después pasó por una revisión adversarial y un control de coherencia (21 inconsistencias corregidas). Trae mapa de navegación, cada pantalla en desktop y en el teléfono, rituales, plan por fases (1a, 1b, 2, 3, 4 y una 5 propuesta), las decisiones para aprobar, los cambios de schema y los riesgos.
 

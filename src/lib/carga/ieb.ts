@@ -944,6 +944,7 @@ function controlSubtotal(s: Seccion, nombre: string, suma: Decimal | null, tol: 
       calculado: null,
       ok: null,
       detalle: `Falta la posición total de alguna fila de ${nombre}: el Subtotal (fila ${sub.fila}, ${fPesos(informado)}) no se puede verificar.`,
+      tolerancia: null,
     }
   }
   const tolerancia = tol.plus(medioDigito(sub.posicion.dec))
@@ -955,6 +956,7 @@ function controlSubtotal(s: Seccion, nombre: string, suma: Decimal | null, tol: 
     calculado: suma.toFixed(),
     ok: dif.abs().lte(tolerancia),
     detalle: `Suma de ${n === 1 ? '1 posición' : `${n} posiciones`}: ${fPesos(suma)} · Subtotal (fila ${sub.fila}): ${fPesos(informado)} · diferencia ${fPesos(dif)} · tolerancia ±${fTol(tolerancia)}.`,
+    tolerancia: tolerancia.toFixed(),
   }
 }
 
@@ -1168,6 +1170,7 @@ function controlB2(
     calculado: null,
     ok: null,
     detalle,
+    tolerancia: null,
   })
   const faltan = [...suma.faltan]
   if (ars.valor === null) faltan.push('el Total ARS de la hoja Saldos')
@@ -1204,6 +1207,7 @@ function controlB2(
       calculado: calculado.toFixed(),
       ok: dif.abs().lte(tol),
       detalle: `Posiciones${dolares.length ? ' (con DOLARUSA)' : ''} ${fPesos(suma.valor)} + saldo en pesos ${fPesos(pesos)}${usdTexto} = ${fPesos(calculado)} · B2: ${fPesos(informado)} · diferencia ${fPesos(dif)} · tolerancia ±${fTol(tol)}.`,
+      tolerancia: tol.toFixed(),
     },
     advertencias,
   }
@@ -1251,7 +1255,16 @@ export async function leerExcelIEB(datos: ArrayBuffer | Uint8Array): Promise<Lec
     saldos: sdo.saldos,
     controles: b2.control ? [...pos.subtotales, b2.control] : pos.subtotales,
     advertencias,
+    // El dólar de IEB (precio de DOLARUSA), como dato con nombre: la bandeja lo
+    // compara con tu CCL (D-66). Sin DOLARUSA, sin dato.
+    tipo_cambio_fuente: { dolar_ieb: dolarIEB(pos.dolares) },
     lector: LECTOR_IEB,
     cruda,
   }
+}
+
+/** Precio de DOLARUSA (pesos por dólar) si el Excel lo trae, normalizado. */
+function dolarIEB(dolares: DolarEnEspecie[]): string | null {
+  for (const { p } of dolares) if (p.precio.k === 'n' && p.precio.v.gt(0)) return p.precio.v.toFixed()
+  return null
 }

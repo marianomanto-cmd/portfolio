@@ -15,7 +15,7 @@ import type { Elecciones } from './_lib/bandeja'
 import { armarConfirmacion, type ArchivoGuardado, type ResumenGuardado } from './_lib/confirmacion'
 import type { ActivoLocal } from './_lib/demo'
 import { aplicarEdiciones, sinCruda, type Ediciones } from './_lib/ediciones'
-import { catalogoEjemplo, lecturaGaliciaEjemplo, lecturaIEBEjemplo, lecturaMPEjemplo } from './_lib/ejemplos'
+import { catalogoEjemplo, lecturaGaliciaDosLecturasEjemplo, lecturaIEBEjemplo, lecturaMPEjemplo } from './_lib/ejemplos'
 import { firmaValida, firmarLectura, hechosParaCarga, modoCarga, type ModoCarga } from './_lib/servidor'
 
 const texto = (e: unknown) => (e instanceof Error ? e.message : String(e))
@@ -59,6 +59,8 @@ export interface EntradaGuardar {
   fecha: string
   ccl: string | null
   cripto: string | null
+  /** De dónde sacaste el CCL (se guarda con el tipo de cambio). */
+  referencia?: string | null
   nota: string | null
   tiempo_activo_ms: number | null
   fuentes: FuenteAGuardar[]
@@ -76,6 +78,7 @@ const esquemaGuardar = z.object({
   fecha,
   ccl: decimal.nullable(),
   cripto: decimal.nullable(),
+  referencia: z.string().max(200).nullable(),
   nota: z.string().max(500).nullable(),
   tiempo_activo_ms: z.number().int().nonnegative().max(24 * 3600 * 1000).nullable(),
 })
@@ -88,6 +91,7 @@ export async function guardar(e: EntradaGuardar): Promise<ResultadoGuardar> {
       fecha: e.fecha,
       ccl: e.ccl,
       cripto: e.cripto,
+      referencia: e.referencia?.trim() ? e.referencia.trim() : null,
       nota: e.nota,
       tiempo_activo_ms: e.tiempo_activo_ms === null ? null : Math.round(e.tiempo_activo_ms),
     })
@@ -107,7 +111,7 @@ export async function guardar(e: EntradaGuardar): Promise<ResultadoGuardar> {
     const armado = armarConfirmacion({
       lote: e.lote,
       fecha: e.fecha,
-      tc: { ccl: e.ccl, cripto_venta: e.cripto },
+      tc: { ccl: e.ccl, cripto_venta: e.cripto, referencia: base.data.referencia },
       propuesta,
       elecciones: e.elecciones,
       ediciones: e.ediciones ?? {},
@@ -182,7 +186,7 @@ export async function ejemploSinBase(fecha: string): Promise<
   await exigirSesion()
   if (modoCarga() === 'real') return { ok: false, error: 'El ejemplo solo existe en el modo demo.' }
   const f = fecha.match(/^\d{4}-\d{2}-\d{2}$/) ? fecha : '2026-10-14'
-  const lecturas = [lecturaIEBEjemplo(f), lecturaGaliciaEjemplo(), lecturaMPEjemplo()]
+  const lecturas = [lecturaIEBEjemplo(f), lecturaGaliciaDosLecturasEjemplo(), lecturaMPEjemplo()]
   return {
     ok: true,
     fuentes: lecturas.map((lectura) => ({ lectura, archivo: null, firma: firmarLectura(lectura, null) })),

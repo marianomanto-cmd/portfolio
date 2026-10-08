@@ -105,7 +105,7 @@ export const CamposTC = forwardRef<HTMLInputElement, Props>(function CamposTC(
           enterKeyHint="done"
           disabled={deshabilitado}
           value={referencia}
-          maxLength={60}
+          maxLength={200}
           onChange={(e) => onReferencia(e.target.value)}
           placeholder="promedio, GGAL…"
           className={CLASE_CAMPO}

@@ -12,6 +12,10 @@ export default function ErrorApp({ error, reset }: { error: Error & { digest?: s
     console.error(error)
   }, [error])
   const falta = /SUPABASE_SECRET_KEY|Falta la variable de entorno/.test(error.message)
+  // En producción Next no manda al navegador el mensaje de un error del
+  // servidor (puede tener datos): queda en los registros de Vercel con su referencia.
+  const oculto = !error.message || /omitted in production builds/.test(error.message)
+  const detalle = oculto ? 'El detalle quedó en los registros del servidor (Vercel → Logs).' : error.message
   return (
     <section role="alert" className="rounded-xl border border-border bg-surface p-5 shadow-[var(--shadow)] md:p-6">
       <div className="flex items-start gap-3">
@@ -20,9 +24,9 @@ export default function ErrorApp({ error, reset }: { error: Error & { digest?: s
         </span>
         <div className="min-w-0 space-y-2">
           <h1 className="text-lg font-semibold">{falta ? 'Falta configurar la base: SUPABASE_SECRET_KEY en Vercel' : 'Algo falló al mostrar esta pantalla'}</h1>
-          <p className="break-words font-mono text-[13px] text-muted">
-            {error.message || 'Error sin mensaje.'}
-            {error.digest ? ` (referencia ${error.digest})` : ''}
+          <p className={`break-words text-[13px] text-muted ${oculto ? '' : 'font-mono'}`}>
+            {detalle}
+            {error.digest ? ` Referencia: ${error.digest}.` : ''}
           </p>
           <p className="text-sm text-muted">Nada se guardó ni se cambió.</p>
           <div className="flex flex-wrap gap-2">

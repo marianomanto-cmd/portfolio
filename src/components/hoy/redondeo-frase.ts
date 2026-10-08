@@ -26,8 +26,8 @@ export class Mostrar {
   constructor(frase: FraseDelDia | null, tarjetas: TarjetaPatrimonio[]) {
     for (const t of tarjetas) {
       if (t.variacion && t.desglose) {
-        grupo(this.r, t.variacion.ars, [t.desglose.tc.ars, t.desglose.activos.ars], 0)
-        grupo(this.r, t.variacion.usd, [t.desglose.activos.usd, t.desglose.tc.usd], 0)
+        grupo(this.r, t.variacion.ars, [t.desglose.tc.ars, t.desglose.activos.ars, t.desglose.sin_atribuir.ars], 0)
+        grupo(this.r, t.variacion.usd, [t.desglose.activos.usd, t.desglose.tc.usd, t.desglose.sin_atribuir.usd], 0)
       }
     }
     if (frase) {

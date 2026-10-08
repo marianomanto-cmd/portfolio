@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { GeistMono } from 'geist/font/mono'
 import { GeistSans } from 'geist/font/sans'
+import { headers } from 'next/headers'
 import type { ReactNode } from 'react'
 import './globals.css'
 
@@ -30,13 +31,17 @@ export const viewport: Viewport = {
 // Aplica tema, paleta, modo privado y barra lateral guardados ANTES de pintar,
 // para que no parpadee. localStorage puede no existir o tirar (ventana privada,
 // datos bloqueados): todo va en try/catch y sin preferencias se usa el sistema.
+// La Content-Security-Policy solo deja correr scripts con el nonce del pedido
+// (src/proxy.ts): este lo lleva. Leer el nonce hace que toda página se arme
+// por pedido, que es lo que la política necesita.
 const PREFERENCIAS = `(function(){try{var d=document.documentElement,s=window.localStorage;var t=s.getItem('portfolio:tema');if(t==='claro')d.setAttribute('data-theme','light');else if(t==='oscuro')d.setAttribute('data-theme','dark');if(s.getItem('portfolio:paleta')==='daltonica')d.setAttribute('data-paleta','daltonica');if(s.getItem('portfolio:privado')==='1')d.setAttribute('data-privado','1');var n=s.getItem('portfolio:nav');if(n==='expandida'||n==='colapsada')d.setAttribute('data-nav',n);}catch(e){}})();`
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const nonce = (await headers()).get('x-nonce') ?? undefined
   return (
     <html lang="es-AR" suppressHydrationWarning className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: PREFERENCIAS }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: PREFERENCIAS }} />
       </head>
       <body className="min-h-dvh bg-bg text-text antialiased">{children}</body>
     </html>

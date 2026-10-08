@@ -10,7 +10,7 @@ import type { NombreCuenta } from '@/lib/carga/contratos'
 import { leerExcelIEB } from '@/lib/carga/ieb'
 import { subirArchivo } from '@/lib/server/escritura'
 import { exigirSesion } from '@/lib/server/sesion'
-import { claseDeArchivo, mimeDeImagen, type RespuestaLectura } from '../_lib/fuentes'
+import { claseDeArchivo, mensajeLectura, mimeDeImagen, type RespuestaLectura } from '../_lib/fuentes'
 import { firmarLectura, modoCarga } from '../_lib/servidor'
 
 export const maxDuration = 60
@@ -56,8 +56,7 @@ export async function POST(request: Request) {
   const ms = Math.round(performance.now() - inicio)
 
   if (lectura.status === 'rejected') {
-    const que = clase === 'excel' ? 'el Excel' : pista ? `la captura de ${pista}` : 'la captura'
-    return error(`No pude leer ${que}: ${texto(lectura.reason)}`, 422)
+    return error(mensajeLectura(clase, pista, lectura.reason), 422)
   }
   if (guardado.status === 'rejected') {
     return error(`Leí ${lectura.value.cuenta}, pero no pude guardar el archivo: ${texto(guardado.reason)}`, 502)

@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { cache } from 'react'
 import { dec, decReq } from '@/lib/domain/dinero'
 import type {
   Activo,
@@ -21,13 +22,22 @@ import { leerTodo } from './supabase'
 
 // Lee todos los hechos de la base y los convierte al dominio. Los numeric
 // vienen como texto (::text) y pasan a Decimal acá y en ningún otro lado.
+//
+// Una sola lectura por pedido: el shell (indicador de datos, punto de Cargar)
+// y la pantalla piden los hechos por su lado, y React cache() los comparte
+// dentro del mismo render del servidor. Fuera de un render (Server Actions,
+// Route Handlers, tests) cache() no guarda nada y cada llamada lee la base:
+// una acción que escribe y vuelve a leer ve lo que acaba de escribir.
+// Quien recibe los hechos no los modifica (los comparten varias pantallas).
 
 type Fila = Record<string, string | number | boolean | null>
 
 const s = (v: Fila[string]) => (v === null ? null : String(v))
 const n = (v: Fila[string]) => Number(v)
 
-export async function leerHechos(): Promise<Hechos> {
+export const leerHechos: () => Promise<Hechos> = cache(leerHechosDeLaBase)
+
+async function leerHechosDeLaBase(): Promise<Hechos> {
   const [
     cuentas,
     activos,

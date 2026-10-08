@@ -13,6 +13,7 @@ export const SUBPANTALLAS = [
   { href: '/datos/cuentas', nombre: 'Cuentas', descripcion: 'IEB, Galicia y Mercado Pago' },
   { href: '/datos/bienes', nombre: 'Bienes', descripcion: 'Casa y camioneta, con valuaciones fechadas' },
   { href: '/datos/leasing', nombre: 'Leasing', descripcion: 'Contrato y capital pendiente informado' },
+  { href: '/datos/movimientos', nombre: 'Movimientos', descripcion: 'Aportes, retiros y transferencias entre tus cuentas' },
 ] as const
 
 export function SelectorDatos() {

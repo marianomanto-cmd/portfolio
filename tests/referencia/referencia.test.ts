@@ -3,6 +3,10 @@
 //
 // tests/referencia/motor_referencia.py se escribió a partir de los documentos
 // (spec, D-12, D-14, D-18, D-19, D-32, D-35 y vision.md), sin mirar este motor.
+// Después del primer cruce se le codificaron las decisiones A–E de la fase 1a
+// (atribución anclada, CCL arrastrado en la foto, compra pendiente al precio
+// del día, bienes sin moneda de riesgo, desde la compra como suma de
+// intervalos): ver su docstring. El motor tiene que coincidir al 100%.
 // tests/referencia/generar_casos.py arma ~300 casos al azar con semilla fija
 // (números inventados) y guarda en casos.json las entradas y las salidas de la
 // referencia. Este test arma los Hechos de cada caso, corre el motor y compara

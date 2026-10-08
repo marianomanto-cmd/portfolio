@@ -194,3 +194,78 @@ describe('armarConfirmacion', () => {
     expect(r.ok && r.confirmacion.nota).toBe('el CCL saltó por la licitación')
   })
 })
+
+describe('D-19, referencia del CCL y motivo principal', () => {
+  // La app tiene 1.240 SPY: 1.230 de la apertura y 10 de una compra con PPP "-".
+  function hechosConPendiente() {
+    const hechos = hechosSinBase(catalogoEjemplo())
+    const base = { fecha_origen: null, cuenta_id: 1, activo_id: -1, moneda: 'ARS' as const, importe: null, comisiones: new Decimal(0), carga_id: 1, notas: null }
+    hechos.operaciones.push(
+      { ...base, id: 30, fecha: '2026-10-01', tipo: 'apertura', cantidad: new Decimal(1230), precio: new Decimal('30100'), ccl_del_dia: null },
+      { ...base, id: 31, fecha: '2026-10-13', tipo: 'compra', cantidad: new Decimal(10), precio: null, ccl_del_dia: new Decimal('1540') },
+    )
+    hechos.cargas.push({ id: 1, lote: null, fecha: '2026-10-13', cuenta_id: 1, origen: 'excel', archivo_path: null, estado: 'vigente', creado_en: '2026-10-13T21:00:00Z', reemplaza_a: null, lector: null, tiempo_activo_ms: null })
+    return hechos
+  }
+  const soloSPY = () => {
+    const l = lecturaIEBEjemplo(FECHA)
+    l.filas = l.filas.filter((f) => f.ticker === 'SPY')
+    return l
+  }
+
+  it('la propuesta de completar no se graba sola: sin aceptarla, la fila queda pendiente', () => {
+    const e = entrada([soloSPY()], { hechos: hechosConPendiente() })
+    const spy = e.propuesta.filas.find((f) => f.ticker === 'SPY')!
+    expect(spy.accion).toBe('completar_precio')
+    // (30.145,16 × 1.240 − 1.230 × 30.100) ÷ 10 = 35.699,84
+    expect(spy.completar).toMatchObject({ operacion_id: 31, precio: '35699.84' })
+    const r = armarConfirmacion(e)
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.confirmacion.cuentas[0]).not.toHaveProperty('completar_precios')
+    expect(r.confirmacion.cuentas[0].cotizaciones).toEqual([])
+    expect(r.resumen.cuentas[0].pendientes).toBe(1)
+  })
+
+  it('aceptada, completa el precio (el propuesto o el corregido) y graba el precio del día', () => {
+    const e = entrada([soloSPY()], { hechos: hechosConPendiente() })
+    const spy = e.propuesta.filas.find((f) => f.ticker === 'SPY')!
+    const elegir = (extra: object): Elecciones => ({
+      ...SIN_ELECCIONES,
+      filas: { [spy.clave]: { resolucion: 'aceptada', motivo: 'completé', operacion: null, huella: huellaFila(spy), ...extra } },
+    })
+    const r = armarConfirmacion({ ...e, elecciones: elegir({}) })
+    expect(r.ok && r.confirmacion.cuentas[0].completar_precios).toEqual([{ operacion_id: 31, precio: '35699.84' }])
+    expect(r.ok && r.confirmacion.cuentas[0].cotizaciones).toEqual([{ activo_id: -1, precio_pesos: '35150' }])
+    expect(r.ok && r.resumen.cuentas[0].precios_completados).toBe(1)
+    const grabado = r.ok ? (r.confirmacion.cuentas[0].grabado as { filas: { completada: unknown }[] }) : null
+    expect(grabado?.filas[0].completada).toMatchObject({ operacion_id: 31, precio: '35699.84', propuesto: '35699.84' })
+
+    const corregido = armarConfirmacion({ ...e, elecciones: elegir({ precio_completar: '35900' }) })
+    expect(corregido.ok && corregido.confirmacion.cuentas[0].completar_precios).toEqual([{ operacion_id: 31, precio: '35900' }])
+
+    const sinCompletar = armarConfirmacion({ ...e, elecciones: elegir({ precio_completar: null }) })
+    expect(sinCompletar.ok && sinCompletar.confirmacion.cuentas[0]).not.toHaveProperty('completar_precios')
+    expect(sinCompletar.ok && sinCompletar.confirmacion.cuentas[0].cotizaciones).toHaveLength(1)
+
+    const malo = armarConfirmacion({ ...e, elecciones: elegir({ precio_completar: '-1' }) })
+    expect(malo).toEqual({ ok: false, errores: [expect.stringContaining('mayor que cero')] })
+  })
+
+  it('la referencia del CCL va con el tipo de cambio, recortada', () => {
+    const r = armarConfirmacion({ ...entrada([]), tc: { ccl: '1548.2', cripto_venta: null, referencia: '  Ámbito, cierre  ' } })
+    expect(r.ok && r.confirmacion.tipo_cambio).toEqual({ ccl: '1548.2', cripto_venta: null, mep: null, oficial: null, referencia: 'Ámbito, cierre' })
+    const sin = armarConfirmacion({ ...entrada([]), tc: { ccl: '1548.2', cripto_venta: null, referencia: '   ' } })
+    expect(sin.ok && sin.confirmacion.tipo_cambio).toEqual({ ccl: '1548.2', cripto_venta: null, mep: null, oficial: null })
+  })
+
+  it('una fila en error muestra su motivo principal (motivos[0]), no el último', () => {
+    const l = lecturaIEBEjemplo(FECHA)
+    l.filas = [{ ...l.filas[0], estado: 'error', motivos: ['La cuenta no cierra: 1.240 × $ 35.150 ≠ $ 43.000.000.', 'Detalle menor.'] }]
+    const e = entrada([l])
+    // Forzar la fila en error a pasar por armarConfirmacion (la bandeja no deja, pero el servidor revalida).
+    const r = armarConfirmacion(e)
+    expect(r).toEqual({ ok: false, errores: [expect.stringContaining('La cuenta no cierra')] })
+    expect(r.ok ? '' : r.errores[0]).not.toContain('Detalle menor')
+  })
+})

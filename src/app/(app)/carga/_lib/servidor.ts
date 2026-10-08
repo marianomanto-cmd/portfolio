@@ -14,7 +14,7 @@ import { leerHechos } from '@/lib/server/hechos'
 import { modoDemo } from '@/lib/server/sesion'
 import { FaltaConfiguracion, configurado } from '@/lib/server/supabase'
 import type { ArchivoGuardado } from './confirmacion'
-import { hechosSinBase, type ActivoLocal } from './demo'
+import { conCompraPendiente, hechosSinBase, type ActivoLocal } from './demo'
 
 export type ModoCarga = 'real' | 'demo' | 'sin_base'
 
@@ -25,6 +25,9 @@ export function modoCarga(): ModoCarga {
 
 export async function hechosParaCarga(locales: readonly ActivoLocal[]): Promise<{ hechos: Hechos; modo: ModoCarga }> {
   const modo = modoCarga()
+  if (modo === 'demo' && process.env.PORTFOLIO_DEMO_ESCENARIO === 'compra_pendiente') {
+    return { hechos: conCompraPendiente(hechosSinBase(locales)), modo }
+  }
   if (modo !== 'real') return { hechos: hechosSinBase(locales), modo }
   try {
     return { hechos: await leerHechos(), modo }

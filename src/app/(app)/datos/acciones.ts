@@ -5,13 +5,22 @@
 // revalidación de las pantallas que dependen de esos datos.
 
 import { revalidatePath } from 'next/cache'
-import { actualizarActivo, crearActivo, crearBien, crearPasivo, guardarPasivoSaldo, guardarValuacionBien } from '@/lib/server/escritura'
+import {
+  actualizarActivo,
+  crearActivo,
+  crearBien,
+  crearPasivo,
+  guardarMovimientoCapital,
+  guardarPasivoSaldo,
+  guardarValuacionBien,
+} from '@/lib/server/escritura'
 import { exigirSesion, modoDemo } from '@/lib/server/sesion'
 import { configurado } from '@/lib/server/supabase'
 import {
   esquemaActivo,
   esquemaBien,
   esquemaEdicionActivo,
+  esquemaMovimiento,
   esquemaPasivo,
   esquemaPasivoSaldo,
   esquemaValuacion,
@@ -150,6 +159,23 @@ export async function nuevoSaldoPasivo(previo: EstadoFormulario, form: FormData)
       if (!r.ok) throw new Error('inválido')
       await guardarPasivoSaldo(r.datos)
       return 'Capital pendiente guardado.'
+    },
+  )
+}
+
+export async function nuevoMovimiento(previo: EstadoFormulario, form: FormData): Promise<EstadoFormulario> {
+  const r = leerFormulario(esquemaMovimiento, form)
+  return escribir(
+    previo,
+    () => r,
+    async () => {
+      if (!r.ok) throw new Error('inválido')
+      await guardarMovimientoCapital(r.datos)
+      return r.datos.tipo === 'aporte'
+        ? 'El aporte quedó registrado.'
+        : r.datos.tipo === 'retiro'
+          ? 'El retiro quedó registrado.'
+          : 'La transferencia quedó registrada.'
     },
   )
 }

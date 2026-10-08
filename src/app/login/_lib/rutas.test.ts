@@ -44,10 +44,30 @@ describe('destinoSeguro', () => {
   it('acepta rutas internas con su búsqueda', () => {
     expect(destinoSeguro('/carga')).toBe('/carga')
     expect(destinoSeguro('/datos/bienes?x=1')).toBe('/datos/bienes?x=1')
+    // "//" en la búsqueda no es una ruta: queda.
+    expect(destinoSeguro('/carga?nota=a//b')).toBe('/carga?nota=a//b')
   })
 
   it('manda a Hoy lo vacío, lo externo y la propia entrada', () => {
-    for (const d of [null, undefined, '', 'carga', '//evil.com', '/\\evil.com', 'https://evil.com', '/login', '/login?desde=/x', '/a\nb']) {
+    for (const d of [
+      null,
+      undefined,
+      '',
+      'carga',
+      '//evil.com',
+      '/\\evil.com',
+      'https://evil.com',
+      '/login',
+      '/login?desde=/x',
+      '/a\nb',
+      '/a\tb',
+      '/..//evil.com',
+      '/carga//x',
+      '/carga\\..\\x',
+      `/${'x'.repeat(3000)}`,
+      '\\\\evil.com',
+      ' //evil.com',
+    ]) {
       expect(destinoSeguro(d), String(d)).toBe('/')
     }
   })

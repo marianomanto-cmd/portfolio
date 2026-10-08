@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { avisosDeFecha, claseDeArchivo, fechaDeCarga, fuentesActivas, mimeDeImagen } from './fuentes'
+import { avisosDeFecha, claseDeArchivo, fechaDeCarga, fuentesActivas, mensajeLectura, mimeDeImagen } from './fuentes'
 import { lecturaGaliciaEjemplo, lecturaIEBEjemplo, lecturaMPEjemplo } from './ejemplos'
 
 describe('claseDeArchivo', () => {
@@ -49,5 +49,18 @@ describe('fuentesActivas', () => {
   it('la elegida gana aunque sea más vieja', () => {
     const r = fuentesActivas([f('a', 'Galicia', 1), f('b', 'Galicia', 2)], { Galicia: 'a' })
     expect([...r.activas]).toEqual(['a'])
+  })
+})
+
+describe('mensajeLectura', () => {
+  it('no repite "No pude leer" si el lector ya lo dice', () => {
+    expect(mensajeLectura('imagen', 'Galicia', new Error('No pude leer la captura de Galicia: la segunda lectura falló.'))).toBe(
+      'No pude leer la captura de Galicia: la segunda lectura falló.',
+    )
+  })
+  it('agrega qué se quiso leer cuando el motivo no lo dice', () => {
+    expect(mensajeLectura('excel', undefined, new Error('El Excel no tiene la hoja Patrimonio.'))).toBe('No pude leer el Excel: El Excel no tiene la hoja Patrimonio.')
+    expect(mensajeLectura('imagen', undefined, 'Falta configurar ANTHROPIC_API_KEY')).toBe('No pude leer la captura: Falta configurar ANTHROPIC_API_KEY')
+    expect(mensajeLectura('imagen', 'Mercado Pago', new Error('tiempo agotado'))).toBe('No pude leer la captura de Mercado Pago: tiempo agotado')
   })
 })

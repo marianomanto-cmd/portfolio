@@ -432,6 +432,82 @@ select pg_temp.espera(pg_temp.huella() = :'huella_m1', 'revertir_lote: restaura 
 select pg_temp.espera_ok($$select revertir_lote('f0000000-0000-4000-8000-00000000000f', 'prueba')$$, 'revertir_lote: primera alta manual');
 select pg_temp.espera(pg_temp.huella() = :'huella_inicial', 'revertir_lote: las altas manuales no dejan rastro');
 
+-- ── D-19: completar el precio de una compra pendiente ──
+-- G1: compra del día con PPP "-" (precio e importe vacíos) y CCL con su referencia.
+select pg_temp.espera_ok($$select confirmar_carga(pg_temp.j($j${"lote": "a1900000-0000-4000-8000-000000000001", "fecha": "2026-11-10",
+  "tipo_cambio": {"ccl": "1500", "cripto_venta": null, "mep": null, "oficial": null, "referencia": "  Ámbito, cierre  "},
+  "cuentas": [{"cuenta_id": "@IEB", "origen": "manual", "cotizaciones": [], "saldos": [],
+               "operaciones": [{"activo_id": "@XCED", "tipo": "compra", "cantidad": "10", "moneda": "ARS", "precio": null,
+                                "importe": null, "comisiones": "0", "ccl_del_dia": "1500", "fecha_origen": null, "notas": null}]}]}$j$))$$,
+  'D-19: compra pendiente (PPP "-")');
+select pg_temp.espera((select referencia from tipo_cambio where fecha = '2026-11-10') = 'Ámbito, cierre',
+                      'tipo_cambio: guarda la referencia del CCL, sin espacios de más');
+select o.id as g1_op from operaciones o join cargas c on c.id = o.carga_id where c.lote = 'a1900000-0000-4000-8000-000000000001' \gset
+select pg_temp.huella() as huella_g1 \gset
+-- Rechazos: ninguno deja rastro.
+select pg_temp.espera_error_por($$select confirmar_carga(jsonb_set(pg_temp.j($j${"lote": "a1900000-0000-4000-8000-0000000000e1", "fecha": "2026-11-11",
+  "tipo_cambio": null, "cuentas": [{"cuenta_id": "@Mercado Pago", "origen": "manual", "completar_precios": [{"operacion_id": 0, "precio": "12200"}]}]}$j$),
+  '{cuentas,0,completar_precios,0,operacion_id}', to_jsonb((select o.id from operaciones o join cargas c on c.id = o.carga_id
+                                                              where c.lote = 'a1900000-0000-4000-8000-000000000001'))))$$,
+  'ya no está pendiente', 'D-19: no completa una compra de otra cuenta');
+select pg_temp.espera_error_por($$select confirmar_carga(jsonb_set(pg_temp.j($j${"lote": "a1900000-0000-4000-8000-0000000000e2", "fecha": "2026-11-09",
+  "tipo_cambio": null, "cuentas": [{"cuenta_id": "@IEB", "origen": "manual", "completar_precios": [{"operacion_id": 0, "precio": "12200"}]}]}$j$),
+  '{cuentas,0,completar_precios,0,operacion_id}', to_jsonb((select o.id from operaciones o join cargas c on c.id = o.carga_id
+                                                              where c.lote = 'a1900000-0000-4000-8000-000000000001'))))$$,
+  'ya no está pendiente', 'D-19: no completa desde una carga anterior a la compra');
+select pg_temp.espera_error_por($$select confirmar_carga(jsonb_set(pg_temp.j($j${"lote": "a1900000-0000-4000-8000-0000000000e3", "fecha": "2026-11-11",
+  "tipo_cambio": null, "cuentas": [{"cuenta_id": "@IEB", "origen": "manual", "completar_precios": [{"operacion_id": 0, "precio": 12200}]}]}$j$),
+  '{cuentas,0,completar_precios,0,operacion_id}', to_jsonb((select o.id from operaciones o join cargas c on c.id = o.carga_id
+                                                              where c.lote = 'a1900000-0000-4000-8000-000000000001'))))$$,
+  'Monto inválido', 'D-19: el precio como número JSON (D-32)');
+select pg_temp.espera_error_por($$select confirmar_carga(jsonb_set(pg_temp.j($j${"lote": "a1900000-0000-4000-8000-0000000000e4", "fecha": "2026-11-11",
+  "tipo_cambio": null, "cuentas": [{"cuenta_id": "@IEB", "origen": "manual", "completar_precios": [{"operacion_id": 0, "precio": "0"}]}]}$j$),
+  '{cuentas,0,completar_precios,0,operacion_id}', to_jsonb((select o.id from operaciones o join cargas c on c.id = o.carga_id
+                                                              where c.lote = 'a1900000-0000-4000-8000-000000000001'))))$$,
+  'operaciones_precio_check', 'D-19: precio cero');
+select pg_temp.espera_error_por($$select confirmar_carga(pg_temp.j($j${"lote": "a1900000-0000-4000-8000-0000000000e5", "fecha": "2026-11-11",
+  "tipo_cambio": null, "cuentas": [{"cuenta_id": "@IEB", "origen": "manual", "completar_precios": [{"operacion_id": 999999, "precio": "1"}]}]}$j$))$$,
+  'ya no está pendiente', 'D-19: una compra que no existe');
+select pg_temp.espera_error_por($$select confirmar_carga(pg_temp.j($j${"lote": "a1900000-0000-4000-8000-0000000000e6", "fecha": "2026-11-11",
+  "tipo_cambio": {"ccl": "1500", "referencia": 12}, "cuentas": []}$j$))$$, 'tiene que ser texto', 'tipo_cambio: referencia que no es texto');
+select pg_temp.espera_error_por(format($f$select confirmar_carga('{"lote": "a1900000-0000-4000-8000-0000000000e7", "fecha": "2026-11-11",
+  "tipo_cambio": {"ccl": "1500", "referencia": "%s"}, "cuentas": []}')$f$, repeat('x', 201)), '200 caracteres', 'tipo_cambio: referencia de más de 200 caracteres');
+select pg_temp.espera(pg_temp.huella() = :'huella_g1'
+                      and not exists (select 1 from cargas where lote::text like 'a1900000-0000-4000-8000-0000000000e%'),
+                      'D-19: los rechazos no dejan rastro');
+-- G2: la carga siguiente completa el precio.
+select pg_temp.espera_ok($$select confirmar_carga(jsonb_set(pg_temp.j($j${"lote": "a1900000-0000-4000-8000-000000000002", "fecha": "2026-11-11",
+  "tipo_cambio": null, "cuentas": [{"cuenta_id": "@IEB", "origen": "manual", "cotizaciones": [{"activo_id": "@XCED", "precio_pesos": "12300"}],
+                                     "completar_precios": [{"operacion_id": 0, "precio": "12200.5"}]}]}$j$),
+  '{cuentas,0,completar_precios,0,operacion_id}', to_jsonb((select o.id from operaciones o join cargas c on c.id = o.carga_id
+                                                              where c.lote = 'a1900000-0000-4000-8000-000000000001'))))$$,
+  'D-19: la carga siguiente completa el precio');
+select id as g2_ieb from cargas where lote = 'a1900000-0000-4000-8000-000000000002' and cuenta_id = 1 \gset
+select pg_temp.espera((select precio::text = '12200.5' and precio_carga_id = :g2_ieb and importe is null from operaciones where id = :g1_op),
+                      'D-19: la compra queda con el precio y la carga que lo completó');
+select pg_temp.espera(exists (select 1 from auditoria where tabla = 'operaciones' and operacion = 'UPDATE'
+                               and (antes ->> 'id')::bigint = :g1_op and antes ->> 'precio' is null
+                               and despues ->> 'precio' = '12200.5' and (despues ->> 'precio_carga_id')::bigint = :g2_ieb),
+                      'D-19: la auditoría guarda el cambio de precio');
+select pg_temp.huella() as huella_g2 \gset
+select pg_temp.espera_error_por($$select confirmar_carga(jsonb_set(pg_temp.j($j${"lote": "a1900000-0000-4000-8000-0000000000e8", "fecha": "2026-11-12",
+  "tipo_cambio": null, "cuentas": [{"cuenta_id": "@IEB", "origen": "manual", "completar_precios": [{"operacion_id": 0, "precio": "1"}]}]}$j$),
+  '{cuentas,0,completar_precios,0,operacion_id}', to_jsonb((select o.id from operaciones o join cargas c on c.id = o.carga_id
+                                                              where c.lote = 'a1900000-0000-4000-8000-000000000001'))))$$,
+  'ya no está pendiente', 'D-19: nunca pisa un precio conocido');
+select pg_temp.espera_error_por($$update operaciones set precio_carga_id = (select min(id) from cargas) where tipo = 'apertura'$$,
+  'operaciones_precio_carga', 'operaciones: precio completado en algo que no es una compra');
+select pg_temp.espera(pg_temp.huella() = :'huella_g2', 'D-19: el intento de pisar no deja rastro');
+-- Revertir G2 deja la compra pendiente otra vez; revertir G1 deja todo como al principio.
+select revertir_lote('a1900000-0000-4000-8000-000000000002', 'PPP mal leído') as reversion_g2 \gset
+select pg_temp.espera((:'reversion_g2'::jsonb ->> 'restauradas')::int = 1 and (:'reversion_g2'::jsonb ->> 'borradas')::int = 1,
+                      'revertir_lote: deshace la completación (1 restaurada) y borra el precio del día (1 borrada)');
+select pg_temp.espera((select precio is null and precio_carga_id is null from operaciones where id = :g1_op)
+                      and pg_temp.huella() = :'huella_g1',
+                      'revertir_lote: la compra vuelve a quedar pendiente y los hechos, como después de G1');
+select pg_temp.espera_ok($$select revertir_lote('a1900000-0000-4000-8000-000000000001', 'prueba')$$, 'revertir_lote: la compra pendiente');
+select pg_temp.espera(pg_temp.huella() = :'huella_inicial', 'D-19: después de revertir todo, la huella inicial');
+
 -- ── Catálogo: alta_activo y editar_activo ──
 select pg_temp.espera_ok($$select alta_activo('{"ticker": "XNEW", "nombre": "CEDEAR nuevo", "tipo": "cedear", "moneda_riesgo": "USD",
   "geografia": "US", "indexacion": null, "ticker_subyacente": "XNEW", "ratio": "20", "color": "#123abc"}')$$, 'alta_activo: CEDEAR con ratio');

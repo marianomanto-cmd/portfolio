@@ -12,6 +12,7 @@ import { calc, sinDato, vista, type Calc, type CalcVista } from '@/lib/domain/ca
 import { Decimal, leerNumeroAR, numero } from '@/lib/domain/dinero'
 import type { Fecha, Moneda, TipoActivo } from '@/lib/domain/tipos'
 import type {
+  Alternativa,
   Chequeo,
   ControlLeido,
   EstadoFila,
@@ -778,10 +779,14 @@ function armarFilaGalicia(
   }
   const ev = mejor as EvaluacionCombo
   const crudoDe = (f: FilaModelo | null, c: CampoNumerico) => (f ? f[c] : null)
+  // Las dos lecturas, para que el dueño elija con un toque: el decimal
+  // normalizado si se entendió; si no, el texto tal cual.
+  const alternativas: Alternativa[] = []
   for (const c of conflicto) {
     const ta = textoDe(na?.[c] ?? null, crudoDe(fa, c))
     const tb = textoDe(nb?.[c] ?? null, crudoDe(fb, c))
     diferencias.push({ campo: c, a: ta, b: tb, elegida: ev.origen[c] })
+    alternativas.push({ campo: c, a: valorDe(na?.[c] ?? null) ?? ta, b: valorDe(nb?.[c] ?? null) ?? tb, propuesta: ev.origen[c] })
   }
 
   // Especie: ticker y nombre (texto).
@@ -792,6 +797,7 @@ function armarFilaGalicia(
   let ticker = tickerA || tickerB
   if (fa && fb && tickerA !== tickerB) {
     diferencias.unshift({ campo: 'ticker', a: fa.ticker ?? 'ilegible', b: fb.ticker ?? 'ilegible', elegida: tickerA ? 'A' : 'B' })
+    alternativas.unshift({ campo: 'ticker', a: fa.ticker ?? 'ilegible', b: fb.ticker ?? 'ilegible', propuesta: tickerA ? 'A' : 'B' })
   }
   if (ticker === '' && seccion === 'fci' && nombre) ticker = normalizarNombre(nombre)
 
@@ -878,6 +884,7 @@ function armarFilaGalicia(
     motivos: estado === 'verificada' ? [] : motivos,
     chequeo: ev.arit?.chequeo ?? null,
     lugar: `captura de Galicia, ${base.seccion ?? 'tabla'}, fila ${base.n}${ticker ? ` (${ticker})` : ''}`,
+    ...(alternativas.length ? { alternativas } : {}),
   }
   return {
     fila,
@@ -983,6 +990,7 @@ function armarGalicia(a: SalidaModelo | null, b: SalidaModelo | null): Resultado
           detalle: new Decimal(informado.valor as string).isZero()
             ? 'Total en cero y sin filas.'
             : 'La captura muestra el total pero ninguna fila: no se puede controlar.',
+          tolerancia: null,
         }
         if (!new Decimal(informado.valor as string).isZero()) {
           advertencias.push(`La captura muestra "${t.etiqueta}" pero ninguna posición: ¿pegaste la pantalla de resumen? Abrí la sección y capturá la tabla.`)
@@ -995,6 +1003,7 @@ function armarGalicia(a: SalidaModelo | null, b: SalidaModelo | null): Resultado
           calculado: null,
           ok: null,
           detalle: `No verificable: falta el valorizado de ${faltan.map((f) => f.fila.ticker || f.fila.clave).join(', ')}.`,
+          tolerancia: null,
         }
       } else {
         const sumandos = filasMoneda.map((f) => f.valorizado as NumeroLeido)
@@ -1011,6 +1020,7 @@ function armarGalicia(a: SalidaModelo | null, b: SalidaModelo | null): Resultado
             `Suma de ${sumandos.length} valorizado${sumandos.length === 1 ? '' : 's'}: ${fmtPlata(elegido.r.calculado, moneda)}` +
             ` ${elegido.r.ok ? '≈' : '≠'} ${fmtPlata(new Decimal(elegido.c.valor as string), moneda)} de la captura (tolerancia ±${fmtPlata(elegido.r.tolerancia, moneda, 4)}).` +
             (difieren ? ` Lectura A: ${corto(t.a)} · Lectura B: ${corto(t.b)}.` : ''),
+          tolerancia: elegido.r.tolerancia.toFixed(),
         }
         if (!elegido.r.ok) {
           degradar(sec.titulo, `La suma de los valorizados no da "${t.etiqueta}" de la captura: ¿falta una fila o hay un número mal leído?`, moneda ?? 'ARS')
@@ -1092,11 +1102,13 @@ function armarMercadoPago(a: SalidaModelo | null, b: SalidaModelo | null): { sal
     })
   }
   const motivos: string[] = []
+  const alternativas: Alternativa[] = []
   let estado: EstadoFila = 'verificada'
   const mostrar = (m: MercadoPagoModelo | null, t: string | null) =>
     t === null ? (m?.saldo_entero ? `"${corto(`${m.saldo_entero}${m.saldo_decimales ? ` + ${m.saldo_decimales}` : ''}`)}" (ilegible)` : 'ilegible') : `$ ${corto(t)}`
   if (va !== vb) {
     motivos.push(`Saldo — Lectura A: ${mostrar(ma, ta)} · Lectura B: ${mostrar(mb, tb)} (se propone la ${va !== null ? 'A' : 'B'}).`)
+    alternativas.push({ campo: 'monto', a: va ?? mostrar(ma, ta), b: vb ?? mostrar(mb, tb), propuesta: va !== null ? 'A' : 'B' })
     estado = 'advertencia'
   }
   const ca = monedaMP(ma)
@@ -1104,6 +1116,7 @@ function armarMercadoPago(a: SalidaModelo | null, b: SalidaModelo | null): { sal
   let moneda: Moneda = ca ?? cb ?? 'ARS'
   if (ca && cb && ca !== cb) {
     motivos.push(`Moneda — Lectura A: ${ca} · Lectura B: ${cb} (se propone la A).`)
+    alternativas.push({ campo: 'moneda', a: ca, b: cb, propuesta: 'A' })
     estado = 'advertencia'
     moneda = ca
   } else if (!ca && !cb) {
@@ -1129,6 +1142,7 @@ function armarMercadoPago(a: SalidaModelo | null, b: SalidaModelo | null): { sal
     estado,
     motivos,
     lugar: `captura de Mercado Pago, saldo${ma?.pestana || mb?.pestana ? ` de la pestaña ${ma?.pestana ?? mb?.pestana}` : ''}`,
+    ...(alternativas.length ? { alternativas } : {}),
   }
   return {
     saldos: [saldo],

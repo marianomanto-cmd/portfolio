@@ -22,6 +22,7 @@ import type {
   CotizacionAGrabar,
   CuentaAGrabar,
   OperacionAGrabar,
+  PrecioACompletar,
   ResultadoConfirmacion,
   SaldoAGrabar,
 } from '@/lib/carga/contratos'
@@ -64,6 +65,29 @@ export interface BienAlta {
   moneda_valuacion: Moneda
   geografia?: Geografia
   pasivo_id?: number | null
+}
+
+/**
+ * Plata que entra, sale o se mueve entre cuentas propias (D-06). Sin esto un
+ * depósito se leería como ganancia.
+ *   aporte: de afuera a una cuenta (destino y monto de destino).
+ *   retiro: de una cuenta hacia afuera (origen y monto de origen).
+ *   transferencia: entre dos cuentas propias distintas, con los dos montos.
+ * `impuesto` va en la moneda de origen; `tc_aplicado`, si hubo conversión.
+ */
+export interface MovimientoCapitalAlta {
+  tipo: 'aporte' | 'retiro' | 'transferencia'
+  fecha: Fecha
+  fecha_acreditacion?: Fecha | null
+  cuenta_origen_id?: number | null
+  cuenta_destino_id?: number | null
+  moneda_origen?: Moneda | null
+  monto_origen?: string | null
+  moneda_destino?: Moneda | null
+  monto_destino?: string | null
+  tc_aplicado?: string | null
+  impuesto?: string | null
+  notas?: string | null
 }
 
 export interface PasivoAlta {
@@ -155,6 +179,14 @@ export async function guardarPasivoSaldo(s: { pasivo_id: number; fecha: Fecha; c
   const p = altaManual({ pasivo_saldos: [normalizarPasivoSaldo(s)] }, s.fecha)
   const data = await llamar('guardar_manual', { p }, 'guardar el capital pendiente', { reintentable: true })
   return leerId(data, 'guardar el capital pendiente')
+}
+
+/** Graba un aporte, un retiro o una transferencia entre cuentas propias (D-06). Devuelve el id de la carga. */
+export async function guardarMovimientoCapital(m: MovimientoCapitalAlta): Promise<number> {
+  const mov = normalizarMovimiento(m)
+  const p = altaManual({ movimientos_capital: [mov] }, mov.fecha)
+  const data = await llamar('guardar_manual', { p }, 'guardar el movimiento', { reintentable: true })
+  return leerId(data, 'guardar el movimiento')
 }
 
 export const BUCKET_CARGAS = 'cargas'
@@ -256,6 +288,9 @@ const RESTRICCIONES: Record<string, string> = {
   operaciones_activo_id_fkey: 'El activo no está en el catálogo: dalo de alta antes de grabar la operación',
   operaciones_cuenta_id_fkey: 'La cuenta de la operación no existe',
   operaciones_una_apertura: 'Ya existe una apertura de ese activo en esa cuenta: la tenencia inicial se carga una sola vez',
+  operaciones_precio_carga: 'Solo se completa el precio de una compra, y queda con precio y sin importe',
+  operaciones_precio_carga_id_fkey: 'La carga que completa el precio no existe',
+  tipo_cambio_referencia_check: 'La referencia del CCL no puede estar vacía ni pasar los 200 caracteres',
   // eventos
   eventos_tipo_check: 'El tipo de evento no es válido',
   eventos_nota: 'La nota del día necesita texto y su carga',
@@ -786,6 +821,9 @@ function normalizarCuenta(k: CuentaAGrabar, i: number): CuentaAGrabar {
   const monedaRepetida = primerRepetido(saldos.map((s) => s.moneda))
   if (monedaRepetida !== null) throw new ErrorEscritura(`${mayus(nombre)} tiene dos saldos en ${monedaRepetida}.`)
   const operaciones = lista(k.operaciones, 'las operaciones').map((o, j) => normalizarOperacion(o, nombre, j))
+  const completar_precios = lista(k.completar_precios, 'los precios a completar').map((c, j) => normalizarPrecioACompletar(c, nombre, j))
+  const compraRepetida = primerRepetido(completar_precios.map((c) => c.operacion_id))
+  if (compraRepetida !== null) throw new ErrorEscritura(`La compra #${compraRepetida} aparece dos veces entre los precios a completar de ${nombre}.`)
   return {
     cuenta_id,
     origen,
@@ -798,6 +836,18 @@ function normalizarCuenta(k: CuentaAGrabar, i: number): CuentaAGrabar {
     cotizaciones,
     saldos,
     operaciones,
+    // Solo si hay: la forma de siempre no cambia (D-19).
+    ...(completar_precios.length ? { completar_precios } : {}),
+  }
+}
+
+/** Precio que completa una compra pendiente (D-19): id de la compra y precio mayor que cero. */
+function normalizarPrecioACompletar(c: PrecioACompletar, cuenta: string, i: number): PrecioACompletar {
+  const campo = `el precio a completar ${i + 1} de ${cuenta}`
+  if (!esObjeto(c)) throw new ErrorEscritura(`${mayus(campo)} no tiene forma de precio a completar.`)
+  return {
+    operacion_id: idPositivo(c.operacion_id, `la compra de ${campo}`),
+    precio: montoRequerido(c.precio, campo, 'positivo'),
   }
 }
 
@@ -828,7 +878,10 @@ export function normalizarConfirmacion(c: ConfirmacionCarga): ConfirmacionCarga 
       mep: montoParaBase(c.tipo_cambio.mep, 'el MEP', 'positivo'),
       oficial: montoParaBase(c.tipo_cambio.oficial, 'el dólar oficial', 'positivo'),
     }
-    if (Object.values(tc).some((v) => v !== null)) tipo_cambio = tc
+    const referencia = textoOpcional(c.tipo_cambio.referencia, 'la referencia del CCL')
+    if (referencia !== null && referencia.length > 200) throw new ErrorEscritura('La referencia del CCL tiene más de 200 caracteres.')
+    // Una referencia sola no es un dato: sin ningún valor, el tipo de cambio no se graba.
+    if (Object.values(tc).some((v) => v !== null)) tipo_cambio = referencia === null ? tc : { ...tc, referencia }
   }
   if (c.cuentas !== null && c.cuentas !== undefined && !Array.isArray(c.cuentas)) {
     throw new ErrorEscritura('Las cuentas de la carga tienen que ser una lista.')
@@ -977,6 +1030,69 @@ export function normalizarPasivoSaldo(s: { pasivo_id: number; fecha: Fecha; capi
     pasivo_id: idPositivo(s.pasivo_id, 'el pasivo'),
     fecha: fechaRequerida(s.fecha, 'la fecha del capital pendiente'),
     capital_pendiente: montoRequerido(s.capital_pendiente, 'el capital pendiente', 'no_negativo'),
+  }
+}
+
+const TIPOS_MOVIMIENTO = ['aporte', 'retiro', 'transferencia'] as const
+
+/**
+ * Valida un movimiento de capital con las reglas de la base (forma por tipo,
+ * montos positivos, acreditación no anterior a la fecha) y lo normaliza.
+ */
+export function normalizarMovimiento(m: MovimientoCapitalAlta) {
+  if (!esObjeto(m)) throw new ErrorEscritura('El movimiento llegó vacío.')
+  const tipo = elegir(m.tipo, TIPOS_MOVIMIENTO, 'el tipo de movimiento')
+  const fecha = fechaRequerida(m.fecha, 'la fecha del movimiento')
+  const fecha_acreditacion = fechaOpcional(m.fecha_acreditacion, 'la fecha de acreditación')
+  if (fecha_acreditacion !== null && fecha_acreditacion < fecha) {
+    throw new ErrorEscritura('La fecha de acreditación no puede ser anterior a la del movimiento.')
+  }
+  const id = (v: unknown, campo: string) => (v === null || v === undefined ? null : idPositivo(v, campo))
+  const cuenta_origen_id = id(m.cuenta_origen_id, 'la cuenta de origen')
+  const cuenta_destino_id = id(m.cuenta_destino_id, 'la cuenta de destino')
+  const monto_origen = montoParaBase(m.monto_origen, 'el monto que salió', 'positivo')
+  const monto_destino = montoParaBase(m.monto_destino, 'el monto que entró', 'positivo')
+  const moneda = (v: unknown, monto: string | null, campo: string): Moneda | null => {
+    if (monto === null) {
+      if (v !== null && v !== undefined && v !== '') throw new ErrorEscritura(`${mayus(campo)} va solo con su monto.`)
+      return null
+    }
+    return elegir(v, MONEDAS, campo)
+  }
+  const moneda_origen = moneda(m.moneda_origen, monto_origen, 'la moneda de origen')
+  const moneda_destino = moneda(m.moneda_destino, monto_destino, 'la moneda de destino')
+  if (tipo === 'aporte') {
+    if (cuenta_destino_id === null) throw new ErrorEscritura('Un aporte entra a una cuenta: falta la cuenta de destino.')
+    if (cuenta_origen_id !== null) throw new ErrorEscritura('Un aporte viene de afuera: no lleva cuenta de origen.')
+    if (monto_destino === null) throw new ErrorEscritura('Falta cuánto entró a la cuenta.')
+  } else if (tipo === 'retiro') {
+    if (cuenta_origen_id === null) throw new ErrorEscritura('Un retiro sale de una cuenta: falta la cuenta de origen.')
+    if (cuenta_destino_id !== null) throw new ErrorEscritura('Un retiro va hacia afuera: no lleva cuenta de destino.')
+    if (monto_origen === null) throw new ErrorEscritura('Falta cuánto salió de la cuenta.')
+  } else {
+    if (cuenta_origen_id === null || cuenta_destino_id === null) {
+      throw new ErrorEscritura('Una transferencia une dos cuentas tuyas: faltan el origen o el destino.')
+    }
+    if (cuenta_origen_id === cuenta_destino_id) throw new ErrorEscritura('Una transferencia une dos cuentas distintas.')
+    if (monto_origen === null || monto_destino === null) {
+      throw new ErrorEscritura('Una transferencia lleva lo que salió y lo que entró.')
+    }
+  }
+  const notas = textoOpcional(m.notas, 'las notas')
+  if (notas !== null && notas.length > 500) throw new ErrorEscritura('Las notas tienen más de 500 caracteres.')
+  return {
+    tipo,
+    fecha,
+    fecha_acreditacion,
+    cuenta_origen_id,
+    cuenta_destino_id,
+    moneda_origen,
+    monto_origen,
+    moneda_destino,
+    monto_destino,
+    tc_aplicado: montoParaBase(m.tc_aplicado, 'el tipo de cambio aplicado', 'positivo'),
+    impuesto: montoParaBase(m.impuesto, 'el impuesto', 'no_negativo') ?? '0',
+    notas,
   }
 }
 

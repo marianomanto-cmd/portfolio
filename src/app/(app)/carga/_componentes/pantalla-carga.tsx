@@ -7,7 +7,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, Undo2 } from 'lucide-react'
-import type { DecisionFila, DecisionSaldo, NombreCuenta, PropuestaCarga } from '@/lib/carga/contratos'
+import type { DecisionFila, DecisionSaldo, FilaLeida, NombreCuenta, PropuestaCarga } from '@/lib/carga/contratos'
 import { fechaCorta } from '@/lib/domain/fechas'
 import {
   SIN_ELECCIONES,
@@ -291,6 +291,13 @@ export function PantallaCarga({ contexto }: { contexto: ContextoCarga }) {
   }, [claveLecturas, claveEdiciones, claveLocales, ccl.valor, fecha])
 
   const resumen = resumirBandeja(lecturas.length ? propuesta : null, elecciones, tiposDeCambio)
+  // Las filas tal como las leyó cada lector (sin ediciones): para elegir entre las dos lecturas.
+  const originales = useMemo(() => {
+    const m = new Map<string, FilaLeida>()
+    for (const l of lecturas) for (const f of l.filas) m.set(f.clave, f)
+    return m
+  }, [lecturas])
+  const dolarIEB = lecturas.find((l) => l.cuenta === 'IEB')?.tipo_cambio_fuente?.dolar_ieb ?? null
   const boton = textoBoton(resumen, { leyendo: nombreLeyendo ? [nombreLeyendo] : [], proponiendo, guardando })
   const avisos = useMemo(() => {
     const todos = [...(propuesta?.advertencias ?? []), ...avisosDeFecha(lecturas, fecha, contexto.hoy)]
@@ -325,11 +332,29 @@ export function PantallaCarga({ contexto }: { contexto: ContextoCarga }) {
   const editarFila = useCallback((clave: string, e: EdicionFila | null) => {
     setEdiciones((x) => {
       const y = { ...x }
-      if (e === null || (e.cantidad === null && e.precio_unitario === null)) delete y[clave]
+      if (e === null || (e.cantidad === null && e.precio_unitario === null && (e.valorizado ?? null) === null)) delete y[clave]
       else y[clave] = e
       return y
     })
   }, [])
+
+  // Elegir la lectura propuesta después de haber elegido la otra: se saca la
+  // edición y, cuando la fila vuelve tal como se leyó, se acepta.
+  const aceptarAlVolver = useRef(new Map<string, string>())
+  useEffect(() => {
+    if (!propuesta || aceptarAlVolver.current.size === 0) return
+    for (const [clave, motivo] of aceptarAlVolver.current) {
+      const d = propuesta.filas.find((f) => f.clave === clave)
+      if (!d) {
+        aceptarAlVolver.current.delete(clave)
+        continue
+      }
+      const sinEditar = !ediciones[clave] && !d.motivos.some((m) => m.startsWith('Editada a mano'))
+      if (!sinEditar) continue
+      if (d.estado === 'advertencia') elegirFila(d, { resolucion: 'aceptada', motivo, operacion: null })
+      aceptarAlVolver.current.delete(clave)
+    }
+  }, [propuesta, ediciones, elegirFila])
 
   // ───────────── Guardar ─────────────
   const enfocarProblema = () => {
@@ -353,6 +378,8 @@ export function PantallaCarga({ contexto }: { contexto: ContextoCarga }) {
         fecha,
         ccl: ccl.valor,
         cripto: cripto.valor,
+        // La referencia se guarda con el tipo de cambio (y se recuerda en este dispositivo).
+        referencia: ccl.valor && referencia.trim() ? referencia.trim().slice(0, 200) : null,
         nota: nota.trim() ? nota.trim() : null,
         tiempo_activo_ms: reloj.current.activoMs,
         fuentes: fuentesListas.map((f) => ({ lectura: f.respuesta!.lectura, archivo: f.respuesta!.archivo, firma: f.respuesta!.firma })),
@@ -473,6 +500,7 @@ export function PantallaCarga({ contexto }: { contexto: ContextoCarga }) {
                     <li key={c.cuenta}>
                       {c.cuenta}: {plural(c.cotizaciones, 'precio', 'precios')} · {plural(c.saldos, 'saldo', 'saldos')} ·{' '}
                       {plural(c.operaciones, 'operación', 'operaciones')}
+                      {c.precios_completados ? ` · ${plural(c.precios_completados, 'precio completado', 'precios completados')}` : ''}
                       {c.listado_completo ? '' : ' · listado incompleto'}
                     </li>
                   ))}
@@ -636,6 +664,10 @@ export function PantallaCarga({ contexto }: { contexto: ContextoCarga }) {
               onAlta={(a) => setActivosLocales((xs) => [...xs.filter((x) => x.ticker !== a.ticker), a])}
               onIrAlCcl={() => refCcl.current?.focus()}
               tiposTipeados={[ccl.valor ? 'CCL' : null, cripto.valor ? 'cripto' : null].filter((x): x is string => x !== null)}
+              originalDe={(clave) => originales.get(clave) ?? null}
+              onAceptarAlVolver={(clave, motivo) => aceptarAlVolver.current.set(clave, motivo)}
+              dolarIEB={dolarIEB}
+              ccl={ccl.valor}
             />
           ) : (
             <p className="text-sm text-muted">

@@ -55,6 +55,7 @@ export function lecturaIEBEjemplo(fecha: Fecha): LecturaCuenta {
       { tipo: 'ieb_subtotal', seccion: 'Cedears', informado: '43586000', calculado: '43586000', ok: true, detalle: null },
     ],
     advertencias: [],
+    tipo_cambio_fuente: { dolar_ieb: '1540' },
     lector: 'ejemplo@1',
     cruda: { ejemplo: true },
   }
@@ -77,6 +78,21 @@ export function lecturaGaliciaEjemplo(): LecturaCuenta {
   }
 }
 
+/**
+ * Galicia con una fila en la que las dos lecturas de la captura no coinciden
+ * (la cantidad): para ver en el modo demo cómo se elige una con un toque.
+ */
+export function lecturaGaliciaDosLecturasEjemplo(): LecturaCuenta {
+  const l = lecturaGaliciaEjemplo()
+  l.filas[0] = {
+    ...l.filas[0],
+    estado: 'advertencia',
+    motivos: ['Cantidad — Lectura A: 11.500.000 · Lectura B: 11.300.000 (se propone la A, que cierra cantidad × precio ≈ valorizado).'],
+    alternativas: [{ campo: 'cantidad', a: '11500000', b: '11300000', propuesta: 'A' }],
+  }
+  return l
+}
+
 export function lecturaMPEjemplo(): LecturaCuenta {
   return {
     cuenta: 'Mercado Pago',
@@ -89,11 +105,8 @@ export function lecturaMPEjemplo(): LecturaCuenta {
         monto: '4912300',
         tna: '27.5',
         estado: 'advertencia',
-        motivos: ['Las dos lecturas no coinciden: $ 4.912.300 y $ 4.912.800.'],
-        partes: [
-          { concepto: 'lectura 1', monto: '4912300' },
-          { concepto: 'lectura 2', monto: '4912800' },
-        ],
+        motivos: ['Saldo — Lectura A: $ 4.912.300 · Lectura B: $ 4.912.800 (se propone la A).'],
+        alternativas: [{ campo: 'monto', a: '4912300', b: '4912800', propuesta: 'A' }],
       }),
     ],
     controles: [],

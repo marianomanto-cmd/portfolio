@@ -12,6 +12,8 @@ export interface EdicionFila {
   cantidad: string | null
   /** Precio por 1 VN / 1 unidad corregido (decimal normalizado). */
   precio_unitario: string | null
+  /** Valorizado corregido: la otra lectura de una captura (decimal normalizado). */
+  valorizado?: string | null
 }
 
 export type Ediciones = Readonly<Record<string, EdicionFila>>
@@ -34,15 +36,18 @@ export function toleranciaEditada(cantidad: string, precio: string): Decimal {
 export function editarFila(f: FilaLeida, e: EdicionFila): FilaLeida {
   const cantidad = e.cantidad ?? f.cantidad
   const precio = e.precio_unitario ?? f.precio_unitario
+  const valorizado = e.valorizado ?? f.valorizado
   const cambios: string[] = []
   if (e.cantidad !== null && e.cantidad !== f.cantidad) cambios.push(`cantidad ${numero(e.cantidad, 4, { min: 0 })}`)
   if (e.precio_unitario !== null && e.precio_unitario !== f.precio_unitario) {
     cambios.push(`precio ${monto(e.precio_unitario, 'ARS', { decimales: Math.max(2, decimalesDe(e.precio_unitario)) })}`)
   }
+  if (e.valorizado != null && e.valorizado !== f.valorizado) cambios.push(`valorizado ${monto(e.valorizado, 'ARS', { decimales: 2 })}`)
   const base: FilaLeida = {
     ...f,
     cantidad,
     precio_unitario: precio,
+    valorizado,
     // El precio tipeado es por 1 VN: el mostrado deja de aplicar.
     precio_mostrado: e.precio_unitario !== null ? null : f.precio_mostrado,
     escala: e.precio_unitario !== null ? '1' : f.escala,
@@ -51,7 +56,7 @@ export function editarFila(f: FilaLeida, e: EdicionFila): FilaLeida {
   if (cantidad === null || precio === null) {
     return { ...base, estado: 'error', motivos: [`Editada a mano (${queCambio}), pero falta ${cantidad === null ? 'la cantidad' : 'el precio'}.`], chequeo: null }
   }
-  if (f.valorizado === null) {
+  if (valorizado === null) {
     return {
       ...base,
       estado: 'advertencia',
@@ -65,18 +70,18 @@ export function editarFila(f: FilaLeida, e: EdicionFila): FilaLeida {
   const tipeada = toleranciaEditada(cantidad, precio)
   const original = f.chequeo && /^\d+(\.\d+)?$/.test(f.chequeo.tolerancia) ? new Decimal(f.chequeo.tolerancia) : null
   const tolerancia = original && original.lt(tipeada) ? original : tipeada
-  const ok = calculado.minus(f.valorizado).abs().lte(tolerancia)
+  const ok = calculado.minus(valorizado).abs().lte(tolerancia)
   return {
     ...base,
     estado: ok ? 'verificada' : 'error',
     motivos: ok
       ? [`Editada a mano (${queCambio}); cierra contra el valorizado de la fuente.`]
       : [
-          `Editada a mano (${queCambio}), pero no cierra: ${numero(cantidad, 4, { min: 0 })} × ${numero(precio, 6, { min: 2 })} = ${monto(calculado, 'ARS', { decimales: 2 })} y la fuente dice ${monto(f.valorizado, 'ARS', { decimales: 2 })}.`,
+          `Editada a mano (${queCambio}), pero no cierra: ${numero(cantidad, 4, { min: 0 })} × ${numero(precio, 6, { min: 2 })} = ${monto(calculado, 'ARS', { decimales: 2 })} y la fuente dice ${monto(valorizado, 'ARS', { decimales: 2 })}.`,
         ],
     chequeo: {
       regla: 'cantidad × precio por 1 VN ≈ valorizado (editada a mano)',
-      esperado: new Decimal(f.valorizado).toFixed(),
+      esperado: new Decimal(valorizado).toFixed(),
       calculado: calculado.toFixed(),
       tolerancia: tolerancia.toFixed(),
       ok,

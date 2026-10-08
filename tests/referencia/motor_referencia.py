@@ -19,6 +19,39 @@ significativos. "Sin dato" es `None` y se propaga: toda cuenta con un insumo
 Correr `python3 tests/referencia/motor_referencia.py` verifica la referencia
 contra los ejemplos numéricos de D-35 y del Apéndice B de `vision.md`.
 
+Decisiones de la fase 1a (provisorias, las tomó el responsable de la
+integración y las confirma el dueño; ver docs/decisiones.md). Se codificaron
+acá después del primer cruce y reemplazan a I-5, I-6, I-7, I-8 e I-10:
+
+- A. Atribución anclada (visión 4.2, D-35). Una observación de una partida el
+  día d es FRESCA si ese día se tipeó un CCL y además hay una cotización del
+  activo de ese día, o la cantidad es 0 (cerrada o todavía no abierta). Con
+  a0 = última fresca ≤ d0 y a1 = última fresca ≤ d1: si a1 > a0, activo y TC
+  son D-35 sobre (a0, a1] (CCL tipeados en a0 y a1, flujos de (a0, a1] cada
+  uno a su CCL) y sin atribuir = R − activo − TC; si no, activo = TC = 0 y
+  todo es sin atribuir. R = V1 − V0 − ΣF como antes. Un período con cargas
+  intermedias es la SUMA de los intervalos entre cargas consecutivas (una
+  carga es cualquier fecha con un tipo de cambio o un precio). Los flujos son
+  fijos: no dependen del intervalo.
+- B. Sin CCL tipeado ese día, la foto usa el último tipeado (como un precio de
+  ayer). La atribución no lo usa (A exige CCL tipeado).
+- C. Compra con precio pendiente (D-19): su flujo se valúa al precio del día
+  de la compra (la última cotización en o antes de esa fecha; si no hay, la
+  primera posterior), marcado "inferido" en el motor.
+- A (flujos fijos): una apertura dentro del intervalo entra a su valor del día
+  de la apertura (cantidad × precio de ese día, al CCL de ese día; el CCL de
+  compra declarado es para el PPC). El CCL de un flujo es el `ccl` de la
+  operación; si no tiene, el tipeado ese día o el último anterior.
+- E. Desde la compra: suma de los intervalos entre cargas desde la primera
+  observación fresca de la tenencia, más un intervalo por lote antes de ella,
+  desde su costo al CCL de compra hasta su valor en esa observación (visión 4.5
+  y D-35 adoptada). Reemplaza a I-11 (CCL_prom queda solo si hubo una baja o un
+  cambio de ratio antes de la primera observación).
+- B07 (pedido explícito): un precio anterior a un cambio de ratio no sirve
+  para la cantidad nueva: el valor es "sin dato".
+- Una partida "sin dato" en un intervalo lo es en las dos monedas (como el
+  motor: si falta el valor o un flujo, no hay resultado de esa partida).
+
 Fórmulas
 ========
 
@@ -286,6 +319,53 @@ def tenencia(operaciones: list[dict], fecha: str) -> dict:
 # ───────────────────────────── foto ──────────────────────────────────────────
 
 
+def ccl_vigente(ccl: dict[str, str | None], fecha: str) -> Monto:
+    """Decisión B: el último CCL tipeado en o antes de la fecha."""
+    mejor = None
+    for d, v in ccl.items():
+        if v is not None and d <= fecha and (mejor is None or d > mejor):
+            mejor = d
+    return None if mejor is None else dec(ccl[mejor])
+
+
+def ccl_de(ccl: dict[str, str | None], fecha: str) -> Monto:
+    """CCL de un flujo sin CCL propio: el vigente; si no hay, el primero posterior."""
+    v = ccl_vigente(ccl, fecha)
+    if v is not None:
+        return v
+    posteriores = sorted(d for d, x in ccl.items() if x is not None and d > fecha)
+    return dec(ccl[posteriores[0]]) if posteriores else None
+
+
+def precio_dia(partida: dict, fecha: str) -> Monto:
+    """Precio del día de una operación: el último en o antes; si no hay, el primero posterior (decisión C)."""
+    p, _ = precio_vigente(partida['precios'], fecha)
+    if p is not None:
+        return p
+    posteriores = sorted((x for x in partida['precios'] if x['fecha'] > fecha), key=lambda x: x['fecha'])
+    return dec(posteriores[0]['precio']) if posteriores else None
+
+
+def ultimo_ratio(operaciones: list[dict], fecha: str) -> str | None:
+    """Fecha del último ajuste de ratio de la tenencia vigente en o antes de la fecha."""
+    q = CERO
+    ult = None
+    for op in ordenar(operaciones):
+        if op['fecha'] > fecha:
+            break
+        if op['tipo'] in ('apertura', 'compra'):
+            q += dec(op['cantidad'])
+        elif op['tipo'] == 'venta':
+            q -= dec(op['cantidad'])
+        elif op['tipo'] == 'ajuste_ratio':
+            q += dec(op['cantidad'])
+            ult = op['fecha']
+        if q <= 0:
+            q = CERO
+            ult = None
+    return ult
+
+
 def precio_vigente(precios: list[dict], fecha: str) -> tuple[Monto, str | None]:
     mejor = None
     for p in precios:
@@ -299,7 +379,10 @@ def precio_vigente(precios: list[dict], fecha: str) -> tuple[Monto, str | None]:
 def foto(partida: dict, ccl: dict[str, str | None], fecha: str) -> dict:
     t = tenencia(partida['operaciones'], fecha)
     precio, fecha_precio = precio_vigente(partida['precios'], fecha)
-    ccl_d = dec(ccl.get(fecha))
+    r = ultimo_ratio(partida['operaciones'], fecha)
+    if fecha_precio is not None and r is not None and fecha_precio < r:
+        precio, fecha_precio = None, None  # B07
+    ccl_d = ccl_vigente(ccl, fecha)  # decisión B
     if t['cantidad'] == 0:
         valor_ars: Monto = CERO  # I-4
         valor_usd: Monto = CERO
@@ -380,19 +463,26 @@ def _partes_de_lo_conocido(d: dict) -> dict:
     return d
 
 
-def flujos_intervalo(partida: dict, t0: str, t1: str, precio1: Monto, ccl1: Monto) -> list[tuple[Monto, Monto]]:
-    """Flujos de la partida con t0 < fecha ≤ t1 (I-1, I-6, I-7)."""
+def flujos_intervalo(partida: dict, ccl: dict[str, str | None], t0: str, t1: str) -> list[tuple[Monto, Monto]]:
+    """Flujos de la partida con t0 < fecha ≤ t1, fijos (decisiones A y C)."""
     out: list[tuple[Monto, Monto]] = []
     for op in ordenar(partida['operaciones']):
         if not (t0 < op['fecha'] <= t1):
             continue
         tipo = op['tipo']
+        c_op = dec(op.get('ccl')) if op.get('ccl') is not None else ccl_de(ccl, op['fecha'])
         if tipo == 'compra':
-            out.append((costo_operacion_ars(op), dec(op.get('ccl'))))
+            costo = costo_operacion_ars(op)
+            if costo is None:  # decisión C: precio pendiente → precio del día
+                costo = prod(dec(op['cantidad']), precio_dia(partida, op['fecha']))
+            out.append((costo, c_op))
         elif tipo == 'venta':
-            out.append((neg(cobrado_venta_ars(op)), dec(op.get('ccl'))))
+            cobrado = cobrado_venta_ars(op)
+            if cobrado is None:
+                cobrado = prod(dec(op['cantidad']), precio_dia(partida, op['fecha']))
+            out.append((neg(cobrado), c_op))
         elif tipo == 'apertura':
-            out.append((prod(dec(op['cantidad']), precio1), ccl1))
+            out.append((prod(dec(op['cantidad']), precio_dia(partida, op['fecha'])), ccl_de(ccl, op['fecha'])))
         elif tipo == 'ajuste_ratio':
             pass
         else:
@@ -400,57 +490,88 @@ def flujos_intervalo(partida: dict, t0: str, t1: str, precio1: Monto, ccl1: Mont
     return out
 
 
-def es_atribuible(partida: dict, t0: str, t1: str, cantidad_t1: Decimal) -> bool:
-    """I-8: hay precio nuevo en (t0, t1], o la partida quedó cerrada en t1."""
-    return cantidad_t1 == 0 or any(t0 < p['fecha'] <= t1 for p in partida['precios'])
+def fresca(partida: dict, ccl: dict[str, str | None], d: str) -> bool:
+    """Decisión A: CCL tipeado ese día y (precio de ese día o cantidad 0)."""
+    if ccl.get(d) is None:
+        return False
+    if any(p['fecha'] == d for p in partida['precios']):
+        return True
+    return tenencia(partida['operaciones'], d)['cantidad'] == 0
 
 
-def variacion(partida: dict, ccl: dict[str, str | None], t0: str, t1: str) -> dict:
+def ancla(partida: dict, ccl: dict[str, str | None], d: str) -> str | None:
+    fechas = sorted((x for x, v in ccl.items() if v is not None and x <= d), reverse=True)
+    for x in fechas:
+        if fresca(partida, ccl, x):
+            return x
+    return None
+
+
+SIN_DATO = {c: None for c in (
+    'resultado_ars', 'resultado_usd', 'activo_ars', 'tc_ars', 'sin_atribuir_ars',
+    'activo_usd', 'tc_usd', 'sin_atribuir_usd')}
+
+
+def intervalo(partida: dict, ccl: dict[str, str | None], t0: str, t1: str) -> dict:
+    """Un intervalo entre dos cargas consecutivas, con la atribución anclada (A)."""
     f0 = foto(partida, ccl, t0)
     f1 = foto(partida, ccl, t1)
-    flujos = flujos_intervalo(partida, t0, t1, f1['precio'], f1['ccl'])
-    atribuible = es_atribuible(partida, t0, t1, f1['cantidad'])
-    d = desglose_intervalo(
-        partida['riesgo'], f0['valor_ars'], f0['valor_usd'], f1['valor_ars'], f1['valor_usd'],
-        f0['ccl'], f1['ccl'], flujos, atribuible,
-    )
+    flujos = flujos_intervalo(partida, ccl, t0, t1)
+    if f0['cantidad'] == 0 and f1['cantidad'] == 0 and not flujos:
+        return {c: CERO for c in SIN_DATO} | {'atribuible': True}
+    faltan = (f0['ccl'] is None or f1['ccl'] is None
+              or f0['valor_ars'] is None or f0['valor_usd'] is None or f1['valor_ars'] is None or f1['valor_usd'] is None
+              or any(f is None or c is None for f, c in flujos))
+    if faltan:
+        return dict(SIN_DATO) | {'atribuible': False}
+    r_ars = f1['valor_ars'] - f0['valor_ars'] - sum((f for f, _ in flujos), CERO)
+    r_usd = f1['valor_usd'] - f0['valor_usd'] - sum((f / c for f, c in flujos), CERO)
+    a0 = ancla(partida, ccl, t0)
+    a1 = ancla(partida, ccl, t1)
+    if a0 is not None and a1 is not None and a1 > a0:
+        fa0 = foto(partida, ccl, a0)
+        fa1 = foto(partida, ccl, a1)
+        fl = flujos_intervalo(partida, ccl, a0, a1)
+        conocido = (fa0['valor_ars'] is not None and fa1['valor_ars'] is not None
+                    and all(f is not None and c is not None for f, c in fl))
+        if conocido:
+            d = desglose_intervalo(partida['riesgo'], fa0['valor_ars'], fa0['valor_usd'], fa1['valor_ars'], fa1['valor_usd'],
+                                   dec(ccl[a0]), dec(ccl[a1]), fl, True)
+            return {
+                'resultado_ars': r_ars, 'resultado_usd': r_usd,
+                'activo_ars': d['activo_ars'], 'tc_ars': d['tc_ars'], 'sin_atribuir_ars': r_ars - d['activo_ars'] - d['tc_ars'],
+                'activo_usd': d['activo_usd'], 'tc_usd': d['tc_usd'], 'sin_atribuir_usd': r_usd - d['activo_usd'] - d['tc_usd'],
+                'atribuible': True, 'ancla': [a0, a1],
+            }
+    return {
+        'resultado_ars': r_ars, 'resultado_usd': r_usd,
+        'activo_ars': CERO, 'tc_ars': CERO, 'sin_atribuir_ars': r_ars,
+        'activo_usd': CERO, 'tc_usd': CERO, 'sin_atribuir_usd': r_usd,
+        'atribuible': False,
+    }
+
+
+def fechas_de_carga(caso: dict) -> list[str]:
+    """Fechas con un tipo de cambio (aunque el CCL sea null) o con un precio."""
+    s = set(caso['ccl'].keys())
+    for p in caso['partidas']:
+        s |= {x['fecha'] for x in p['precios']}
+    return sorted(s)
+
+
+def variacion(partida: dict, ccl: dict[str, str | None], t0: str, t1: str, cargas: list[str] | None = None) -> dict:
+    """Variación t0 → t1: suma de los intervalos entre cargas consecutivas (A)."""
+    puntos = [t0] + [d for d in (cargas or []) if t0 < d < t1] + [t1]
+    partes = [intervalo(partida, ccl, a, b) for a, b in zip(puntos, puntos[1:])]
+    if any(p['resultado_ars'] is None for p in partes):
+        d = dict(SIN_DATO)
+    else:
+        d = {c: sum((p[c] for p in partes), CERO) for c in SIN_DATO}
+    d['atribuible'] = all(p['atribuible'] for p in partes)
+    flujos = flujos_intervalo(partida, ccl, t0, t1)
     d['flujos_ars'] = suma(*[f for f, _ in flujos])
     d['flujos_usd'] = suma(*[div(f, c) for f, c in flujos])
     return d
-
-
-def variacion_anclada(partida: dict, ccl: dict[str, str | None], t0: str, t1: str) -> dict | None:
-    """Variante de vision.md 4.2 para precio viejo en t0 y fresco en t1 (I-10).
-
-    Devuelve None si no aplica (precio fresco en t0, sin precio en t0, partida no
-    atribuible en el intervalo, u operaciones entre s0 y t0).
-    """
-    f0 = foto(partida, ccl, t0)
-    if f0['fecha_precio'] is None or f0['fresco'] or f0['cantidad'] == 0:
-        return None
-    if not es_atribuible(partida, t0, t1, tenencia(partida['operaciones'], t1)['cantidad']):
-        return None
-    s0 = f0['fecha_precio']
-    if any(s0 < op['fecha'] <= t0 for op in partida['operaciones']):
-        return None
-    simple = variacion(partida, ccl, t0, t1)
-    fs = foto(partida, ccl, s0)
-    f1 = foto(partida, ccl, t1)
-    flujos = flujos_intervalo(partida, t0, t1, f1['precio'], f1['ccl'])
-    anclado = desglose_intervalo(
-        partida['riesgo'], fs['valor_ars'], fs['valor_usd'], f1['valor_ars'], f1['valor_usd'],
-        fs['ccl'], f1['ccl'], flujos, True,
-    )
-    # Lo que quedó pendiente en s0 → t0 vuelve con signo opuesto.
-    pend_ars = resta(f0['valor_ars'], fs['valor_ars'])
-    pend_usd = resta(f0['valor_usd'], fs['valor_usd'])
-    return _partes_de_lo_conocido({
-        'resultado_ars': simple['resultado_ars'],
-        'resultado_usd': simple['resultado_usd'],
-        'activo_ars': anclado['activo_ars'], 'tc_ars': anclado['tc_ars'], 'sin_atribuir_ars': neg(pend_ars),
-        'activo_usd': anclado['activo_usd'], 'tc_usd': anclado['tc_usd'], 'sin_atribuir_usd': neg(pend_usd),
-        'ancla': s0,
-    })
 
 
 # ───────────────────────────── desglose desde la compra ──────────────────────
@@ -478,11 +599,70 @@ def desglose_desde_compra(riesgo: str, costo_ars: Monto, costo_usd: Monto, valor
     })
 
 
-def desde_compra(partida: dict, ccl: dict[str, str | None], fecha: str) -> dict | None:
+def ops_tenencia_vigente(operaciones: list[dict], fecha: str) -> list[dict]:
+    """Operaciones de la tenencia vigente: desde la última vez que quedó en cero."""
+    ops: list[dict] = []
+    q = CERO
+    for op in ordenar(operaciones):
+        if op['fecha'] > fecha:
+            break
+        if q == 0 and op['tipo'] == 'venta':
+            continue
+        ops.append(op)
+        if op['tipo'] in ('apertura', 'compra', 'ajuste_ratio'):
+            q += dec(op['cantidad'])
+        elif op['tipo'] == 'venta':
+            q -= dec(op['cantidad'])
+        if q <= 0:
+            q = CERO
+            ops = []
+    return ops
+
+
+def desde_compra(partida: dict, ccl: dict[str, str | None], fecha: str, cargas: list[str] | None = None) -> dict | None:
+    """Decisión E (visión 4.5, D-35): suma de los intervalos entre cargas desde la
+    primera observación fresca de la tenencia, más un intervalo por lote antes de
+    ella, desde su costo al CCL de compra hasta su valor en esa observación. Si
+    hubo una baja o un cambio de ratio antes de la primera observación, un solo
+    intervalo con CCL_prom (como antes)."""
     f = foto(partida, ccl, fecha)
     if f['cantidad'] == 0:
         return None
-    return desglose_desde_compra(partida['riesgo'], f['costo_ars'], f['costo_usd'], f['valor_ars'], f['valor_usd'], f['ccl'])
+    if cargas is None:
+        cargas = sorted(set(ccl) | {x['fecha'] for x in partida['precios']})
+    base = {'resultado_ars': resta(f['valor_ars'], f['costo_ars']), 'resultado_usd': resta(f['valor_usd'], f['costo_usd'])}
+    sin = base | {'activo_ars': None, 'tc_ars': None, 'activo_usd': None, 'tc_usd': None}
+    ops = ops_tenencia_vigente(partida['operaciones'], fecha)
+    inicio = ops[0]['fecha']
+    candidatas = sorted(d for d, v in ccl.items() if v is not None and inicio <= d <= fecha)
+    primera = next((d for d in candidatas if any(p['fecha'] == d for p in partida['precios'])
+                    and tenencia(partida['operaciones'], d)['cantidad'] != 0), None)
+    if primera is None:
+        return sin
+    if any(op['fecha'] <= primera and op['tipo'] not in ('apertura', 'compra') for op in ops):
+        return desglose_desde_compra(partida['riesgo'], f['costo_ars'], f['costo_usd'], f['valor_ars'], f['valor_usd'], f['ccl'])
+    ccl1 = dec(ccl[primera])
+    p1 = next(dec(p['precio']) for p in partida['precios'] if p['fecha'] == primera)
+    suma_partes = {c: CERO for c in ('activo_ars', 'tc_ars', 'activo_usd', 'tc_usd')}
+    for op in ops:
+        if op['fecha'] > primera or op['tipo'] not in ('apertura', 'compra'):
+            continue
+        costo = costo_operacion_ars(op)
+        c0 = dec(op.get('ccl'))
+        if costo is None or c0 is None:
+            return sin
+        v1 = dec(op['cantidad']) * p1
+        d = desglose_intervalo(partida['riesgo'], costo, costo / c0, v1, v1 / ccl1, c0, ccl1, [], True)
+        for c in suma_partes:
+            suma_partes[c] += d[c]
+    puntos = [d for d in cargas if primera <= d <= fecha]
+    for a, b in zip(puntos, puntos[1:]):
+        x = intervalo(partida, ccl, a, b)
+        if x['resultado_ars'] is None:
+            return sin
+        for c in suma_partes:
+            suma_partes[c] += x[c]
+    return base | suma_partes
 
 
 # ───────────────────────────── un caso completo ──────────────────────────────
@@ -501,14 +681,14 @@ def total(valores: list[Monto]) -> dict:
 
 def calcular_caso(caso: dict) -> dict:
     t0, t1, ccl = caso['t0'], caso['t1'], caso['ccl']
+    cargas = fechas_de_carga(caso)
     partidas = {}
     for p in caso['partidas']:
         partidas[p['activo']] = {
             'foto_t0': foto(p, ccl, t0),  # incluye la tenencia y el PPC a t0
             'foto_t1': foto(p, ccl, t1),
-            'variacion': variacion(p, ccl, t0, t1),
-            'variacion_anclada': variacion_anclada(p, ccl, t0, t1),
-            'desde_compra_t1': desde_compra(p, ccl, t1),
+            'variacion': variacion(p, ccl, t0, t1, cargas),  # atribución anclada (decisión A)
+            'desde_compra_t1': desde_compra(p, ccl, t1, cargas),  # decisión E
         }
     totales = {
         'valor_ars_t0': total([x['foto_t0']['valor_ars'] for x in partidas.values()]),
@@ -637,13 +817,14 @@ def _autoverificacion() -> list[str]:
     dc = desde_compra(t30, ccl, '2026-10-14')
     chequear('Ap. B T30J7 resultado_ars', dc['resultado_ars'], '237600', 2)
     chequear('Ap. B T30J7 resultado_usd', dc['resultado_usd'], '-235.7033', 4)
-    # I-11: por lote (Apéndice B) el reparto es +162,8604 / −398,5636; con
-    # CCL_prom (lo pedido) es otro. Se deja constancia, no es un error.
+    # Decisión E: con una sola observación (la del 14/10), el tramo anterior es un
+    # intervalo por lote al CCL de compra: reproduce el reparto por lote del
+    # Apéndice B (+162,8604 / −398,5636), que CCL_prom (I-11) no daba.
     por_lote_activo = (Decimal(8_000_000) * Decimal('1.1240') - Decimal('8779800')) / Decimal('1452.00') \
         + (Decimal(1_000_000) * Decimal('1.1240') - Decimal('1098600')) / Decimal('1519.40')
     chequear('Ap. B T30J7 activo_usd por lote', por_lote_activo, '162.8604', 4)
-    if _cerca(dc['activo_usd'], '162.8604', 4):
-        errores.append('T30J7: se esperaba que CCL_prom NO coincida con el reparto por lote')
+    chequear('Ap. B T30J7 activo_usd (E)', dc['activo_usd'], '162.8604', 4)
+    chequear('Ap. B T30J7 tc_usd (E)', dc['tc_usd'], '-398.5636', 4)
     return errores
 
 
@@ -654,6 +835,5 @@ if __name__ == '__main__':
         for e in errores:
             print('  -', e)
         sys.exit(1)
-    t30_lote = 'por lote: activo +162,8604 / TC −398,5636'
-    print('Referencia OK: reproduce D-35 (§6.1) y el Apéndice B de vision.md.')
-    print(f'Nota I-11 (T30J7, riesgo ARS): con CCL_prom el reparto difiere del {t30_lote}.')
+    print('Referencia OK: reproduce D-35 (§6.1) y el Apéndice B de vision.md (con la decisión E,')
+    print('también el reparto por lote de T30J7: activo +162,8604 / TC −398,5636).')

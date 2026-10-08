@@ -1,9 +1,9 @@
 import { LogOut } from 'lucide-react'
 import type { Metadata } from 'next'
+import { salir } from '@/app/login/acciones'
 import { modoDemo } from '@/lib/server/sesion'
 import { FormularioPreferencias } from '@/components/ajustes/formulario'
 import { Tarjeta } from '@/components/ui'
-import { cerrarSesion } from './acciones'
 
 export const metadata: Metadata = { title: 'Ajustes' }
 
@@ -45,14 +45,14 @@ export default function PaginaAjustes() {
           <p className="text-sm text-muted">
             {demo
               ? 'Estás en modo demo: datos de ejemplo inventados y sin clave. Nada de lo que hagas acá toca la base.'
-              : 'La sesión dura 30 días en este dispositivo. La clave nunca viaja guardada: solo una firma.'}
+              : 'La sesión dura 30 días en este dispositivo. La clave nunca viaja guardada: solo una firma. Salir la cierra acá; cambiar la clave en Vercel la cierra en todos lados.'}
           </p>
-          <form action={cerrarSesion} className="mt-4">
+          <form action={salir} className="mt-4">
             <button
               type="submit"
               className="tocable inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-4 text-sm font-medium hover:bg-surface-2"
             >
-              <LogOut aria-hidden className="size-4" /> Cerrar sesión
+              <LogOut aria-hidden className="size-4" /> Salir
             </button>
           </form>
         </Tarjeta>

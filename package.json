@@ -10,6 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:e2e:auth": "E2E_SOLO=auth playwright test",
+    "test:e2e:prod": "E2E_PROD=1 playwright test",
     "test:schema": "supabase/tests/run.sh"
   },
   "dependencies": {

@@ -15,6 +15,7 @@ import type {
   LecturaCuenta,
   NombreCuenta,
   OperacionAGrabar,
+  PrecioACompletar,
   PropuestaCarga,
   SaldoAGrabar,
 } from '@/lib/carga/contratos'
@@ -24,6 +25,7 @@ import {
   eleccionSaldo,
   estadoFila,
   estadoSaldo,
+  precioACompletar,
   seGraba,
   type Elecciones,
 } from './bandeja'
@@ -43,7 +45,7 @@ export interface FuenteConfirmada {
 export interface EntradaConfirmacion {
   lote: string
   fecha: Fecha
-  tc: { ccl: string | null; cripto_venta: string | null }
+  tc: { ccl: string | null; cripto_venta: string | null; referencia?: string | null }
   /** Propuesta armada con las lecturas ya editadas. */
   propuesta: PropuestaCarga
   elecciones: Elecciones
@@ -61,6 +63,8 @@ export interface ResumenCuenta {
   cotizaciones: number
   saldos: number
   operaciones: number
+  /** Compras pendientes cuyo precio se completa (D-19). */
+  precios_completados: number
   /** Filas y saldos que no se graban (y tenencias que la fuente no trajo). */
   pendientes: number
   listado_completo: boolean
@@ -78,13 +82,17 @@ export type ResultadoArmado =
   | { ok: true; confirmacion: ConfirmacionCarga; resumen: ResumenGuardado }
   | { ok: false; errores: string[] }
 
-const esPositivo = (v: string | null) => v !== null && new Decimal(v).gt(0)
+const esPositivo = (v: string | null) => v !== null && /^-?\d+(\.\d+)?$/.test(v) && new Decimal(v).gt(0)
+
+/** "No cierra." → "No cierra" (el mensaje sigue después). */
+const quitarPunto = (m: string) => m.trim().replace(/\.$/, '')
 
 export function armarConfirmacion(e: EntradaConfirmacion): ResultadoArmado {
   const errores: string[] = []
+  const referencia = e.tc.referencia?.trim() ? e.tc.referencia.trim().slice(0, 200) : null
   const tipo_cambio =
     e.tc.ccl !== null || e.tc.cripto_venta !== null
-      ? { ccl: e.tc.ccl, cripto_venta: e.tc.cripto_venta, mep: null, oficial: null }
+      ? { ccl: e.tc.ccl, cripto_venta: e.tc.cripto_venta, mep: null, oficial: null, ...(referencia ? { referencia } : {}) }
       : null
 
   // Un precio por activo y por día (la clave de cotizaciones es fecha + activo):
@@ -117,6 +125,7 @@ export function armarConfirmacion(e: EntradaConfirmacion): ResultadoArmado {
     const cotizaciones: CotizacionAGrabar[] = []
     const saldos: SaldoAGrabar[] = []
     const operaciones: OperacionAGrabar[] = []
+    const completar: PrecioACompletar[] = []
     const filasGrabado: unknown[] = []
     const saldosGrabado: unknown[] = []
     let pendientes = 0
@@ -137,7 +146,8 @@ export function armarConfirmacion(e: EntradaConfirmacion): ResultadoArmado {
         propuesta: d.operacion,
       }
       if (estado === 'error') {
-        errores.push(`${nombre} · ${d.ticker}: ${d.motivos.at(-1) ?? 'tiene un error'}. Editala o dejala pendiente.`)
+        // motivos[0] es el principal (conciliar pone primero lo que frena).
+        errores.push(`${nombre} · ${d.ticker}: ${quitarPunto(d.motivos[0] ?? 'tiene un error')}. Editala o dejala pendiente.`)
         continue
       }
       if (!seGraba(estado) || d.activo_id === null) {
@@ -186,13 +196,28 @@ export function armarConfirmacion(e: EntradaConfirmacion): ResultadoArmado {
                 ? `la ${op.tipo} necesita el CCL del día: tipealo arriba`
                 : op.tipo === 'venta' && op.precio === null && op.importe === null
                   ? 'la venta necesita el precio'
-                  : null
+                  : op.tipo === 'ajuste_ratio' && (op.precio !== null || op.importe !== null)
+                    ? 'un ajuste de ratio no lleva precio'
+                    : null
         if (problema) {
           errores.push(`${nombre} · ${d.ticker}: ${problema}.`)
           continue
         }
         grabada = op
         operaciones.push(op)
+      }
+      // D-19: completar el precio de una compra pendiente, solo si lo aceptaste.
+      let completada: (PrecioACompletar & { propuesto: string; formula: string }) | null = null
+      if (d.accion === 'completar_precio' && d.completar) {
+        if (el?.precio_completar !== undefined && el.precio_completar !== null && precioACompletar(d, el) === null) {
+          errores.push(`${nombre} · ${d.ticker}: el precio para completar la compra tiene que ser mayor que cero.`)
+          continue
+        }
+        const precio = precioACompletar(d, el)
+        if (precio !== null) {
+          completada = { operacion_id: d.completar.operacion_id, precio, propuesto: d.completar.precio, formula: d.completar.formula }
+          completar.push({ operacion_id: d.completar.operacion_id, precio })
+        }
       }
       grabadas++
       filasGrabado.push({
@@ -202,6 +227,7 @@ export function armarConfirmacion(e: EntradaConfirmacion): ResultadoArmado {
         grabada,
         cotizacion,
         nota,
+        ...(d.accion === 'completar_precio' ? { completada } : {}),
       })
     }
 
@@ -211,7 +237,7 @@ export function armarConfirmacion(e: EntradaConfirmacion): ResultadoArmado {
       const estado = estadoSaldo(d, el)
       const registro = { clave: d.clave, moneda: d.moneda, leido: d.monto, partes: d.saldo.partes, anterior: d.anterior, motivos: d.motivos }
       if (estado === 'error') {
-        errores.push(`${nombre} · saldo en ${d.moneda}: ${d.motivos.at(-1) ?? 'no se pudo leer'}. Tipealo o dejalo pendiente.`)
+        errores.push(`${nombre} · saldo en ${d.moneda}: ${quitarPunto(d.motivos[0] ?? 'no se pudo leer')}. Tipealo o dejalo pendiente.`)
         continue
       }
       if (!seGraba(estado)) {
@@ -256,8 +282,17 @@ export function armarConfirmacion(e: EntradaConfirmacion): ResultadoArmado {
       cotizaciones,
       saldos,
       operaciones,
+      ...(completar.length ? { completar_precios: completar } : {}),
     })
-    resumen.push({ cuenta: nombre, cotizaciones: cotizaciones.length, saldos: saldos.length, operaciones: operaciones.length, pendientes, listado_completo })
+    resumen.push({
+      cuenta: nombre,
+      cotizaciones: cotizaciones.length,
+      saldos: saldos.length,
+      operaciones: operaciones.length,
+      precios_completados: completar.length,
+      pendientes,
+      listado_completo,
+    })
     total += grabadas
     pendientesTotales += pendientes
   }

@@ -376,7 +376,10 @@ describe('Galicia: dos lecturas', () => {
     expect(s.estado).toBe('advertencia')
     expect(s.cantidad).toBe('5000000')
     expect(s.motivos.join(' ')).toContain('Cantidad — Lectura A: 5.000.000 · Lectura B: 5.000.800 (se propone la A, que cierra')
+    // Las mismas dos lecturas, estructuradas, para elegir con un toque.
+    expect(s.alternativas).toEqual([{ campo: 'cantidad', a: '5000000', b: '5000800', propuesta: 'A' }])
     expect(l.filas[1].estado).toBe('verificada')
+    expect(l.filas[1].alternativas).toBeUndefined()
 
     // Si la que se equivocó es la A, se propone la B.
     const l2 = armar(bonos([{ ...S28F7, cantidad: '5.800.000' }, T15E7]), bonos())
@@ -636,6 +639,8 @@ describe('Mercado Pago', () => {
     expect(s.estado).toBe('advertencia')
     expect(s.monto).toBe('3210987.45')
     expect(s.motivos[0]).toBe('Saldo — Lectura A: $ 3.210.987,45 · Lectura B: $ 3.210.98745 (se propone la A).')
+    // B pegó los centavos: no es un número legible, va como texto y no se ofrece elegirla.
+    expect(s.alternativas).toEqual([{ campo: 'monto', a: '3210987.45', b: expect.stringContaining('3.210.98745'), propuesta: 'A' }])
   })
 
   it('una lectura no vio los centavos: advertencia', () => {

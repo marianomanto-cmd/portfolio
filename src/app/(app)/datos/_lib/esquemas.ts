@@ -129,6 +129,61 @@ export const esquemaPasivoSaldo = z.object({
   capital_pendiente: numeroAR({ min: 'cero' }),
 })
 
+const idOpcional = z.preprocess(vacio, id.optional()).transform((v) => v ?? null)
+const monedaOpcional = z.preprocess(vacio, z.enum(MONEDAS).optional()).transform((v) => v ?? null)
+const montoOpcional = (min: 'positivo' | 'cero') => z.preprocess(vacio, numeroAR({ min }).optional()).transform((v) => v ?? null)
+
+/**
+ * Aporte, retiro o transferencia entre cuentas propias (D-06). La forma de
+ * cada tipo es la de la base: un aporte entra a una cuenta, un retiro sale de
+ * una, una transferencia une dos cuentas distintas con lo que salió y lo que
+ * entró (y el impuesto, en la moneda de origen).
+ */
+export const esquemaMovimiento = z
+  .object({
+    tipo: z.enum(['aporte', 'retiro', 'transferencia'], { message: 'Elegí el tipo.' }),
+    fecha,
+    fecha_acreditacion: fechaOpcional,
+    cuenta_origen_id: idOpcional,
+    cuenta_destino_id: idOpcional,
+    moneda_origen: monedaOpcional,
+    monto_origen: montoOpcional('positivo'),
+    moneda_destino: monedaOpcional,
+    monto_destino: montoOpcional('positivo'),
+    tc_aplicado: montoOpcional('positivo'),
+    impuesto: montoOpcional('cero'),
+    notas: z.preprocess(vacio, z.string().trim().max(500, 'Hasta 500 caracteres.').optional()).transform((v) => v ?? null),
+  })
+  .superRefine((m, ctx) => {
+    const falta = (path: string, message: string) => ctx.addIssue({ code: 'custom', path: [path], message })
+    if (m.fecha_acreditacion && m.fecha_acreditacion < m.fecha) falta('fecha_acreditacion', 'No puede ser anterior a la fecha del movimiento.')
+    if (m.monto_origen && !m.moneda_origen) falta('moneda_origen', '¿En qué moneda salió?')
+    if (m.monto_destino && !m.moneda_destino) falta('moneda_destino', '¿En qué moneda entró?')
+    if (m.tipo === 'aporte') {
+      if (!m.cuenta_destino_id) falta('cuenta_destino_id', '¿A qué cuenta entró?')
+      if (!m.monto_destino) falta('monto_destino', '¿Cuánto entró?')
+    } else if (m.tipo === 'retiro') {
+      if (!m.cuenta_origen_id) falta('cuenta_origen_id', '¿De qué cuenta salió?')
+      if (!m.monto_origen) falta('monto_origen', '¿Cuánto salió?')
+    } else {
+      if (!m.cuenta_origen_id) falta('cuenta_origen_id', '¿De qué cuenta salió?')
+      if (!m.cuenta_destino_id) falta('cuenta_destino_id', '¿A qué cuenta entró?')
+      if (m.cuenta_origen_id && m.cuenta_origen_id === m.cuenta_destino_id) falta('cuenta_destino_id', 'Tiene que ser otra cuenta.')
+      if (!m.monto_origen) falta('monto_origen', '¿Cuánto salió?')
+      if (!m.monto_destino) falta('monto_destino', '¿Cuánto entró?')
+    }
+  })
+  .transform((m) => ({
+    ...m,
+    // Lo que no corresponde al tipo no viaja (un aporte viene de afuera; un retiro va hacia afuera).
+    cuenta_origen_id: m.tipo === 'aporte' ? null : m.cuenta_origen_id,
+    cuenta_destino_id: m.tipo === 'retiro' ? null : m.cuenta_destino_id,
+    moneda_origen: m.monto_origen ? m.moneda_origen : null,
+    moneda_destino: m.monto_destino ? m.moneda_destino : null,
+  }))
+
+export type DatosMovimiento = z.infer<typeof esquemaMovimiento>
+
 export type ResultadoFormulario<T> = { ok: true; datos: T } | { ok: false; errores: Record<string, string> }
 
 /** FormData → datos validados, o el primer error de cada campo. */

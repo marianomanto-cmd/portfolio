@@ -22,9 +22,12 @@ export function esRutaPublica(ruta: string): boolean {
 export function destinoSeguro(desde: string | null | undefined): string {
   if (!desde) return '/'
   const d = desde.trim()
-  if (!d.startsWith('/')) return '/'
+  if (!d.startsWith('/') || d.length > 2048) return '/'
   if (d.startsWith('//') || d.startsWith('/\\')) return '/'
-  if (/[\u0000-\u001f]/.test(d)) return '/'
+  if (/[\u0000-\u001f\u007f]/.test(d)) return '/'
+  // Ninguna ruta de la app lleva "//" ni barras invertidas: "/..//otro.sitio"
+  // igual quedaría adentro, pero no hay por qué aceptarlo.
+  if (d.split(/[?#]/)[0].includes('//') || d.includes('\\')) return '/'
   if (d === '/login' || d.startsWith('/login/') || d.startsWith('/login?')) return '/'
   return d
 }

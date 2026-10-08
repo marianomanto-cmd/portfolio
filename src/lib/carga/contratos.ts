@@ -26,6 +26,21 @@ export interface Chequeo {
   ok: boolean
 }
 
+/**
+ * Las dos lecturas de una captura no coinciden en un campo (D-36). `a` y `b`
+ * son lo que vio cada lectura: texto decimal normalizado ("1234.5") cuando se
+ * entendió como número; si no, el texto tal cual. `propuesta` es la que cerró
+ * la aritmética (o la única legible). La bandeja muestra las dos y el dueño
+ * elige una con un toque.
+ */
+export interface Alternativa {
+  /** Campo de la fuente: 'cantidad', 'precio', 'valorizado', 'ppc', 'rendimiento_monto', 'rendimiento_porcentaje', 'ticker', 'monto', 'moneda'. */
+  campo: string
+  a: string
+  b: string
+  propuesta: 'A' | 'B'
+}
+
 export interface FilaLeida {
   /** Identificador estable dentro de la lectura: "IEB:T30J7". */
   clave: string
@@ -57,6 +72,8 @@ export interface FilaLeida {
   chequeo: Chequeo | null
   /** Dónde está en la fuente: "hoja Patrimonio, fila 21". */
   lugar: string | null
+  /** Campos en los que las dos lecturas de una captura no coinciden. */
+  alternativas?: Alternativa[]
 }
 
 export interface SaldoLeido {
@@ -70,6 +87,8 @@ export interface SaldoLeido {
   estado: EstadoFila
   motivos: string[]
   lugar: string | null
+  /** Las dos lecturas del saldo (o de su moneda) cuando no coinciden. */
+  alternativas?: Alternativa[]
 }
 
 export interface ControlLeido {
@@ -80,6 +99,8 @@ export interface ControlLeido {
   calculado: string | null
   ok: boolean | null
   detalle: string | null
+  /** Tolerancia del control (D-37), en la misma moneda y escala; null si no se pudo calcular. */
+  tolerancia?: string | null
 }
 
 export interface LecturaCuenta {
@@ -92,6 +113,11 @@ export interface LecturaCuenta {
   controles: ControlLeido[]
   /** Advertencias generales (no de una fila). */
   advertencias: string[]
+  /**
+   * Tipos de cambio que la fuente usa para valuar (D-66): IEB pasa los dólares
+   * a pesos con el precio de DOLARUSA. La bandeja lo compara con tu CCL.
+   */
+  tipo_cambio_fuente?: { dolar_ieb: string | null } | null
   /** Lector y versión: "ieb-excel@1", "captura-claude@1". */
   lector: string
   /** Lo crudo, para cargas.lectura_cruda. */
@@ -123,6 +149,13 @@ export interface OperacionAGrabar {
   notas: string | null
 }
 
+/** Completa el precio de una compra que quedó pendiente (D-19). */
+export interface PrecioACompletar {
+  operacion_id: number
+  /** Por 1 VN / 1 unidad, en la moneda de la compra. */
+  precio: string
+}
+
 export interface CuentaAGrabar {
   cuenta_id: number
   origen: 'excel' | 'captura' | 'manual'
@@ -136,6 +169,12 @@ export interface CuentaAGrabar {
   cotizaciones: CotizacionAGrabar[]
   saldos: SaldoAGrabar[]
   operaciones: OperacionAGrabar[]
+  /**
+   * Compras pendientes de esta cuenta (precio e importe vacíos) cuyo precio se
+   * completa con el PPP de hoy (D-19). La base solo lo acepta si la compra
+   * sigue pendiente y es de esta cuenta; revertir el lote la deja pendiente otra vez.
+   */
+  completar_precios?: PrecioACompletar[]
 }
 
 export interface ConfirmacionCarga {
@@ -147,6 +186,8 @@ export interface ConfirmacionCarga {
     cripto_venta: string | null
     mep: string | null
     oficial: string | null
+    /** De dónde sacaste el CCL ("Ámbito, cierre"); hasta 200 caracteres. */
+    referencia?: string | null
   } | null
   cuentas: CuentaAGrabar[]
   /** Tiempo activo de la carga, para medir los 60 segundos (D-62). */
@@ -170,6 +211,7 @@ export type AccionFila =
   | 'apertura' // primera vez que se ve esta tenencia (D-14)
   | 'compra' // el bróker tiene más que la app (D-15, D-19)
   | 'venta' // el bróker tiene menos que la app
+  | 'completar_precio' // la cantidad coincide y el PPP de hoy completa una compra pendiente (D-19)
   | 'revisar' // no se puede decidir solo
 
 export interface ActivoNuevo {
@@ -196,10 +238,23 @@ export interface DecisionFila {
   cantidad_app: string | null
   accion: AccionFila
   operacion: OperacionAGrabar | null
+  /**
+   * accion 'completar_precio': la compra pendiente y el precio inferido del
+   * PPP, con la fórmula (traza). Se acepta de a una; nunca se aplica sola.
+   */
+  completar?: PrecioInferido | null
   cotizacion: { precio_pesos: string } | null
   estado: EstadoFila
   motivos: string[]
   fila: FilaLeida
+}
+
+export interface PrecioInferido extends PrecioACompletar {
+  /** Fecha y cantidad de la compra pendiente. */
+  fecha: Fecha
+  cantidad: string
+  /** "(10.200 × 110 − $ 1.000.000) ÷ 10 = $ 12.200". */
+  formula: string
 }
 
 export interface DecisionSaldo {

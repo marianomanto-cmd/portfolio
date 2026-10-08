@@ -202,6 +202,11 @@ describe('leerExcelIEB · Portafolio de ejemplo', async () => {
     expect(c.ok).toBe(true)
     expect(c.detalle).toContain('US$ 4.182,20 × 1.573,00 (dólar de IEB, DOLARUSA)')
     expect(c.detalle).toContain('diferencia $ 0,00')
+    // La tolerancia como dato (D-37) y el dólar de IEB con nombre (D-66).
+    expect(c.tolerancia).toMatch(/^\d+(\.\d+)?$/)
+    expect(new Decimal(c.tolerancia!).gt(0)).toBe(true)
+    expect(l.tipo_cambio_fuente).toEqual({ dolar_ieb: '1573' })
+    for (const s of l.controles.filter((x) => x.tipo === 'ieb_subtotal')) expect(s.tolerancia).toMatch(/^\d+(\.\d+)?$/)
   })
 
   it('no deja advertencias generales', () => {
@@ -692,7 +697,9 @@ const arbPortafolio: fc.Arbitrary<PortafolioIEB> = fc
 
 // IEB_CORRIDAS=500 npx vitest run src/lib/carga/ieb.test.ts para una pasada larga.
 const CORRIDAS = Number(process.env.IEB_CORRIDAS) || null
-const LIMITE = CORRIDAS ? 600_000 : undefined
+// Cada corrida arma y lee un Excel: con la máquina cargada (servidores y otras
+// suites en paralelo) 40 corridas pasan los 5 s por defecto. Margen holgado.
+const LIMITE = CORRIDAS ? 600_000 : 60_000
 
 describe('leerExcelIEB · propiedades (fast-check)', () => {
   it('cualquier portafolio sintético cierra: cada fila, cada Subtotal y B2', async () => {

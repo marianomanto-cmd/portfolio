@@ -29,3 +29,24 @@ export const NOMBRE_GEOGRAFIA: Record<(typeof GEOGRAFIAS)[number], string> = {
   BR: 'Brasil',
   GLOBAL: 'Global',
 }
+
+/** Subpantallas de Datos, en el orden del selector. */
+export const SECCIONES_DATOS = ['catalogo', 'cuentas', 'bienes', 'leasing', 'movimientos'] as const
+
+/**
+ * /datos?seccion=<sub>&… → /datos/<sub>?… (conserva el resto de la consulta,
+ * por ejemplo el movimiento precargado desde la bandeja). Sin sección o con
+ * una desconocida, el catálogo.
+ */
+export function rutaDeSeccion(q: Record<string, string | string[] | undefined>): string {
+  const crudo = q.seccion
+  const seccion = typeof crudo === 'string' ? crudo.trim().toLowerCase() : Array.isArray(crudo) ? (crudo[0] ?? '').toLowerCase() : ''
+  const destino = (SECCIONES_DATOS as readonly string[]).includes(seccion) ? seccion : 'catalogo'
+  const resto = new URLSearchParams()
+  for (const [k, v] of Object.entries(q)) {
+    if (k === 'seccion' || v === undefined) continue
+    for (const x of Array.isArray(v) ? v : [v]) resto.append(k, x)
+  }
+  const query = resto.toString()
+  return `/datos/${destino}${query ? `?${query}` : ''}`
+}

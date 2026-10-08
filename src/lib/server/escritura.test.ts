@@ -48,6 +48,7 @@ import {
   extensionArchivo,
   fechaOpcional,
   fechaRequerida,
+  guardarMovimientoCapital,
   guardarPasivoSaldo,
   guardarValuacionBien,
   leerId,
@@ -60,6 +61,7 @@ import {
   normalizarBien,
   normalizarCambiosActivo,
   normalizarConfirmacion,
+  normalizarMovimiento,
   normalizarPasivo,
   revertirLote,
   rutaArchivo,
@@ -709,5 +711,148 @@ describe('llamadas a la base (cliente falso)', () => {
     fake.estado.respuestaUpload = { data: null, error: new Error('Bucket not found') }
     expect(await mensajeAsync(() => subirArchivo(bytes, 'image/png', 'captura.png'))).toBe('No se pudo guardar el archivo: Bucket not found')
     expect(await mensajeAsync(() => subirArchivo(new Uint8Array(), 'image/png', 'vacia.png'))).toBe('El archivo está vacío.')
+  })
+})
+
+describe('D-19, referencia del CCL y movimientos de capital', () => {
+  it('completar_precios: se manda solo si hay, validado (id de la compra y precio > 0, como texto)', () => {
+    expect(normalizarConfirmacion(confirmacion()).cuentas[0]).not.toHaveProperty('completar_precios')
+    const p = normalizarConfirmacion(confirmacion({ cuentas: [cuentaIEB({ completar_precios: [{ operacion_id: 31, precio: ' 12200.5 ' }] })] }))
+    expect(p.cuentas[0].completar_precios).toEqual([{ operacion_id: 31, precio: '12200.5' }])
+    expect(mensaje(() => normalizarConfirmacion(confirmacion({ cuentas: [cuentaIEB({ completar_precios: [{ operacion_id: 31, precio: '0' }] })] })))).toMatch(
+      /mayor que cero/,
+    )
+    expect(
+      mensaje(() =>
+        normalizarConfirmacion(confirmacion({ cuentas: [cuentaIEB({ completar_precios: [{ operacion_id: 31, precio: 12200 as unknown as string }] })] })),
+      ),
+    ).toMatch(/D-32/)
+    expect(mensaje(() => normalizarConfirmacion(confirmacion({ cuentas: [cuentaIEB({ completar_precios: [{ operacion_id: 0, precio: '1' }] })] })))).toMatch(
+      /Falta la compra/,
+    )
+    expect(
+      mensaje(() =>
+        normalizarConfirmacion(
+          confirmacion({
+            cuentas: [
+              cuentaIEB({
+                completar_precios: [
+                  { operacion_id: 31, precio: '1' },
+                  { operacion_id: 31, precio: '2' },
+                ],
+              }),
+            ],
+          }),
+        ),
+      ),
+    ).toMatch(/dos veces/)
+  })
+
+  it('referencia del CCL: se manda recortada, solo con algún valor, hasta 200 caracteres', () => {
+    const tc = { ccl: '1500', cripto_venta: null, mep: null, oficial: null }
+    expect(normalizarConfirmacion(confirmacion({ tipo_cambio: { ...tc, referencia: '  Ámbito, cierre ' } })).tipo_cambio).toEqual({
+      ...tc,
+      referencia: 'Ámbito, cierre',
+    })
+    expect(normalizarConfirmacion(confirmacion({ tipo_cambio: { ...tc, referencia: '  ' } })).tipo_cambio).toEqual(tc)
+    expect(normalizarConfirmacion(confirmacion({ tipo_cambio: { ccl: null, cripto_venta: null, mep: null, oficial: null, referencia: 'x' } })).tipo_cambio).toBeNull()
+    expect(mensaje(() => normalizarConfirmacion(confirmacion({ tipo_cambio: { ...tc, referencia: 'x'.repeat(201) } })))).toMatch(/200 caracteres/)
+  })
+
+  it('normalizarMovimiento: la forma de cada tipo, con mensajes en castellano', () => {
+    expect(
+      normalizarMovimiento({ tipo: 'aporte', fecha: '2026-11-02', cuenta_destino_id: 3, moneda_destino: 'ARS', monto_destino: '500000', notas: ' sueldo ' }),
+    ).toEqual({
+      tipo: 'aporte',
+      fecha: '2026-11-02',
+      fecha_acreditacion: null,
+      cuenta_origen_id: null,
+      cuenta_destino_id: 3,
+      moneda_origen: null,
+      monto_origen: null,
+      moneda_destino: 'ARS',
+      monto_destino: '500000',
+      tc_aplicado: null,
+      impuesto: '0',
+      notas: 'sueldo',
+    })
+    expect(
+      normalizarMovimiento({
+        tipo: 'transferencia',
+        fecha: '2026-11-02',
+        fecha_acreditacion: '2026-11-03',
+        cuenta_origen_id: 3,
+        cuenta_destino_id: 1,
+        moneda_origen: 'ARS',
+        monto_origen: '1000000',
+        moneda_destino: 'ARS',
+        monto_destino: '994000',
+        impuesto: '6000',
+      }),
+    ).toMatchObject({ impuesto: '6000', fecha_acreditacion: '2026-11-03' })
+    const base = { fecha: '2026-11-02' }
+    expect(mensaje(() => normalizarMovimiento({ ...base, tipo: 'aporte', monto_destino: '1', moneda_destino: 'ARS' }))).toMatch(/cuenta de destino/)
+    expect(mensaje(() => normalizarMovimiento({ ...base, tipo: 'aporte', cuenta_destino_id: 3 }))).toMatch(/cuánto entró/)
+    expect(mensaje(() => normalizarMovimiento({ ...base, tipo: 'retiro', cuenta_origen_id: 3, cuenta_destino_id: 1, monto_origen: '1', moneda_origen: 'ARS' }))).toMatch(
+      /no lleva cuenta de destino/,
+    )
+    expect(
+      mensaje(() =>
+        normalizarMovimiento({
+          ...base,
+          tipo: 'transferencia',
+          cuenta_origen_id: 3,
+          cuenta_destino_id: 3,
+          monto_origen: '1',
+          moneda_origen: 'ARS',
+          monto_destino: '1',
+          moneda_destino: 'ARS',
+        }),
+      ),
+    ).toMatch(/distintas/)
+    expect(mensaje(() => normalizarMovimiento({ ...base, tipo: 'aporte', cuenta_destino_id: 3, monto_destino: '1' }))).toMatch(/moneda de destino/)
+    expect(mensaje(() => normalizarMovimiento({ ...base, tipo: 'aporte', cuenta_destino_id: 3, monto_destino: '-1', moneda_destino: 'ARS' }))).toMatch(
+      /mayor que cero/,
+    )
+    expect(mensaje(() => normalizarMovimiento({ ...base, tipo: 'aporte', cuenta_destino_id: 3, monto_destino: 1 as unknown as string, moneda_destino: 'ARS' }))).toMatch(
+      /D-32/,
+    )
+    expect(
+      mensaje(() => normalizarMovimiento({ ...base, fecha_acreditacion: '2026-11-01', tipo: 'aporte', cuenta_destino_id: 3, monto_destino: '1', moneda_destino: 'ARS' })),
+    ).toMatch(/acreditación/)
+    expect(mensaje(() => normalizarMovimiento({ ...base, tipo: 'aporte', cuenta_destino_id: 3, monto_destino: '1', moneda_destino: 'ARS', impuesto: '-1' }))).toMatch(
+      /negativo/,
+    )
+    expect(mensaje(() => normalizarMovimiento({ ...base, tipo: 'regalo' as 'aporte', cuenta_destino_id: 3 }))).toMatch(/tipo de movimiento/)
+  })
+
+  it('guardarMovimientoCapital usa guardar_manual con un lote nuevo y devuelve la carga', async () => {
+    fake.estado.respuestasRpc.push({ data: 51, error: null })
+    expect(
+      await guardarMovimientoCapital({
+        tipo: 'aporte',
+        fecha: '2026-11-02',
+        cuenta_destino_id: 3,
+        moneda_origen: 'USD',
+        monto_origen: '1000',
+        moneda_destino: 'ARS',
+        monto_destino: '1480000',
+        tc_aplicado: '1480',
+      }),
+    ).toBe(51)
+    const [a] = fake.estado.rpc
+    expect(a.fn).toBe('guardar_manual')
+    expect(a.args.p).toMatchObject({
+      fecha: '2026-11-02',
+      movimientos_capital: [{ tipo: 'aporte', cuenta_destino_id: 3, monto_origen: '1000', monto_destino: '1480000', tc_aplicado: '1480', impuesto: '0' }],
+    })
+    expect((a.args.p as { lote: string }).lote).toMatch(/^[0-9a-f-]{36}$/)
+    fake.estado.respuestasRpc.push({
+      data: null,
+      error: { code: '23514', message: 'new row for relation "movimientos_capital" violates check constraint "movimientos_capital_check3"', details: 'movimiento 1 (aporte)' },
+    })
+    expect(
+      await mensajeAsync(() => guardarMovimientoCapital({ tipo: 'aporte', fecha: '2026-11-02', cuenta_destino_id: 3, monto_destino: '1', moneda_destino: 'ARS' })),
+    ).toMatch(/forma de su tipo/)
   })
 })

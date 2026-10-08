@@ -411,24 +411,26 @@ def _partida(activo: str, riesgo: str, clase: str, etiquetas: list[str], ops: li
 
 
 def casos_minimos() -> list[dict]:
-    """Un caso mínimo por cada diferencia encontrada contra el motor TS
-    (ver el informe del cruce). Números inventados y redondos."""
+    """Un caso mínimo por cada diferencia que encontró el primer cruce contra el
+    motor TS. Números inventados y redondos. Las diferencias 1 a 4 se
+    resolvieron con las decisiones A, B y C de la fase 1a (ver el docstring de
+    motor_referencia.py): hoy el motor y la referencia coinciden en todos."""
     ap = {'id': 1, 'fecha': '2026-06-01', 'tipo': 'apertura', 'cantidad': '100', 'precio': '9000',
           'ccl': '900', 'fecha_origen': '2025-06-02'}
     ccl_base = {'2025-06-02': '900', '2026-06-01': '950'}
     return [
-        # 1. Carga sin CCL en t1: el valor en USD es "sin dato" (no se arrastra el CCL de t0).
+        # 1. Carga sin CCL en t1: la foto usa el CCL de t0 (decisión B) y nada se atribuye (A).
         {'id': 'min_ccl_sin_dato_t1', 'etiquetas': ['minimo', 'sin_ccl_t1'], 't0': '2026-06-10', 't1': '2026-06-11',
          'ccl': ccl_base | {'2026-06-10': '1000', '2026-06-11': None},
          'partidas': [_partida('A1', 'USD', 'cedear', ['sin_ops'], [ap],
                                [('2026-06-10', '10000'), ('2026-06-11', '11000')])]},
-        # 2. Compra del día con precio pendiente (D-19) dentro del intervalo.
+        # 2. Compra del día con precio pendiente (D-19): su flujo va al precio del día (decisión C).
         {'id': 'min_compra_pendiente', 'etiquetas': ['minimo'], 't0': '2026-06-10', 't1': '2026-06-11',
          'ccl': ccl_base | {'2026-06-10': '1000', '2026-06-11': '1100'},
          'partidas': [_partida('A1', 'USD', 'cedear', ['compra_pendiente'],
                                [ap, {'id': 2, 'fecha': '2026-06-11', 'tipo': 'compra', 'cantidad': '10', 'ccl': '1100'}],
                                [('2026-06-10', '10000'), ('2026-06-11', '11000')])]},
-        # 3. Posición nueva (no estaba en t0) sin precio nuevo en t1.
+        # 3. Posición nueva (no estaba en t0) sin precio nuevo en t1: todo sin atribuir (A).
         {'id': 'min_nueva_sin_precio', 'etiquetas': ['minimo'], 't0': '2026-06-10', 't1': '2026-06-11',
          'ccl': {'2026-06-10': '1000', '2026-06-11': '1100'},
          'partidas': [_partida('A1', 'USD', 'cedear', ['nueva_compra', 'viejo_t1'],
@@ -446,7 +448,7 @@ def casos_minimos() -> list[dict]:
          'ccl': ccl_base | {'2026-06-10': '1000', '2026-06-11': '1100'},
          'partidas': [_partida('A1', 'ARS', 'bono', ['sin_ops', 'sin_precio_t0'],
                                [ap | {'cantidad': '1000', 'precio': '1.00'}], [('2026-06-11', '1.05')])]},
-        # 6. Carga express (jue) entre dos completas (mié y vie): vision.md 4.2.
+        # 6. Carga express (jue) entre dos completas (mié y vie): el viernes devuelve lo del jueves (A, visión 4.2).
         {'id': 'min_express_entre_completas', 'etiquetas': ['minimo'], 't0': '2026-06-11', 't1': '2026-06-12',
          'ccl': ccl_base | {'2026-06-10': '1000', '2026-06-11': '1100', '2026-06-12': '1120'},
          'partidas': [_partida('A1', 'USD', 'cedear', ['sin_ops', 'viejo_t0'], [ap],
