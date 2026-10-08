@@ -1,3 +1,4 @@
+import { ArrowRight } from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import type { CalcVista } from '@/lib/domain/calc'
@@ -88,11 +89,18 @@ export default async function PaginaExposicion({ searchParams }: { searchParams:
           <Rotulo as="h2" className="mb-3">
             <span id="composicion">Composición {modo === 'total' ? 'del total (sin restar deudas)' : 'del financiero'}</span>
           </Rotulo>
-          <div className="flex flex-col gap-5">
-            <Barra titulo="Por clase" segmentos={v.por_clase} />
-            <Barra titulo="Por moneda de riesgo" segmentos={v.por_moneda} />
-            <Barra titulo="Por geografía" segmentos={v.por_geografia} nota="La liquidez cuenta en la geografía de su custodio." />
-          </div>
+          {v.fecha_datos ? (
+            <div className="flex flex-col gap-5">
+              <Barra titulo="Por clase" segmentos={v.por_clase} />
+              <Barra titulo="Por moneda de riesgo" segmentos={v.por_moneda} />
+              <Barra titulo="Por geografía" segmentos={v.por_geografia} nota="La liquidez cuenta en la geografía de su custodio." />
+            </div>
+          ) : (
+            // Sin ninguna carga no hay composición: se dice, en vez de tres barras vacías.
+            <p className="text-sm text-muted">
+              <span className="italic">sin dato</span> · aparece con tu primera carga.
+            </p>
+          )}
         </Tarjeta>
 
         <Tarjeta className="p-4 md:p-5" aria-labelledby="concentracion">
@@ -123,6 +131,12 @@ export default async function PaginaExposicion({ searchParams }: { searchParams:
 function FraseExposicion({ v, pesosUsd, sensPesos }: { v: VistaExposicion; pesosUsd: CalcVista; sensPesos: CalcVista }) {
   const r = v.resumen
   if (r.neto_ars.valor === null) {
+    // El "sin dato" lleva a lo que lo resuelve (visión §4.0), según la parte que falta.
+    const accion = !v.fecha_datos
+      ? { href: '/carga', etiqueta: 'Hacer la primera carga' }
+      : r.deuda_pesos.ars.valor === null
+        ? { href: '/datos/leasing', etiqueta: 'Cargar el capital pendiente en Datos › Leasing' }
+        : null
     return (
       <div className="space-y-1">
         <p className="text-[15px] leading-7 md:text-base">
@@ -135,6 +149,11 @@ function FraseExposicion({ v, pesosUsd, sensPesos }: { v: VistaExposicion; pesos
             </span>
           ) : null}
         </p>
+        {accion ? (
+          <Link href={accion.href} className="tocable inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline">
+            {accion.etiqueta} <ArrowRight aria-hidden className="size-4" />
+          </Link>
+        ) : null}
       </div>
     )
   }

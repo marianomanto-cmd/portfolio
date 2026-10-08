@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { useEffect, useId, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { MontoTrazado } from '@/components/monto'
+import { ConMontos, M } from '../../carga/_componentes/montos'
 import { monto } from '@/lib/domain/dinero'
 import { fechaLarga } from '@/lib/domain/fechas'
 import type { Fecha } from '@/lib/domain/tipos'
@@ -106,7 +107,8 @@ function Dato({ etiqueta, valor }: { etiqueta: string; valor: string | null }) {
   return (
     <div className="min-w-0">
       <dt className="text-xs text-muted">{etiqueta}</dt>
-      <dd className={`num break-words text-sm ${valor === null ? 'text-muted italic' : 'text-text'}`}>{valor ?? 'sin dato'}</dd>
+      {/* Los montos del contrato se tapan en el modo privado (manual §4.7). */}
+      <dd className={`num break-words text-sm ${valor === null ? 'text-muted italic' : 'text-text'}`}>{valor === null ? 'sin dato' : <ConMontos texto={valor} />}</dd>
     </div>
   )
 }
@@ -204,7 +206,7 @@ export function Leasing({
                   <ul className="num mt-1 space-y-0.5 text-muted">
                     {historia.map((s) => (
                       <li key={s.fecha}>
-                        {fechaLarga(s.fecha)} · {m(s.capital_pendiente)}
+                        {fechaLarga(s.fecha)} · <M usd={p.moneda === 'USD'}>{m(s.capital_pendiente) ?? 'sin dato'}</M>
                       </li>
                     ))}
                   </ul>

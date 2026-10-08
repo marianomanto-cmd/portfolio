@@ -650,6 +650,15 @@ describe('llamadas a la base (cliente falso)', () => {
     expect(fake.estado.rpc[1]).toEqual({ fn: 'revertir_lote', args: { p_lote: LOTE, p_motivo: 'lectura equivocada' } })
   })
 
+  it('el lote del formulario viaja tal cual: el mismo envío reintentado no se duplica (guardar_manual es idempotente por lote)', async () => {
+    fake.estado.respuestasRpc.push({ data: 61, error: null }, { data: 61, error: null })
+    const mov = { tipo: 'aporte' as const, fecha: '2026-11-02', cuenta_destino_id: 3, moneda_destino: 'USD' as const, monto_destino: '2000' }
+    expect(await guardarMovimientoCapital(mov, LOTE.toUpperCase())).toBe(61)
+    expect(await guardarMovimientoCapital(mov, LOTE)).toBe(61)
+    expect(fake.estado.rpc.map((r) => (r.args.p as { lote: string }).lote)).toEqual([LOTE, LOTE])
+    expect(await mensajeAsync(() => guardarValuacionBien({ bien_id: 1, fecha: '2026-11-02', valor: '1', fuente: 'x' }, 'no-es-un-lote'))).toMatch(/lote/)
+  })
+
   it('guardarValuacionBien y guardarPasivoSaldo usan guardar_manual con un lote nuevo', async () => {
     fake.estado.respuestasRpc.push({ data: 41, error: null }, { data: 42, error: null })
     expect(await guardarValuacionBien({ bien_id: 1, fecha: '2026-11-02', valor: '25000000', fuente: ' tasación ' })).toBe(41)

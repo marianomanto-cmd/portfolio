@@ -293,6 +293,6 @@ test.describe('desktop (1280 × 900)', () => {
     expect(await esperarHidratacion(page)).toBe(true)
     await expect(page.getByText('Todavía no hay datos: arrancá por acá.')).toBeVisible()
     await expect(page.getByRole('link', { name: 'Hacer la primera carga' })).toHaveAttribute('href', '/carga')
-    await expect(page.getByRole('link', { name: 'Ir a Datos' })).toHaveAttribute('href', '/datos')
+    await expect(page.getByRole('link', { name: 'Empezar por Datos › Leasing' })).toHaveAttribute('href', '/datos/leasing')
   })
 })

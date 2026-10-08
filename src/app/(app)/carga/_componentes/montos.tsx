@@ -9,8 +9,8 @@ export function M({ children, usd = false }: { children: ReactNode; usd?: boolea
   return <span className={usd ? 'monto usd' : 'monto'}>{children}</span>
 }
 
-/** "$ 1.234,56", "US$ 620,00", "−$ 3,5": lo que en un texto es plata. */
-export const RE_MONTO = /(?:US\$|\$)\s?[−+-]?\d[\d.]*(?:,\d+)?/g
+/** "$ 1.234,56", "US$ 620,00", "−$ 3,5", "+$ 1.000": lo que en un texto es plata (con su signo). */
+export const RE_MONTO = /[−+-]?(?:US\$|\$)\s?[−+-]?\d[\d.]*(?:,\d+)?/g
 
 /** Partes de un texto: los montos, marcados; el resto, tal cual. Puro (para los tests). */
 export function partirMontos(texto: string): { texto: string; monto: boolean }[] {
@@ -30,7 +30,7 @@ export function partirMontos(texto: string): { texto: string; monto: boolean }[]
 export function ConMontos({ texto }: { texto: string }) {
   return (
     <>
-      {partirMontos(texto).map((p, i) => (p.monto ? <M key={i} usd={p.texto.startsWith('US$')}>{p.texto}</M> : p.texto))}
+      {partirMontos(texto).map((p, i) => (p.monto ? <M key={i} usd={p.texto.includes('US$')}>{p.texto}</M> : p.texto))}
     </>
   )
 }

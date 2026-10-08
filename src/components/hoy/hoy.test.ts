@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Hechos } from '@/lib/domain/tipos'
 import { armarHoy } from '@/lib/vistas/armar'
 import type { VistaHoy } from '@/lib/vistas/contratos'
-import { hechosEjemplo, HOY_EJEMPLO } from '@/lib/vistas/ejemplo'
+import { hechosEjemplo, hechosVacios, HOY_EJEMPLO } from '@/lib/vistas/ejemplo'
 
 let hechos: Hechos = hechosEjemplo()
 let demo = false
@@ -136,6 +136,27 @@ describe('Hoy · "Todavía no cargaste hoy" recién después del cierre de BYMA 
       expect(texto(await pagina())).toContain('Todavía no cargaste hoy')
     } finally {
       vi.useRealTimers()
+    }
+  })
+})
+
+describe('Hoy · Día cero: el orden del manual (D-70, manual §5)', () => {
+  it('Leasing, Bienes, el catálogo opcional y después la primera carga; sin pedir las cuentas', async () => {
+    hechos = hechosVacios()
+    try {
+      const html = await pagina()
+      const t = texto(html)
+      expect(t).toContain('Todavía no hay datos')
+      expect(t).not.toMatch(/tus cuentas/)
+      const orden = ['Leasing', 'Bienes', 'catálogo', 'primera carga'].map((x) => t.indexOf(x))
+      expect(orden.every((i) => i >= 0)).toBe(true)
+      expect([...orden].sort((a, b) => a - b)).toEqual(orden)
+      // La acción principal es el paso 1, y va directo a Datos › Leasing.
+      const links = [...html.matchAll(/<a href="([^"]*)" class="([^"]*)"/g)].map((m) => ({ href: m[1], principal: m[2].includes('bg-accent') }))
+      expect(links.find((l) => l.principal)?.href).toBe('/datos/leasing')
+      expect(links.map((l) => l.href)).toContain('/carga')
+    } finally {
+      hechos = hechosEjemplo()
     }
   })
 })

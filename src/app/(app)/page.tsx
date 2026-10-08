@@ -525,22 +525,23 @@ function DiaCero({ v }: { v: VistaHoy }) {
       <Tarjeta className="p-5 md:p-8">
         <Rotulo as="p">Día cero · {fechaLarga(v.hoy)}</Rotulo>
         <p className="mt-3 max-w-[60ch] text-xl font-semibold leading-snug tracking-tight md:text-2xl">Todavía no hay datos: arrancá por acá.</p>
+        {/* El orden del manual §5 (D-70): las cuentas ya vienen dadas de alta. */}
         <p className="mt-3 max-w-[70ch] text-[15px] leading-6 text-muted">
-          Primero cargá en Datos tus cuentas, el catálogo (cada activo con su moneda de riesgo), la casa, la camioneta y el leasing. Después hacé tu primera
-          carga: CCL, cripto, el Excel de IEB y las capturas de Galicia y Mercado Pago.
+          Primero, en Datos: el Leasing, con el último capital pendiente, y los Bienes (la casa y la camioneta), con su valuación. El catálogo es opcional: si
+          no das de alta tus activos, la bandeja te los pide. Después, tu primera carga: CCL, cripto, el Excel de IEB y las capturas de Galicia y Mercado Pago.
         </p>
         <div className="mt-5 flex flex-col gap-2 sm:flex-row">
           <Link
-            href="/carga"
+            href="/datos/leasing"
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-[15px] font-medium text-on-accent hover:bg-accent-strong"
           >
-            <Upload aria-hidden className="size-5" /> Hacer la primera carga
+            <Database aria-hidden className="size-5" /> Empezar por Datos › Leasing
           </Link>
           <Link
-            href="/datos"
+            href="/carga"
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-4 text-[15px] font-medium hover:bg-surface-2"
           >
-            <Database aria-hidden className="size-5" /> Ir a Datos
+            <Upload aria-hidden className="size-5" /> Hacer la primera carga
           </Link>
         </div>
       </Tarjeta>

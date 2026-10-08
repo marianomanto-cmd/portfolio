@@ -16,6 +16,7 @@ import { enDosMonedas, ultimaValuacion, type CCL, type Valuacion } from '../_lib
 import { GEOGRAFIAS, NOMBRE_GEOGRAFIA } from '../_lib/catalogo'
 import type { BienFila, PasivoFila } from '../_lib/servidor'
 import { ElegirMoneda, Mensaje, Panel, useFormulario } from './formulario'
+import { M } from '../../carga/_componentes/montos'
 
 const NOMBRE_TIPO_BIEN = { inmueble: 'Inmueble', vehiculo: 'Vehículo', otro: 'Otro' } as const
 
@@ -184,7 +185,8 @@ export function Bienes({
                   <ul className="num mt-1 space-y-0.5 text-muted">
                     {historia.map((v) => (
                       <li key={v.fecha}>
-                        {fechaLarga(v.fecha)} · {monto(v.valor, b.moneda_valuacion, { decimales: b.moneda_valuacion === 'USD' ? 2 : 0 })} · {v.fuente}
+                        {fechaLarga(v.fecha)} ·{' '}
+                        <M usd={b.moneda_valuacion === 'USD'}>{monto(v.valor, b.moneda_valuacion, { decimales: b.moneda_valuacion === 'USD' ? 2 : 0 })}</M> · {v.fuente}
                       </li>
                     ))}
                   </ul>

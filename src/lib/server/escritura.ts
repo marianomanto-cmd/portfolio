@@ -198,23 +198,23 @@ export async function crearPasivo(p: PasivoAlta): Promise<number> {
 }
 
 /** Graba (o corrige, si ya hay una ese día) la valuación de un bien. Devuelve el id de la carga. */
-export async function guardarValuacionBien(v: { bien_id: number; fecha: Fecha; valor: string; fuente: string }): Promise<number> {
-  const p = altaManual({ bienes_valuaciones: [normalizarValuacion(v)] }, v.fecha)
+export async function guardarValuacionBien(v: { bien_id: number; fecha: Fecha; valor: string; fuente: string }, lote?: string | null): Promise<number> {
+  const p = altaManual({ bienes_valuaciones: [normalizarValuacion(v)] }, v.fecha, lote)
   const data = await llamar('guardar_manual', { p }, 'guardar la valuación', { reintentable: true })
   return leerId(data, 'guardar la valuación')
 }
 
 /** Graba (o corrige) el capital pendiente informado de un pasivo. Devuelve el id de la carga. */
-export async function guardarPasivoSaldo(s: { pasivo_id: number; fecha: Fecha; capital_pendiente: string }): Promise<number> {
-  const p = altaManual({ pasivo_saldos: [normalizarPasivoSaldo(s)] }, s.fecha)
+export async function guardarPasivoSaldo(s: { pasivo_id: number; fecha: Fecha; capital_pendiente: string }, lote?: string | null): Promise<number> {
+  const p = altaManual({ pasivo_saldos: [normalizarPasivoSaldo(s)] }, s.fecha, lote)
   const data = await llamar('guardar_manual', { p }, 'guardar el capital pendiente', { reintentable: true })
   return leerId(data, 'guardar el capital pendiente')
 }
 
 /** Graba un aporte, un retiro o una transferencia entre cuentas propias (D-06). Devuelve el id de la carga. */
-export async function guardarMovimientoCapital(m: MovimientoCapitalAlta): Promise<number> {
+export async function guardarMovimientoCapital(m: MovimientoCapitalAlta, lote?: string | null): Promise<number> {
   const mov = normalizarMovimiento(m)
-  const p = altaManual({ movimientos_capital: [mov] }, mov.fecha)
+  const p = altaManual({ movimientos_capital: [mov] }, mov.fecha, lote)
   const data = await llamar('guardar_manual', { p }, 'guardar el movimiento', { reintentable: true })
   return leerId(data, 'guardar el movimiento')
 }
@@ -1139,9 +1139,12 @@ export function normalizarMovimiento(m: MovimientoCapitalAlta) {
   }
 }
 
-/** Payload de guardar_manual, con un lote nuevo. */
-function altaManual(hechos: Record<string, unknown[]>, fecha: Fecha): Record<string, unknown> {
-  return { lote: randomUUID(), fecha: fechaRequerida(fecha, 'la fecha'), ...hechos }
+/**
+ * Payload de guardar_manual. El lote lo manda el formulario (el mismo envío
+ * reintentado trae el mismo: guardar_manual no lo duplica); sin lote, uno nuevo.
+ */
+function altaManual(hechos: Record<string, unknown[]>, fecha: Fecha, lote?: string | null): Record<string, unknown> {
+  return { lote: lote ? loteValido(lote) : randomUUID(), fecha: fechaRequerida(fecha, 'la fecha'), ...hechos }
 }
 
 // ───────────── Archivos ─────────────

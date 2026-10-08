@@ -4,8 +4,9 @@
 // vista, los errores van al lado de cada campo y, al guardar, el formulario se
 // limpia (cambia su key).
 
-import { startTransition, useActionState, type FormEvent, type ReactNode } from 'react'
+import { startTransition, useActionState, useRef, type FormEvent, type ReactNode } from 'react'
 import type { EstadoFormulario } from '../acciones'
+import { loteDelEnvio, sinConexion, type LoteEnvio } from '../_lib/envio'
 
 export const ESTADO_INICIAL: EstadoFormulario = { ok: null, mensaje: null, errores: {}, vez: 0 }
 
@@ -15,12 +16,25 @@ type Accion = (previo: EstadoFormulario, form: FormData) => Promise<EstadoFormul
  * Se envía con onSubmit y no con `action`: React 19 vacía los campos después de
  * una acción de formulario, y con un error de validación perderías lo tipeado.
  * Al guardar bien, el formulario se limpia cambiando su key (estado.vez).
+ *
+ * Cada envío lleva su lote: el mismo envío reintentado (se cortó la conexión)
+ * trae el mismo y la base no lo duplica; otro contenido o un guardado nuevo,
+ * otro. Un corte no lleva a la pantalla de error: queda acá, con qué hacer.
  */
 export function useFormulario(accion: Accion) {
-  const [estado, despachar, enviando] = useActionState(accion, ESTADO_INICIAL)
+  const [estado, despachar, enviando] = useActionState(async (previo: EstadoFormulario, form: FormData) => {
+    try {
+      return await accion(previo, form)
+    } catch {
+      return sinConexion(previo)
+    }
+  }, ESTADO_INICIAL)
+  const ultimo = useRef<LoteEnvio | null>(null)
   const enviar = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const datos = new FormData(e.currentTarget)
+    ultimo.current = loteDelEnvio(ultimo.current, estado.vez, datos, () => crypto.randomUUID())
+    datos.set('lote', ultimo.current.lote)
     startTransition(() => despachar(datos))
   }
   return [estado, enviar, enviando] as const
