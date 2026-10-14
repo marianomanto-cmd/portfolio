@@ -24,8 +24,10 @@ export const Boton = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButt
   },
 )
 
+// `tocable` (fuera de las capas): con puntero grueso mide 44 px también a 1024 px,
+// donde lg:min-h-10 lo dejaba en 42 (D-100, tablet o teléfono acostado).
 export const CLASE_CAMPO =
-  'min-h-11 lg:min-h-10 w-full min-w-0 rounded-lg border border-border bg-surface px-3 py-2 text-base text-text outline-none placeholder:text-faint focus:border-accent aria-[invalid=true]:border-negative'
+  'tocable min-h-11 lg:min-h-10 w-full min-w-0 rounded-lg border border-border bg-surface px-3 py-2 text-base text-text outline-none placeholder:text-faint focus:border-accent aria-[invalid=true]:border-negative'
 
 export function Campo({
   etiqueta,

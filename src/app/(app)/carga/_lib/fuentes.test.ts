@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { avisosDeFecha, claseDeArchivo, fechaDeCarga, fuentesActivas, mensajeLectura, mimeDeImagen } from './fuentes'
+import { decidirFuente, ErrorCaptura } from '@/lib/carga/captura-verificacion'
+import { avisosDeFecha, claseDeArchivo, cuentasParaElegir, fechaDeCarga, fuentesActivas, mensajeLectura, mimeDeImagen } from './fuentes'
 import { lecturaGaliciaEjemplo, lecturaIEBEjemplo, lecturaMPEjemplo } from './ejemplos'
 
 describe('claseDeArchivo', () => {
@@ -62,5 +63,27 @@ describe('mensajeLectura', () => {
     expect(mensajeLectura('excel', undefined, new Error('El Excel no tiene la hoja Patrimonio.'))).toBe('No pude leer el Excel: El Excel no tiene la hoja Patrimonio.')
     expect(mensajeLectura('imagen', undefined, 'Falta configurar ANTHROPIC_API_KEY')).toBe('No pude leer la captura: Falta configurar ANTHROPIC_API_KEY')
     expect(mensajeLectura('imagen', 'Mercado Pago', new Error('tiempo agotado'))).toBe('No pude leer la captura de Mercado Pago: tiempo agotado')
+  })
+})
+
+describe('una captura que las lecturas atribuyen a bancos distintos (revisión fase 1a)', () => {
+  it('se pregunta de qué banco es (y se vuelve a leer con esa pista); el mensaje dice eso, no "pegala en otro lugar"', () => {
+    let error: unknown = null
+    try {
+      decidirFuente('galicia', 'mercado_pago')
+    } catch (e) {
+      error = e
+    }
+    expect(error).toBeInstanceOf(ErrorCaptura)
+    expect(String((error as Error).message)).toMatch(/Decime de cuál es y la vuelvo a leer\.$/)
+    expect(cuentasParaElegir(error)).toEqual(['Galicia', 'Mercado Pago'])
+    // Con la pista, decide: la pantalla manda la elegida.
+    expect(decidirFuente('galicia', 'mercado_pago', 'Mercado Pago').fuente).toBe('mercado_pago')
+  })
+
+  it('otros errores no preguntan nada', () => {
+    expect(cuentasParaElegir(new ErrorCaptura('no_reconocida', 'no parece una pantalla de inversiones'))).toBeNull()
+    expect(cuentasParaElegir(new Error('x'))).toBeNull()
+    expect(cuentasParaElegir(null)).toBeNull()
   })
 })

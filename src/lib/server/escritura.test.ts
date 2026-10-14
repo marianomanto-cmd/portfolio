@@ -9,6 +9,8 @@ const fake = vi.hoisted(() => {
     respuestasRpc: [] as { data: unknown; error: unknown }[],
     inserts: [] as { tabla: string; fila: unknown }[],
     respuestaInsert: { data: { id: 7 } as unknown, error: null as unknown },
+    updates: [] as { tabla: string; fila: unknown; eq?: [string, unknown] }[],
+    respuestaUpdate: { data: [{ id: 3 }] as unknown, error: null as unknown },
     uploads: [] as { bucket: string; path: string; opciones: unknown }[],
     respuestaUpload: { data: null as unknown, error: null as unknown },
   }
@@ -21,6 +23,16 @@ const fake = vi.hoisted(() => {
       insert: (fila: unknown) => {
         estado.inserts.push({ tabla, fila })
         return { select: () => ({ single: () => Promise.resolve(estado.respuestaInsert) }) }
+      },
+      update: (fila: unknown) => {
+        const u: { tabla: string; fila: unknown; eq?: [string, unknown] } = { tabla, fila }
+        estado.updates.push(u)
+        return {
+          eq: (col: string, val: unknown) => {
+            u.eq = [col, val]
+            return { select: () => Promise.resolve(estado.respuestaUpdate) }
+          },
+        }
       },
     }),
     storage: {
@@ -39,6 +51,8 @@ vi.mock('./supabase', () => ({ supabase: () => fake.cliente }))
 
 import {
   actualizarActivo,
+  actualizarBien,
+  actualizarPasivo,
   confirmarCarga,
   crearActivo,
   crearBien,
@@ -255,6 +269,15 @@ describe('normalizarConfirmacion', () => {
       { moneda: 'ARS', monto: '-50000.25' },
       { moneda: 'USD', monto: '120.5' },
     ])
+  })
+
+  it('la huella del pedido viaja normalizada (sha256 en hex) y se valida', () => {
+    const h = 'AB'.repeat(32)
+    expect(normalizarConfirmacion(confirmacion({ huella: h })).huella).toBe('ab'.repeat(32))
+    expect(normalizarConfirmacion(confirmacion())).not.toHaveProperty('huella')
+    expect(normalizarConfirmacion(confirmacion({ huella: null }))).not.toHaveProperty('huella')
+    expect(mensaje(() => normalizarConfirmacion(confirmacion({ huella: 'abc' })))).toMatch(/huella de la carga no es válida/)
+    expect(mensaje(() => normalizarConfirmacion(confirmacion({ huella: 7 as unknown as string })))).toMatch(/huella de la carga no es válida/)
   })
 
   it('un tipo de cambio sin valores no se manda', () => {
@@ -639,6 +662,30 @@ describe('llamadas a la base (cliente falso)', () => {
     fake.estado.respuestasRpc.push({ data: { lote: LOTE, cargas: [4, 5], borradas: 1, restauradas: 3 }, error: null })
     expect(await revertirLote(LOTE, ' lectura equivocada ')).toEqual({ lote: LOTE, cargas: [4, 5], borradas: 1, restauradas: 3 })
     expect(fake.estado.rpc[1]).toEqual({ fn: 'revertir_lote', args: { p_lote: LOTE, p_motivo: 'lectura equivocada' } })
+  })
+
+  it('el lote del formulario viaja tal cual: el mismo envío reintentado no se duplica (guardar_manual es idempotente por lote)', async () => {
+    fake.estado.respuestasRpc.push({ data: 61, error: null }, { data: 61, error: null })
+    const mov = { tipo: 'aporte' as const, fecha: '2026-11-02', cuenta_destino_id: 3, moneda_destino: 'USD' as const, monto_destino: '2000' }
+    expect(await guardarMovimientoCapital(mov, LOTE.toUpperCase())).toBe(61)
+    expect(await guardarMovimientoCapital(mov, LOTE)).toBe(61)
+    expect(fake.estado.rpc.map((r) => (r.args.p as { lote: string }).lote)).toEqual([LOTE, LOTE])
+    expect(await mensajeAsync(() => guardarValuacionBien({ bien_id: 1, fecha: '2026-11-02', valor: '1', fuente: 'x' }, 'no-es-un-lote'))).toMatch(/lote/)
+  })
+
+  it('un bien o un pasivo cargado con un dato equivocado se corrige (fila por fila, con la auditoría)', async () => {
+    await actualizarBien(3, { nombre: ' Casa ', tipo: 'inmueble', moneda_valuacion: 'USD', geografia: 'AR', pasivo_id: null })
+    expect(fake.estado.updates.at(-1)).toEqual({
+      tabla: 'bienes',
+      fila: { nombre: 'Casa', tipo: 'inmueble', moneda_valuacion: 'USD', geografia: 'AR', pasivo_id: null },
+      eq: ['id', 3],
+    })
+    await actualizarPasivo(2, { nombre: 'Leasing', tipo: 'leasing', moneda: 'ARS', fecha_inicio: '2025-06-01', cuotas_totales: 36, monto_financiado_neto: '42000000' })
+    expect(fake.estado.updates.at(-1)).toMatchObject({ tabla: 'pasivos', fila: { cuotas_totales: 36, monto_financiado_neto: '42000000', anticipo_neto: null }, eq: ['id', 2] })
+    fake.estado.respuestaUpdate = { data: [], error: null }
+    expect(await mensajeAsync(() => actualizarBien(99, { nombre: 'X', tipo: 'otro', moneda_valuacion: 'ARS' }))).toMatch(/No existe el bien #99/)
+    expect(await mensajeAsync(() => actualizarBien(3, { nombre: 'Casa', tipo: 'otro', moneda_valuacion: 'EUR' as 'ARS' }))).toMatch(/moneda de valuación/)
+    fake.estado.respuestaUpdate = { data: [{ id: 3 }], error: null }
   })
 
   it('guardarValuacionBien y guardarPasivoSaldo usan guardar_manual con un lote nuevo', async () => {

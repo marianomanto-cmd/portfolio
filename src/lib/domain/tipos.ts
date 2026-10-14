@@ -164,6 +164,29 @@ export interface CargaResumen {
   reemplaza_a: number | null
   lector: string | null
   tiempo_activo_ms: number | null
+  /**
+   * false si la carga dejó algo sin grabar: filas, saldos o tenencias ausentes
+   * pendientes (D-47, D-106). Ausente = true (las cargas viejas y los tests).
+   */
+  listado_completo?: boolean
+}
+
+/**
+ * Tenencia que la carga vigente más reciente de su cuenta no trajo (la fuente
+ * ya no la lista: venta total o vencimiento) y que el dueño no registró: toda
+ * resolución distinta de 'registrada' ('pendiente' y 'sin revisar al guardar').
+ * Desde `fecha` su valor es "sin dato".
+ */
+export interface Ausente {
+  cuenta_id: number
+  activo_id: number
+  /**
+   * Fecha de la primera carga de la racha que la declara ausente: si quedó
+   * pendiente varios días, la del primero, así las fotos de los días del medio
+   * tampoco la valúan.
+   */
+  fecha: Fecha
+  carga_id: number
 }
 
 /** Todo lo que el motor necesita para calcular. Se lee entero desde la base. */
@@ -182,4 +205,6 @@ export interface Hechos {
   feriados: Feriado[]
   /** Solo cargas vigentes (las revertidas no aportan hechos). */
   cargas: CargaResumen[]
+  /** Tenencias declaradas ausentes y sin resolver (ver Ausente). Opcional: vacío si falta. */
+  ausentes?: Ausente[]
 }

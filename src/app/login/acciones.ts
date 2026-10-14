@@ -15,10 +15,9 @@ import {
 } from '@/lib/server/sesion'
 import {
   DEMORA_FALLO_MS,
-  anotarError,
   anotarExito,
-  esperaPendiente,
   origenDelPedido,
+  reservarIntento,
   textoEspera,
   type Registro,
 } from './_lib/intentos'
@@ -43,21 +42,26 @@ export async function entrar(_previo: EstadoEntrada, form: FormData): Promise<Es
   if (clave === '') return { error: 'Escribí la clave.' }
 
   const origen = origenDelPedido(await headers())
-  const espera = esperaPendiente(registro, origen, Date.now())
-  if (espera > 0) {
-    // Trabado: la clave ni se mira (si no, los intentos en paralelo pasarían).
+  // Mirar la traba y anotar el intento van juntos y antes de cualquier await:
+  // un pedido en paralelo ya ve este intento (D-112).
+  const reserva = reservarIntento(registro, origen, Date.now())
+  if (reserva.trabado) {
+    // Trabado: la clave ni se mira.
     await dormir(DEMORA_FALLO_MS)
-    return { error: `Demasiados intentos seguidos. ${textoEspera(espera)} y probá de nuevo.` }
+    return { error: `Demasiados intentos seguidos. ${textoEspera(reserva.espera)} y probá de nuevo.` }
   }
 
   if (!(await claveCorrecta(clave))) {
-    const traba = anotarError(registro, origen, Date.now())
     await dormir(DEMORA_FALLO_MS)
     return {
-      error: traba > 0 ? `Esa no es la clave. ${textoEspera(traba)} antes de probar otra vez.` : 'Esa no es la clave. Probá de nuevo.',
+      error:
+        reserva.traba > 0
+          ? `Esa no es la clave. ${textoEspera(reserva.traba)} antes de probar otra vez.`
+          : 'Esa no es la clave. Probá de nuevo.',
     }
   }
 
+  // Era la clave: se borra el intento anotado y el origen queda limpio.
   anotarExito(registro, origen)
   const token = await crearTokenSesion()
   ;(await cookies()).set(COOKIE_SESION, token, OPCIONES_COOKIE)

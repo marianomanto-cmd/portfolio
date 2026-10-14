@@ -99,7 +99,17 @@ export interface VistaHoy {
   aviso_fin_de_anio: string | null
   /** Quién movió la variación del día, ordenado por aporte absoluto. */
   movimientos: MovimientoActivo[]
-  cuadre: { ars_ok: boolean | null; usd_ok: boolean | null; detalle: string }
+  cuadre: {
+    ars_ok: boolean | null
+    usd_ok: boolean | null
+    detalle: string
+    /**
+     * Patrimonio de hoy − el de la carga anterior − flujos externos − (activos
+     * + TC + sin atribuir), con traza: "0" si cierra, el monto si no ("no cierra
+     * por $ X"). null o ausente si no se puede verificar.
+     */
+    diferencia?: Par | null
+  }
 }
 
 export interface MovimientoActivo {
@@ -133,8 +143,10 @@ export interface FilaCartera {
    * (decisión E, D-35): suma de los intervalos entre cargas desde la primera
    * observación fresca, más un intervalo por lote antes de ella al CCL de
    * compra. sin_atribuir es lo pendiente hoy (partida sin precio o CCL nuevo).
-   * activo + tc + sin_atribuir = resultado, salvo que haya habido ventas desde
-   * la primera observación: entonces incluye lo realizado (la traza lo dice).
+   * Es el de la tenencia vigente: cada venta deja lo acumulado × cantidad
+   * después ÷ cantidad antes (como el costo) y las rentas no entran (D-114),
+   * así que activo + tc + sin_atribuir = resultado. Si el resultado es "sin
+   * dato", sus partes también, con el mismo motivo.
    */
   desglose: { moneda: Moneda; activo: CalcVista; tc: CalcVista; sin_atribuir: CalcVista } | null
   peso: CalcVista
@@ -145,6 +157,8 @@ export interface FilaCartera {
    * (la apertura en la app, sin fecha de compra real).
    */
   dias_desde: 'compra' | 'declarada' | 'apertura' | null
+  /** Desde cuándo se cuentan los días (la traza muestra la resta). Opcional. */
+  fecha_inicio?: Fecha | null
   /** Badge único cuando los signos de ARS y USD difieren. */
   ganas_pesos_perdes_dolares: boolean
   pendiente: string | null
@@ -212,6 +226,19 @@ export interface FilaRegistro {
   cotizaciones: number
   saldos: number
   operaciones: number
+  /**
+   * Lo que grabó un guardado de Datos (D-111, D-04): valuaciones de bienes,
+   * capitales pendientes y movimientos de capital. 0 en las demás cargas.
+   */
+  valuaciones?: number
+  capitales?: number
+  movimientos?: number
+  /**
+   * Qué grabó un guardado de Datos, en palabras: "valuación de Casa · aporte a
+   * Mercado Pago". null en las demás cargas. Su `cuenta` es "Datos" (no "Tipo
+   * de cambio": esa es la carga del CCL y el cripto, lector "tipeado").
+   */
+  detalle?: string | null
   tiempo_activo_ms: number | null
 }
 

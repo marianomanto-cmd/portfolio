@@ -4,6 +4,100 @@ Todo cambio de la app se registra acá, el más nuevo primero. Cada entrada dice
 
 ## [Sin publicar]
 
+### 2026-10-14 — Revisión de la 1a: correcciones
+La 1a desplegada pasó por una revisión adversarial de todo el código, y cada arreglo tiene un test que falla sin él. Las decisiones de esta ronda son D-117 a D-131; las que esperan tu confirmación están marcadas como provisorias.
+
+- **Cargar** (D-117 a D-123):
+  - una posición que la fuente deja de listar (venta total o vencimiento) ya no sigue valuada en silencio: la bandeja ofrece "Registrar venta" o "Registrar vencimiento" (lo cobrado lo tipeás vos; el último precio es solo una referencia) o "Dejar pendiente", y una pendiente vale "sin dato" desde la primera carga que no la trajo (D-117). En una captura, solo para la sección y la moneda de un total que cierra;
+  - una carga que deja algo pendiente pone su fuente en ≠ "parcial" en el chip de datos y suma un ítem en Atención, hasta la próxima carga de esa cuenta (D-118);
+  - recargar el mismo día con un solo tipo de cambio ya no borra el otro, y sin CCL tipeado las operaciones usan el que ese día ya tiene cargado (D-119);
+  - una captura posterior del mismo día ya no pisa el precio que grabó el Excel de IEB (D-119);
+  - reintentar un Enter cuya respuesta se perdió muestra lo que de verdad quedó grabado; si cambiaste algo, no dice "guardado": pide "Nueva carga". Un error al guardar ofrece "Ver Registro" y "Nueva carga" (D-120);
+  - "Ya la tenía (apertura)": una tenencia nueva en una cuenta ya cargada (por ejemplo, una que quedó pendiente el Día cero) puede entrar como apertura con el PPP, además de como compra (D-121);
+  - una fuente que no graba nada no crea su carga ni reemplaza la buena del día (D-122);
+  - Galicia: una fila en dólares ("Bonos en dólares", U$D) ya no se graba como precio en pesos: queda en error, para dejarla pendiente. Los controles en dólares se ven en US$ (D-123);
+  - el fondo sin código de Galicia se puede dar de alta: su ticker es el nombre con guiones ("FIMA-PREMIUM-CLASE-A"), y el alta muestra todos sus errores (D-123);
+  - IEB: un PPP o un precio de 0 es "sin dato", nunca un costo ni un precio de $ 0; si B2 o un Subtotal no cierran, nada de lo que controlan queda verificado (D-123);
+  - corregir a mano la cantidad de una fila de Galicia vuelve a armar el costo con el rendimiento $, y el precio implícito de una compra sale del costo total exacto (D-123);
+  - una captura que las dos lecturas atribuyen a bancos distintos pregunta de cuál es ("Es de Galicia" o "Es de Mercado Pago") y la vuelve a leer (D-123);
+  - Mercado Pago: si las dos lecturas del saldo no coinciden, el que se propone ya no dice "cierra"; una TNA de 1% o menos ya no se toma como fracción;
+  - modo privado: Cargar ya no deja montos a la vista.
+- **Datos** (D-124):
+  - un guardado reintentado no se duplica: cada envío lleva su lote. Un corte de conexión deja el formulario y avisa que no se sabe si se guardó;
+  - "Corregir datos" en cada bien y "Corregir el contrato" en cada pasivo; el cambio queda en la auditoría;
+  - un CEDEAR nunca queda sin ratio, tampoco al editarlo: lo controla la base (D-104);
+  - modo privado: el contrato del leasing y su historia, las valuaciones y el impuesto de los movimientos ya no dejan montos a la vista;
+  - cada subpantalla tiene su encabezado principal (para el lector de pantalla), y cada bien y cada pasivo, el suyo;
+  - Movimientos: a 360 px, "Transferencia" ya no se sale de su botón.
+- **Hoy:**
+  - una tenencia que la fuente ya no lista y dejaste pendiente vale "sin dato": los totales que la incluyen muestran "sin dato · parcial" con la suma parcial, en vez de contarla dos veces, y Atención la muestra con gravedad alta (D-117);
+  - sin los bienes o sin el leasing cargados, el patrimonio total y su variación son "sin dato · parcial", con la suma de lo cargado (antes repetían el financiero), y la deuda en pesos es "sin dato", no $ 0 (D-126);
+  - un total al que le falta una parte muestra debajo la suma parcial en pesos y en dólares, con su traza (D-65);
+  - el cuadre dice por cuánto: "cierra (diferencia $ 0,00 · US$ 0,00)" o "no cierra por …", cada cifra con su traza; "no verificable" dice qué falta (D-66);
+  - una compra, una venta o un cobro en una cuenta sin saldo cargado en esa moneda (Galicia) cuenta como plata que entró o salió de la app: el cuadre cierra y la nombra (D-125);
+  - la frase lleva verbo en las dos oraciones ("tus activos sumaron…", "la suba del CCL le restó…"), como en el manual; si falta una partida, dice cuál y por qué en vez de repartir cifras (D-128);
+  - carga express: "de tus US$ …" es una cifra más de la frase, con su traza y su renglón en la hoja del teléfono; la puntuación que sigue a una cifra ya no baja sola de renglón;
+  - "Quién movió tu financiero": cada aporte trae su cuenta completa (valores, CCL y flujos);
+  - Atención: un saldo viejo dice de qué cuenta es ("Pesos en Mercado Pago: dato viejo");
+  - el punto de Cargar y "Todavía no cargaste hoy" aparecen recién después del cierre de BYMA, a las 17 h de Córdoba (D-127);
+  - el Día cero sigue el orden del manual (Leasing, Bienes, el catálogo opcional y la primera carga), no pide las cuentas y lleva primero a Datos › Leasing (D-128);
+  - en el teléfono, la línea "Pesos fin. − leasing" ya no se sale de su tarjeta; con mouse en una ventana angosta, la frase se lee entera;
+  - modo privado: los montos sueltos de la frase también se ocultan.
+- **Cartera:**
+  - el desglose activo/TC es el de la tenencia vigente: después de una venta parcial o de un cupón, activo + TC + sin atribuir = resultado de la fila (D-35);
+  - si el resultado de una fila es "sin dato" (precio pendiente, tenencia que la fuente ya no lista), las partes de su desglose también, con el mismo motivo (D-126);
+  - los Días abren su traza ("jue 15/10 − jue 01/10 = 14 días desde la apertura en la app") y llevan el chip "desde apertura" o "declarado";
+  - los montos compactos llevan su signo ("+$ 6,2 M"), y en Totales "TC" va en el renglón de su cifra;
+  - el "sin dato" de una apertura sin CCL de compra ya no manda a declararlo (en la 1a no hay dónde): "se declara desde la 1b (Pendientes)";
+  - con el dedo, los encabezados y el botón de cada fila miden 44 px (D-100).
+- **Exposición:**
+  - sin el leasing, la deuda en pesos, el neto, la sensibilidad y el % neto son "sin dato · parcial" (D-126); sin el total del financiero, la concentración es "sin dato";
+  - una suma sin ninguna parte conocida ya no dice "suma parcial (0 de 1): $ 0,00": dice qué falta (D-126);
+  - sin cargas, dice que la composición aparece con la primera carga y lleva a Cargar; sin el capital pendiente del leasing, lleva a Datos › Leasing;
+  - la frase del neto ya no deja un "(" o un ";" solos en un renglón del teléfono, y sus montos se ocultan en modo privado.
+- **Registro:**
+  - un guardado de Datos se llama "Datos", su origen es "manual" y dice qué grabó ("valuación de Casa", "capital pendiente de Leasing", "aporte a Mercado Pago"), también en el resumen del lote y al revertir. Antes figuraba como "Tipo de cambio · CCL y cripto";
+  - si guardaste otro día que el de los datos, la tarjeta lo dice ("mié 14/10 · guardado el jue 15/10 a las 08:00").
+- **En toda la app:**
+  - en el teléfono, el chip de estado de los datos se abre entero debajo de la barra; antes salía cortado a la izquierda (D-30);
+  - los resultados en dólares van en verde o en rojo también dentro de su pastilla;
+  - la traza muestra los insumos con sus decimales: un precio de $ 1,124 ya no sale $ 1,12 (D-128);
+  - el anillo de foco ya no deforma los controles;
+  - Ajustes: el interruptor de Modo privado apagado se ve, con contraste de 3:1 o más (D-128);
+  - una dirección que no existe dice "No encontré esa página", dentro de las barras de la app y con "Ir a Hoy" (D-128);
+  - la pantalla de error ya no dice "Nada se guardó ni se cambió", que no sabe: "Si estabas guardando algo, no sé si se guardó: mirá el Registro antes de volver a intentar", con un link al Registro (D-128);
+  - con el dedo en una tablet o un teléfono acostado, los links de la barra lateral y los campos de Cargar y de Datos miden 44 px, también a 1024 px (D-100).
+- **Seguridad:**
+  - el freno a las claves vale también en paralelo (D-112): mirar la traba y anotar el intento van en un solo paso, antes de comparar la clave. Antes, una ráfaga de pedidos simultáneos probaba todas sus claves y la correcta entraba; ahora prueba como mucho 3, igual que en serie, y trabada ni la clave correcta entra;
+  - las cifras reales del dueño que habían llegado a tests y fixtures se reemplazaron por números inventados. Siguen en el historial del repo público: qué hacer con eso lo decide el dueño (D-24).
+- **Base** (cuatro migraciones, aplicadas en producción el 14/10 con la versión que registró Supabase; `docs/datos.md`):
+  - `20261014193803_confirmar_carga_recarga`: `confirmar_carga` conserva lo no tipeado del tipo de cambio, respeta el precio del Excel entre cargas y guarda la huella del pedido (D-119, D-120);
+  - `20261014193834_catalogo_cedear_ratio`: `alta_activo` y `editar_activo` rechazan un CEDEAR sin ratio (D-124);
+  - `20261014193836_auditoria_search_path`: `registrar_auditoria` fija `search_path = public, pg_temp`. Una sesión SQL con una tabla temporal llamada `auditoria` se llevaba ahí las filas de la auditoría (D-17);
+  - `20261014203031_feriados_2026_2027`: la tabla `feriados` estaba vacía, y los feriados contaban como días hábiles para "viejo" y para "Todavía no cargaste hoy" (por ejemplo, el lun 12/10). Entran 49 días: los días sin rueda en BYMA (17 de 2026 y 12 de 2027) y los cierres de la NYSE (10 de cada año), cada uno con su fuente oficial (D-129);
+  - cada función aplicada coincide con su archivo (md5 del cuerpo); las firmas no cambian, así que los tipos de `src/lib/database.types.ts` tampoco;
+  - se sacó `supabase/schema.sql`, el schema de Corte que había quedado junto a las migraciones (D-01);
+  - el Día cero del dueño se cargó el 14/10 desde la base, con las mismas funciones que usa la app (D-130);
+  - la deuda del leasing es, por ahora, un estimado que aprobó el dueño, hasta que la leasera informe el valor de cancelación (D-131).
+- **Verificación:**
+  - Vitest: 40 archivos y 944 tests, entre ellos uno por arreglo;
+  - tests del schema: 191 controles (antes 143), con la recarga del tipo de cambio, el precio del Excel entre cargas, la huella, el ratio de un CEDEAR, la auditoría y los feriados;
+  - Playwright: 49 tests. El de layout (D-30) recorre 9 anchos en claro y en oscuro, y además 768 y 1024 px con el dedo; marca también lo que se sale de su tarjeta o de un botón, exige un h1 por pantalla, recorre la página de "no encontrada" y abre el chip de datos a 360, 390 y 412 px. Cargar y Datos lo frenan como cualquier pantalla;
+  - el de interacción prueba el modo privado en todas las pantallas (ningún monto a la vista), el foco con teclado, el 404 y el Día cero;
+  - la referencia en Python codifica el desglose de la tenencia vigente (D-35), y los 310 casos se regeneraron;
+  - ningún test usa cantidades ni precios de los archivos reales del dueño (D-24).
+- **Documentación:**
+  - decisiones D-117 a D-131, y D-01, D-16, D-24, D-35, D-47, D-65, D-66, D-70, D-100, D-104, D-106, D-107, D-108, D-112 y D-113 al día;
+  - `docs/datos.md` (las cuatro migraciones, `cargas.grabado`, el `search_path` de la auditoría), `docs/arquitectura.md`, `docs/carga-diaria.md`, `docs/calidad.md` ("Estado de la 1a" al 14/10) y `docs/stack.md` (feriados sin date-holidays);
+  - el manual corrige la frase de ejemplo, las 13 columnas de Cartera, el límite de imagen, el tiempo activo de una captura y "viejo" con feriados;
+  - en la entrada del 08/10 de abajo, el modo demo decía "solo en desarrollo" (anda fuera de producción, también en un Preview de Vercel) y había "una sola lectura de la base por pantalla" (es una sola lectura de los hechos por pedido; Registro y Datos leen además sus tablas). Quedó corregida.
+
+### 2026-10-08 — Deshacer y Revertir andan
+- **Base:** se aplicó la migración `carga_revertir` (`revertir_lote`). La aplicó el dueño desde el editor SQL, porque el conector de Supabase no puede aplicar sentencias con `DELETE` (D-116). Quedó registrada en el historial de migraciones con su versión, y la función es idéntica al archivo salvo el fin de línea (`docs/datos.md`).
+- **Cargar y Registro:** Deshacer y Revertir ya funcionan; se sacó del manual el aviso "Por ahora no anda" (`docs/manual.md` §8).
+- **Tipos:** `src/lib/database.types.ts` regenerado, con `revertir_lote`.
+- **Documentación:** `docs/arquitectura.md` ubicaba las cinco funciones de escritura en `carga_transaccional`; ahora nombra la migración de cada una.
+
 ### 2026-10-08 — Fase 1a: la primera versión usable
 La app nueva reemplaza a Corte (D-01): carga diaria, Hoy, Cartera, Exposición, Registro, Datos y Ajustes, con todo número en pesos y en dólares y su traza. Cómo se usa: `docs/manual.md`. Cómo está hecha: `docs/arquitectura.md`.
 
@@ -13,7 +107,7 @@ La app nueva reemplaza a Corte (D-01): carga diaria, Hoy, Cartera, Exposición, 
   - freno a los intentos de clave: 800 ms por error y, desde el tercero seguido, una espera que se duplica hasta 5 minutos;
   - Content-Security-Policy con nonce por pedido, rechazo de todo POST que no venga de la propia app y encabezados de seguridad en toda respuesta (sin iframes, HSTS, `nosniff`, sin cámara ni ubicación, `noindex`);
   - la vuelta después de entrar solo va a rutas propias;
-  - modo demo (`PORTFOLIO_DEMO=1`) solo en desarrollo, imposible en producción;
+  - modo demo (`PORTFOLIO_DEMO=1`), con datos inventados y sin clave: se ignora en producción, pero anda fuera de ella (desarrollo, tests, `next start` y los Previews de Vercel), así que no se carga en ningún entorno de Vercel;
   - la base sigue cerrada al navegador (D-20);
   - un solo "Salir", en Ajustes.
 - **Shell:**
@@ -22,7 +116,7 @@ La app nueva reemplaza a Corte (D-01): carga diaria, Hoy, Cartera, Exposición, 
   - chip de estado de los datos ("Datos al cierre del mié 14/10 · 5 de 5 fuentes"), modo privado, tema y paleta daltónica;
   - atajos `c` (Cargar) y `h` (modo privado);
   - colores tenues y paleta daltónica con contraste AA;
-  - una sola lectura de la base por pantalla.
+  - una sola lectura de los hechos por pedido (`leerHechos()` con `cache()`, compartida por la barra y la página); Registro y Datos leen además sus propias tablas.
 - **Hoy:**
   - la frase del día, con cada cifra tocable;
   - patrimonio financiero y total en pesos y en dólares (D-03);

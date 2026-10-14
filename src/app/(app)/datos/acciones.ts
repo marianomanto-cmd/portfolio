@@ -7,6 +7,8 @@
 import { revalidatePath } from 'next/cache'
 import {
   actualizarActivo,
+  actualizarBien,
+  actualizarPasivo,
   crearActivo,
   crearBien,
   crearPasivo,
@@ -19,6 +21,8 @@ import { configurado } from '@/lib/server/supabase'
 import {
   esquemaActivo,
   esquemaBien,
+  esquemaEdicionBien,
+  esquemaEdicionPasivo,
   esquemaEdicionActivo,
   esquemaMovimiento,
   esquemaPasivo,
@@ -36,6 +40,12 @@ export interface EstadoFormulario {
 }
 
 const texto = (e: unknown) => (e instanceof Error ? e.message : String(e))
+
+/** El lote del envío (lo arma el formulario): un reintento del mismo envío no duplica el hecho. */
+const loteDe = (form: FormData): string | null => {
+  const v = form.get('lote')
+  return typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v) ? v : null
+}
 
 async function escribir(
   previo: EstadoFormulario,
@@ -124,6 +134,34 @@ export async function nuevoBien(previo: EstadoFormulario, form: FormData): Promi
   )
 }
 
+export async function editarBien(previo: EstadoFormulario, form: FormData): Promise<EstadoFormulario> {
+  const r = leerFormulario(esquemaEdicionBien, form)
+  return escribir(
+    previo,
+    () => r,
+    async () => {
+      if (!r.ok) throw new Error('inválido')
+      const { id, ...bien } = r.datos
+      await actualizarBien(id, bien)
+      return `${bien.nombre} quedó corregido (el cambio queda en la auditoría).`
+    },
+  )
+}
+
+export async function editarPasivo(previo: EstadoFormulario, form: FormData): Promise<EstadoFormulario> {
+  const r = leerFormulario(esquemaEdicionPasivo, form)
+  return escribir(
+    previo,
+    () => r,
+    async () => {
+      if (!r.ok) throw new Error('inválido')
+      const { id, ...pasivo } = r.datos
+      await actualizarPasivo(id, pasivo)
+      return `${pasivo.nombre} quedó corregido (el cambio queda en la auditoría).`
+    },
+  )
+}
+
 export async function nuevaValuacion(previo: EstadoFormulario, form: FormData): Promise<EstadoFormulario> {
   const r = leerFormulario(esquemaValuacion, form)
   return escribir(
@@ -131,7 +169,7 @@ export async function nuevaValuacion(previo: EstadoFormulario, form: FormData): 
     () => r,
     async () => {
       if (!r.ok) throw new Error('inválido')
-      await guardarValuacionBien(r.datos)
+      await guardarValuacionBien(r.datos, loteDe(form))
       return 'Valuación guardada.'
     },
   )
@@ -157,7 +195,7 @@ export async function nuevoSaldoPasivo(previo: EstadoFormulario, form: FormData)
     () => r,
     async () => {
       if (!r.ok) throw new Error('inválido')
-      await guardarPasivoSaldo(r.datos)
+      await guardarPasivoSaldo(r.datos, loteDe(form))
       return 'Capital pendiente guardado.'
     },
   )
@@ -170,7 +208,7 @@ export async function nuevoMovimiento(previo: EstadoFormulario, form: FormData):
     () => r,
     async () => {
       if (!r.ok) throw new Error('inválido')
-      await guardarMovimientoCapital(r.datos)
+      await guardarMovimientoCapital(r.datos, loteDe(form))
       return r.datos.tipo === 'aporte'
         ? 'El aporte quedó registrado.'
         : r.datos.tipo === 'retiro'

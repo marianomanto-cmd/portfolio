@@ -90,9 +90,10 @@ export function FormularioPreferencias() {
             aria-checked={p.privado}
             aria-label="Modo privado"
             onClick={() => cambiarPreferencia('privado', !p.privado)}
-            className={`tocable relative inline-flex h-8 w-14 items-center rounded-full border transition-colors ${p.privado ? 'border-accent bg-accent' : 'border-border-strong bg-surface-3'}`}
+            className={`tocable relative inline-flex h-8 w-14 items-center rounded-full border transition-colors ${p.privado ? 'border-accent bg-accent' : 'border-muted bg-surface-3'}`}
           >
-            <span className={`inline-block size-6 rounded-full bg-surface shadow transition-transform ${p.privado ? 'translate-x-7' : 'translate-x-1'}`} />
+            {/* Apagado, la perilla va en gris medio: llega a 3:1 contra la pista y el borde contra la tarjeta (WCAG 1.4.11). */}
+            <span className={`inline-block size-6 rounded-full shadow transition-transform ${p.privado ? 'translate-x-7 bg-surface' : 'translate-x-1 bg-muted'}`} />
           </button>
         </Fila>
         <Fila titulo="Barra lateral" detalle="En la compu: automática (expandida desde 1280 px), siempre expandida o siempre en íconos.">

@@ -1,3 +1,4 @@
+import { ArrowRight } from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import type { CalcVista } from '@/lib/domain/calc'
@@ -7,7 +8,7 @@ import { vistaExposicion } from '@/lib/vistas'
 import type { Segmento, VistaExposicion } from '@/lib/vistas/contratos'
 import { porSubaDeCcl } from '@/components/calculos'
 import { ErrorVista } from '@/components/error-vista'
-import { Monto, MontoTrazado, Porcentaje } from '@/components/monto'
+import { Monto, MontoTrazado, Porcentaje, TextoConMontos } from '@/components/monto'
 import { Traza } from '@/components/traza'
 import { Aviso, ParMonto, Rotulo, Tarjeta } from '@/components/ui'
 
@@ -88,11 +89,18 @@ export default async function PaginaExposicion({ searchParams }: { searchParams:
           <Rotulo as="h2" className="mb-3">
             <span id="composicion">Composición {modo === 'total' ? 'del total (sin restar deudas)' : 'del financiero'}</span>
           </Rotulo>
-          <div className="flex flex-col gap-5">
-            <Barra titulo="Por clase" segmentos={v.por_clase} />
-            <Barra titulo="Por moneda de riesgo" segmentos={v.por_moneda} />
-            <Barra titulo="Por geografía" segmentos={v.por_geografia} nota="La liquidez cuenta en la geografía de su custodio." />
-          </div>
+          {v.fecha_datos ? (
+            <div className="flex flex-col gap-5">
+              <Barra titulo="Por clase" segmentos={v.por_clase} />
+              <Barra titulo="Por moneda de riesgo" segmentos={v.por_moneda} />
+              <Barra titulo="Por geografía" segmentos={v.por_geografia} nota="La liquidez cuenta en la geografía de su custodio." />
+            </div>
+          ) : (
+            // Sin ninguna carga no hay composición: se dice, en vez de tres barras vacías.
+            <p className="text-sm text-muted">
+              <span className="italic">sin dato</span> · aparece con tu primera carga.
+            </p>
+          )}
         </Tarjeta>
 
         <Tarjeta className="p-4 md:p-5" aria-labelledby="concentracion">
@@ -123,13 +131,29 @@ export default async function PaginaExposicion({ searchParams }: { searchParams:
 function FraseExposicion({ v, pesosUsd, sensPesos }: { v: VistaExposicion; pesosUsd: CalcVista; sensPesos: CalcVista }) {
   const r = v.resumen
   if (r.neto_ars.valor === null) {
+    // El "sin dato" lleva a lo que lo resuelve (visión §4.0), según la parte que falta.
+    const accion = !v.fecha_datos
+      ? { href: '/carga', etiqueta: 'Hacer la primera carga' }
+      : r.deuda_pesos.ars.valor === null
+        ? { href: '/datos/leasing', etiqueta: 'Cargar el capital pendiente en Datos › Leasing' }
+        : null
     return (
       <div className="space-y-1">
         <p className="text-[15px] leading-7 md:text-base">
           <span className="font-semibold">{v.vista === 'total' ? 'Total' : 'Neto'}: </span>
           <MontoTrazado calc={r.neto_ars} moneda="ARS" titulo="Exposición neta al peso" />
-          {r.neto_ars.motivo ? <span className="text-muted"> · {r.neto_ars.motivo}</span> : null}
+          {r.neto_ars.motivo ? (
+            <span className="text-muted">
+              {' · '}
+              <TextoConMontos texto={r.neto_ars.motivo} />
+            </span>
+          ) : null}
         </p>
+        {accion ? (
+          <Link href={accion.href} className="tocable inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline">
+            {accion.etiqueta} <ArrowRight aria-hidden className="size-4" />
+          </Link>
+        ) : null}
       </div>
     )
   }
@@ -139,15 +163,33 @@ function FraseExposicion({ v, pesosUsd, sensPesos }: { v: VistaExposicion; pesos
     <p className="text-[15px] leading-8 md:text-base">
       Estás <span className="font-semibold">{largo ? 'largo' : 'corto'} en pesos</span> por{' '}
       <MontoTrazado calc={r.neto_ars} moneda="ARS" titulo="Pesos financieros − deuda del leasing" className="font-semibold" />{' '}
-      <MontoTrazado calc={r.neto_usd} moneda="USD" titulo="El neto en dólares" decimales={0} />: tus pesos financieros (
-      <MontoTrazado calc={r.pesos_financieros.ars} moneda="ARS" titulo="Pesos financieros" compacta />, <MontoTrazado calc={pesosUsd} moneda="USD" titulo="Pesos financieros en dólares" decimales={0} />){' '}
-      {largo ? 'superan' : 'no llegan a'} lo que debés del leasing (<MontoTrazado calc={r.deuda_pesos.ars} moneda="ARS" titulo="Deuda del leasing" compacta />).{' '}
+      {/* La puntuación va pegada a su cifra (whitespace-nowrap): cada cifra es un
+          botón y un "(" o un ";" quedaban solos en un renglón del teléfono. */}
+      <span className="whitespace-nowrap">
+        <MontoTrazado calc={r.neto_usd} moneda="USD" titulo="El neto en dólares" decimales={0} />:
+      </span>{' '}
+      tus pesos financieros{' '}
+      <span className="whitespace-nowrap">
+        (<MontoTrazado calc={r.pesos_financieros.ars} moneda="ARS" titulo="Pesos financieros" compacta />,
+      </span>{' '}
+      <span className="whitespace-nowrap">
+        <MontoTrazado calc={pesosUsd} moneda="USD" titulo="Pesos financieros en dólares" decimales={0} />)
+      </span>{' '}
+      {largo ? 'superan' : 'no llegan a'} lo que debés del leasing{' '}
+      <span className="whitespace-nowrap">
+        (<MontoTrazado calc={r.deuda_pesos.ars} moneda="ARS" titulo="Deuda del leasing" compacta />).
+      </span>{' '}
       <span className="font-semibold">Por cada +1% de CCL:</span> en dólares, ese neto {sens !== null && sens.startsWith('-') ? 'pierde' : 'gana'}{' '}
-      <Traza calc={r.sensibilidad_usd_1pct} titulo="Si el CCL sube 1%: el neto en dólares" moneda="USD">
-        <Monto valor={sens === null ? null : sens.replace(/^-/, '')} moneda="USD" decimales={0} />
-      </Traza>
-      ; en pesos, tus activos en dólares suman{' '}
-      <MontoTrazado calc={sensPesos} moneda="ARS" titulo="Si el CCL sube 1%: tus activos en dólares, en pesos" />.
+      <span className="whitespace-nowrap">
+        <Traza calc={r.sensibilidad_usd_1pct} titulo="Si el CCL sube 1%: el neto en dólares" moneda="USD">
+          <Monto valor={sens === null ? null : sens.replace(/^-/, '')} moneda="USD" decimales={0} />
+        </Traza>
+        ;
+      </span>{' '}
+      en pesos, tus activos en dólares suman{' '}
+      <span className="whitespace-nowrap">
+        <MontoTrazado calc={sensPesos} moneda="ARS" titulo="Si el CCL sube 1%: tus activos en dólares, en pesos" />.
+      </span>
     </p>
   )
 }

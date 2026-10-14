@@ -1,5 +1,5 @@
 import { devices, expect, test } from '@playwright/test'
-import { esperarHidratacion, sinIndicadorDev } from './ayudas'
+import { esperarHidratacion, montosALaVista, sinIndicadorDev } from './ayudas'
 
 // Interacciones que el layout no ve: Hoy arriba del pliegue en el teléfono,
 // la traza al tocar un número (hoja inferior en el teléfono, panel en
@@ -103,6 +103,23 @@ test.describe('teléfono (iPhone 13, 390 × 664)', () => {
   })
 })
 
+test.describe('ventana angosta con mouse (640 × 900)', () => {
+  test.use({ viewport: { width: 640, height: 900 } })
+
+  test('la frase se lee entera, o hay cómo verla entera', async ({ page }) => {
+    for (const ruta of ['/', '/?demo=express']) {
+      await page.goto(ruta)
+      expect(await esperarHidratacion(page)).toBe(true)
+      const frase = page.getByLabel('Qué pasó desde la última carga').locator('p').first()
+      const { recortada } = await frase.evaluate((el) => ({ recortada: el.scrollHeight > el.clientHeight + 1 }))
+      const boton = page.getByRole('button', { name: /Ver la frase completa/ })
+      if (recortada) await expect(boton, `${ruta}: la frase está recortada y no hay cómo verla entera`).toBeVisible()
+      // Con mouse, cada cifra de la frase abre su traza en el lugar.
+      if (!recortada) expect(await frase.getByRole('button').count(), ruta).toBeGreaterThan(0)
+    }
+  })
+})
+
 test.describe('desktop (1280 × 900)', () => {
   test.use({ viewport: { width: 1280, height: 900 } })
 
@@ -133,6 +150,35 @@ test.describe('desktop (1280 × 900)', () => {
     expect(b.x + b.width).toBeLessThanOrEqual(1280)
   })
 
+  test('los resultados en dólares van en verde o en rojo también dentro de la pastilla', async ({ page }) => {
+    for (const ruta of ['/', '/cartera']) {
+      await page.goto(ruta)
+      expect(await esperarHidratacion(page)).toBe(true)
+      const r = await page.evaluate(() => {
+        const sonda = (clase: string) => {
+          const s = document.createElement('span')
+          s.className = clase
+          document.body.appendChild(s)
+          const c = getComputedStyle(s).color
+          s.remove()
+          return c
+        }
+        const tono = { 'text-negative': sonda('text-negative'), 'text-positive': sonda('text-positive') }
+        const tinta = sonda('usd')
+        const conTono = Array.from(document.querySelectorAll('.usd.text-negative, .usd.text-positive'))
+        const mal = conTono
+          .filter((el) => getComputedStyle(el).color !== tono[el.classList.contains('text-negative') ? 'text-negative' : 'text-positive'])
+          .map((el) => `${el.textContent}: ${getComputedStyle(el).color}`)
+        // Sin resultado, la pastilla conserva su tinta.
+        const neutra = document.querySelector('.usd:not(.text-negative):not(.text-positive)')
+        return { cuantos: conTono.length, mal, neutra: neutra ? getComputedStyle(neutra).color === tinta : null }
+      })
+      expect(r.cuantos, ruta).toBeGreaterThan(0)
+      expect(r.mal, ruta).toEqual([])
+      expect(r.neutra, ruta).toBe(true)
+    }
+  })
+
   test('Cartera: ordenar por una columna y filtrar', async ({ page }) => {
     await page.goto('/cartera')
     expect(await esperarHidratacion(page)).toBe(true)
@@ -159,6 +205,43 @@ test.describe('desktop (1280 × 900)', () => {
     expect(await esperarHidratacion(page)).toBe(true)
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
     await expect(page.locator('html')).toHaveAttribute('data-privado', '1')
+  })
+
+  test('con el modo privado no se lee ningún monto, en ninguna pantalla', async ({ page }) => {
+    await page.addInitScript(() => window.localStorage.setItem('portfolio:privado', '1'))
+    const rutas = ['/', '/?demo=express', '/?demo=viejo', '/cartera', '/exposicion', '/exposicion?vista=total', '/registro', '/carga', '/datos/catalogo', '/datos/cuentas', '/datos/bienes', '/datos/leasing', '/datos/movimientos']
+    const vistos: string[] = []
+    for (const ruta of rutas) {
+      await page.goto(ruta)
+      expect(await esperarHidratacion(page), ruta).toBe(true)
+      await expect(page.locator('html')).toHaveAttribute('data-privado', '1')
+      if (ruta === '/carga') {
+        // Cargar muestra montos recién con las fuentes leídas.
+        await page.getByRole('button', { name: 'Probar con un ejemplo' }).click()
+        await expect(page.getByText(/IEB/).first()).toBeVisible()
+        await page.waitForTimeout(300)
+      }
+      vistos.push(...(await montosALaVista(page)).map((m) => `${ruta} · ${m}`))
+    }
+    expect(vistos, `Montos que se leen con el modo privado:\n${vistos.join('\n')}`).toEqual([])
+  })
+
+  test('con el teclado, el foco se ve sin deformar el control', async ({ page }) => {
+    await page.goto('/ajustes')
+    expect(await esperarHidratacion(page)).toBe(true)
+    const interruptor = page.getByRole('switch', { name: 'Modo privado' })
+    for (let i = 0; i < 60 && !(await interruptor.evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press('Tab')
+    const r = await interruptor.evaluate((el) => {
+      const cs = getComputedStyle(el)
+      return { foco: el.matches(':focus-visible'), radio: parseFloat(cs.borderRadius), anillo: `${cs.outlineStyle} ${cs.outlineWidth}` }
+    })
+    expect(r.foco).toBe(true)
+    expect(r.radio, 'el interruptor sigue siendo una pastilla').toBeGreaterThanOrEqual(16)
+    expect(r.anillo).toBe('solid 2px')
+    // Lo que trae su propio indicador de foco (outline-none) no suma un segundo contorno.
+    const principal = page.locator('main')
+    await principal.evaluate((el) => (el as HTMLElement).focus())
+    expect(await principal.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('none')
   })
 
   test('Exposición: el selector dice qué netea y Total muestra "sin dato" con la suma parcial', async ({ page }) => {
@@ -190,11 +273,26 @@ test.describe('desktop (1280 × 900)', () => {
     await expect(page.getByRole('status').first()).toContainText('Modo demo')
   })
 
+  test('una dirección que no existe: 404 en español, dentro del marco de la app y con salida', async ({ page }) => {
+    for (const ruta of ['/no-existe', '/cartera/no-existe']) {
+      const r = await page.goto(ruta)
+      expect(r?.status(), ruta).toBe(404)
+      expect(await esperarHidratacion(page), ruta).toBe(true)
+      await expect(page).toHaveTitle('No encontré esa página · Portfolio')
+      await expect(page.getByRole('heading', { level: 1, name: 'No encontré esa página' })).toBeVisible()
+      await expect(page.getByText(/could not be found/i)).toHaveCount(0)
+      // El marco: la barra lateral con sus secciones y la barra superior.
+      await expect(page.getByRole('link', { name: 'Cartera', exact: true }).first()).toBeVisible()
+      await expect(page.getByRole('button', { name: /Ocultar los montos/ })).toBeVisible()
+      await expect(page.getByRole('link', { name: 'Ir a Hoy' })).toHaveAttribute('href', '/')
+    }
+  })
+
   test('Día cero: dice qué hacer y lleva a Cargar y a Datos', async ({ page }) => {
     await page.goto('/?demo=vacio')
     expect(await esperarHidratacion(page)).toBe(true)
     await expect(page.getByText('Todavía no hay datos: arrancá por acá.')).toBeVisible()
     await expect(page.getByRole('link', { name: 'Hacer la primera carga' })).toHaveAttribute('href', '/carga')
-    await expect(page.getByRole('link', { name: 'Ir a Datos' })).toHaveAttribute('href', '/datos')
+    await expect(page.getByRole('link', { name: 'Empezar por Datos › Leasing' })).toHaveAttribute('href', '/datos/leasing')
   })
 })

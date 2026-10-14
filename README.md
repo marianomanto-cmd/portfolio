@@ -10,7 +10,7 @@ Un solo usuario. La app no opera ni recomienda, y no trae precios de afuera: mue
 
 | Fase | Contenido | Estado |
 |---|---|---|
-| **1a · Núcleo mínimo** | Carga diaria (Excel de IEB, capturas de Galicia y Mercado Pago, CCL y cripto) con bandeja de revisión; Hoy, Cartera y Exposición en dos monedas con desglose activo/TC; Registro con reversión; Datos (catálogo, cuentas, bienes, leasing, movimientos de capital); Ajustes | **Construida.** Falta validarla con tus archivos reales, el respaldo nocturno y CI (`docs/calidad.md`, "Estado de la 1a") |
+| **1a · Núcleo mínimo** | Carga diaria (Excel de IEB, capturas de Galicia y Mercado Pago, CCL y cripto) con bandeja de revisión; Hoy, Cartera y Exposición en dos monedas con desglose activo/TC; Registro con reversión; Datos (catálogo, cuentas, bienes, leasing, movimientos de capital); Ajustes | **Construida y desplegada**, con la revisión adversarial de todo el código (14/10) y tu Día cero cargado (D-130). Falta validarla con tus cargas reales, el respaldo nocturno y Playwright en CI (`docs/calidad.md`, "Estado de la 1a") |
 | 1b · Núcleo completo | Evolución y PnL, Pendientes, ficha de activo, gráficos de Exposición, borrador compartido entre dispositivos, tesis como datos | Pendiente |
 | 2 · Contexto | Pasivos y licuación, flujo de caja y cierre del mes, calendario con alertas | Pendiente |
 | 3 · Motor | Proyecciones, escenarios, Monte Carlo, cobertura de cuota | Pendiente |

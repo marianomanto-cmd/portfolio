@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { compacto, monto as formatoMonto, porcentaje } from '@/lib/domain/dinero'
 import type { CalcVista } from '@/lib/domain/calc'
 import { Traza } from './traza'
@@ -7,6 +8,35 @@ import { Traza } from './traza'
 // el símbolo. "Sin dato" nunca es cero: es una palabra gris y tocable.
 
 type Moneda = 'ARS' | 'USD'
+
+/** Un monto ya formateado que redondea a cero ("$ 0", "US$ 0,00"). */
+const ES_CERO = /^[−+-]?(US)?\$ 0(,0+)?$/
+
+/** Un monto dentro de un texto armado: "US$ 4.200", "−$ 21.400.000", "+$ 6,2 M", "US$ 1,8k". */
+const MONTO_EN_TEXTO = /[−+-]?(?:US\$|\$)\s?[−+-]?\d(?:[\d.]*\d)?(?:,\d+)?(?:\s?M\b|k\b)?/g
+
+/**
+ * Un texto ya armado (un motivo, un pedazo de la frase) con montos adentro:
+ * cada monto va en su .monto (el modo privado lo oculta) y, en dólares, en su
+ * pastilla (D-68). No es una cifra con traza: la traza la da quien armó el texto.
+ */
+export function TextoConMontos({ texto }: { texto: string }) {
+  const partes: ReactNode[] = []
+  let desde = 0
+  for (const m of texto.matchAll(MONTO_EN_TEXTO)) {
+    const i = m.index ?? 0
+    if (i > desde) partes.push(texto.slice(desde, i))
+    partes.push(
+      <span key={i} className={m[0].includes('US$') ? 'num monto usd' : 'num monto whitespace-nowrap'}>
+        {m[0]}
+      </span>,
+    )
+    desde = i + m[0].length
+  }
+  if (desde === 0) return texto
+  if (desde < texto.length) partes.push(texto.slice(desde))
+  return <>{partes}</>
+}
 
 export function SinDato({ motivo }: { motivo?: string }) {
   return (
@@ -35,11 +65,12 @@ export function Monto({
   className?: string
 }) {
   if (valor === null) return <SinDato />
-  const texto = compacta
-    ? compacto(valor, moneda)
-    : formatoMonto(valor, moneda, { signo, decimales })
+  const base = compacta ? compacto(valor, moneda) : formatoMonto(valor, moneda, { signo, decimales })
+  const cero = ES_CERO.test(base)
+  // El compacto no trae el "+": se agrega si se pidió signo, salvo en lo que redondea a cero.
+  const texto = compacta && signo && !cero && !base.startsWith('−') ? `+${base}` : base
   const tono =
-    color && !/^[−-]?(US)?\$ 0(,0+)?$/.test(texto)
+    color && !cero
       ? valor.startsWith('-')
         ? 'text-negative'
         : 'text-positive'

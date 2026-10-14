@@ -8,11 +8,12 @@ import Link from 'next/link'
 import { useEffect, useId, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { MontoTrazado } from '@/components/monto'
+import { ConMontos, M } from '../../carga/_componentes/montos'
 import { monto } from '@/lib/domain/dinero'
 import { fechaLarga } from '@/lib/domain/fechas'
 import type { Fecha } from '@/lib/domain/tipos'
 import { Boton, Campo, Chip, Entrada, Selector } from '../../carga/_componentes/ui'
-import { nuevoPasivo, nuevoSaldoPasivo } from '../acciones'
+import { editarPasivo, nuevoPasivo, nuevoSaldoPasivo } from '../acciones'
 import { enDosMonedas, ultimoSaldoPasivo, type CCL, type SaldoPasivo } from '../_lib/calculos'
 import type { BienFila, PasivoFila } from '../_lib/servidor'
 import { ElegirMoneda, Mensaje, Panel, useFormulario } from './formulario'
@@ -42,14 +43,17 @@ function FormSaldo({ pasivo, hoy }: { pasivo: PasivoFila; hoy: Fecha }) {
   )
 }
 
-function FormPasivo({ onCerrar }: { onCerrar: () => void }) {
+/** Alta de un pasivo o, con `pasivo`, la corrección del contrato de uno cargado. */
+function FormPasivo({ onCerrar, pasivo = null }: { onCerrar: () => void; pasivo?: PasivoFila | null }) {
   const id = useId()
-  const [estado, enviar, enviando] = useFormulario(nuevoPasivo)
-  const [moneda, setMoneda] = useState<'ARS' | 'USD' | ''>('')
+  const [estado, enviar, enviando] = useFormulario(pasivo ? editarPasivo : nuevoPasivo)
+  const [moneda, setMoneda] = useState<'ARS' | 'USD' | ''>(pasivo?.moneda ?? '')
   const e = estado.errores
   useEffect(() => {
-    if (estado.ok && estado.vez > 0) setMoneda('')
-  }, [estado.ok, estado.vez])
+    if (estado.ok && estado.vez > 0 && !pasivo) setMoneda('')
+  }, [estado.ok, estado.vez, pasivo])
+  /** Un monto guardado ("42000000") → como se tipea ("42000000,5"). */
+  const tipeable = (v: string | null | undefined) => (v === null || v === undefined ? undefined : v.replace('.', ','))
   const campo = (nombre: string, etiqueta: string, opciones: { tipo?: string; ayuda?: string; decimal?: boolean; defecto?: string } = {}) => (
     <Campo etiqueta={etiqueta} htmlFor={`${id}-${nombre}`} error={e[nombre]} ayuda={opciones.ayuda}>
       <Entrada
@@ -64,35 +68,36 @@ function FormPasivo({ onCerrar }: { onCerrar: () => void }) {
     </Campo>
   )
   return (
-    <form key={estado.vez} onSubmit={enviar} noValidate className="space-y-3" aria-label="Nuevo pasivo">
+    <form key={pasivo ? 'corregir' : estado.vez} onSubmit={enviar} noValidate className="space-y-3" aria-label={pasivo ? `Corregir ${pasivo.nombre}` : 'Nuevo pasivo'}>
+      {pasivo ? <input type="hidden" name="id" value={pasivo.id} /> : null}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {campo('nombre', 'Nombre', { defecto: 'Leasing camioneta' })}
+        {campo('nombre', 'Nombre', { defecto: pasivo?.nombre ?? 'Leasing camioneta' })}
         <Campo etiqueta="Tipo" htmlFor={`${id}-tipo`} error={e.tipo}>
-          <Selector id={`${id}-tipo`} name="tipo" defaultValue="leasing">
+          <Selector id={`${id}-tipo`} name="tipo" defaultValue={pasivo?.tipo ?? 'leasing'}>
             <option value="leasing">Leasing</option>
             <option value="prestamo">Préstamo</option>
             <option value="tarjeta">Tarjeta</option>
           </Selector>
         </Campo>
-        {campo('fecha_inicio', 'Inicio', { tipo: 'date' })}
-        {campo('cuotas_totales', 'Cuotas', { decimal: true, ayuda: 'Cantidad total, ej.: 48.' })}
+        {campo('fecha_inicio', 'Inicio', { tipo: 'date', defecto: pasivo?.fecha_inicio })}
+        {campo('cuotas_totales', 'Cuotas', { decimal: true, ayuda: 'Cantidad total, ej.: 48.', defecto: pasivo ? String(pasivo.cuotas_totales) : undefined })}
       </div>
       <div className="max-w-md">
         <ElegirMoneda nombre="moneda" valor={moneda} onCambio={setMoneda} leyenda="Moneda de la deuda" error={e.moneda} />
       </div>
       <p className="text-sm text-muted">Montos del contrato, netos de IVA. Todos opcionales: lo que no tengas a mano queda "sin dato".</p>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {campo('monto_financiado_neto', 'Monto financiado', { decimal: true })}
-        {campo('anticipo_neto', 'Anticipo', { decimal: true })}
-        {campo('valor_bien', 'Valor del bien', { decimal: true })}
-        {campo('opcion_compra_neto', 'Opción de compra', { decimal: true })}
-        {campo('opcion_compra_fecha', 'Fecha de la opción', { tipo: 'date' })}
-        <div className="sm:col-span-2 xl:col-span-3">{campo('notas', 'Notas')}</div>
+        {campo('monto_financiado_neto', 'Monto financiado', { decimal: true, defecto: tipeable(pasivo?.monto_financiado_neto) })}
+        {campo('anticipo_neto', 'Anticipo', { decimal: true, defecto: tipeable(pasivo?.anticipo_neto) })}
+        {campo('valor_bien', 'Valor del bien', { decimal: true, defecto: tipeable(pasivo?.valor_bien) })}
+        {campo('opcion_compra_neto', 'Opción de compra', { decimal: true, defecto: tipeable(pasivo?.opcion_compra_neto) })}
+        {campo('opcion_compra_fecha', 'Fecha de la opción', { tipo: 'date', defecto: pasivo?.opcion_compra_fecha ?? undefined })}
+        <div className="sm:col-span-2 xl:col-span-3">{campo('notas', 'Notas', { defecto: pasivo?.notas ?? undefined })}</div>
       </div>
       <Mensaje estado={estado} />
       <div className="flex flex-wrap gap-2 [&>*]:max-sm:flex-1">
         <Boton type="submit" variante="primario" disabled={enviando}>
-          {enviando ? 'Guardando…' : 'Cargar pasivo'}
+          {enviando ? 'Guardando…' : pasivo ? 'Guardar la corrección' : 'Cargar pasivo'}
         </Boton>
         <Boton variante="fantasma" onClick={onCerrar}>
           {estado.ok ? 'Cerrar' : 'Cancelar'}
@@ -106,7 +111,8 @@ function Dato({ etiqueta, valor }: { etiqueta: string; valor: string | null }) {
   return (
     <div className="min-w-0">
       <dt className="text-xs text-muted">{etiqueta}</dt>
-      <dd className={`num break-words text-sm ${valor === null ? 'text-muted italic' : 'text-text'}`}>{valor ?? 'sin dato'}</dd>
+      {/* Los montos del contrato se tapan en el modo privado (manual §4.7). */}
+      <dd className={`num break-words text-sm ${valor === null ? 'text-muted italic' : 'text-text'}`}>{valor === null ? 'sin dato' : <ConMontos texto={valor} />}</dd>
     </div>
   )
 }
@@ -126,6 +132,7 @@ export function Leasing({
 }) {
   const [nuevo, setNuevo] = useState(false)
   const [informando, setInformando] = useState<number | null>(null)
+  const [corrigiendo, setCorrigiendo] = useState<number | null>(null)
   return (
     <div className="space-y-4">
       {nuevo ? (
@@ -161,7 +168,7 @@ export function Leasing({
           return (
             <li key={p.id} className="min-w-0 rounded-2xl border border-border bg-surface p-4">
               <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <h3 className="font-semibold text-text">{p.nombre}</h3>
+                <h2 className="font-semibold text-text">{p.nombre}</h2>
                 <Chip>{NOMBRE_TIPO[p.tipo]}</Chip>
                 <Chip>en {p.moneda === 'USD' ? 'dólares' : 'pesos'}</Chip>
               </div>
@@ -204,7 +211,7 @@ export function Leasing({
                   <ul className="num mt-1 space-y-0.5 text-muted">
                     {historia.map((s) => (
                       <li key={s.fecha}>
-                        {fechaLarga(s.fecha)} · {m(s.capital_pendiente)}
+                        {fechaLarga(s.fecha)} · <M usd={p.moneda === 'USD'}>{m(s.capital_pendiente) ?? 'sin dato'}</M>
                       </li>
                     ))}
                   </ul>
@@ -217,10 +224,19 @@ export function Leasing({
                     Cerrar
                   </Boton>
                 </>
+              ) : corrigiendo === p.id ? (
+                <div className="mt-3 rounded-xl border border-border bg-surface-2 p-3">
+                  <FormPasivo pasivo={p} onCerrar={() => setCorrigiendo(null)} />
+                </div>
               ) : (
-                <Boton variante="secundario" className="mt-3 max-sm:w-full" onClick={() => setInformando(p.id)}>
-                  Registrar capital pendiente
-                </Boton>
+                <div className="mt-3 flex flex-wrap gap-2 [&>*]:max-sm:flex-1">
+                  <Boton variante="secundario" onClick={() => setInformando(p.id)}>
+                    Registrar capital pendiente
+                  </Boton>
+                  <Boton variante="fantasma" onClick={() => setCorrigiendo(p.id)}>
+                    Corregir el contrato
+                  </Boton>
+                </div>
               )}
             </li>
           )

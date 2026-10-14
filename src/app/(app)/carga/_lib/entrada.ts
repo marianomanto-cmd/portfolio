@@ -44,3 +44,17 @@ export function leerMonto(texto: string, opciones: { positivo?: boolean } = {}):
   if (opciones.positivo && new Decimal(v).lte(0)) return { valor: null, error: 'Tiene que ser mayor que cero.' }
   return { valor: v, error: null }
 }
+
+/** Cómo se llaman, en un aviso, los campos del alta que no tienen su propia caja. */
+const ETIQUETA_CAMPO: Record<string, string> = { ticker: 'Ticker', fecha_vencimiento: 'Vencimiento' }
+
+/**
+ * Errores del alta de un activo que no tienen dónde mostrarse (el ticker sale
+ * de la fuente y no se edita): van juntos en el aviso general, nunca se pierden
+ * en silencio.
+ */
+export function erroresSueltos(errores: Readonly<Record<string, string>>, conCampo: readonly string[]): string[] {
+  return Object.entries(errores)
+    .filter(([k]) => !conCampo.includes(k))
+    .map(([k, m]) => (k === '_' ? m : `${ETIQUETA_CAMPO[k] ?? k}: ${m}`))
+}

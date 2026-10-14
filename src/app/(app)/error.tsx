@@ -28,9 +28,13 @@ export default function ErrorApp({ error, reset }: { error: Error & { digest?: s
             {detalle}
             {error.digest ? ` Referencia: ${error.digest}.` : ''}
           </p>
-          <p className="text-sm text-muted">Nada se guardó ni se cambió.</p>
+          {/* La red de abajo no sabe si el error vino de un guardado (Datos, Revertir): no promete nada. */}
+          <p className="text-sm text-muted">Si estabas guardando algo, no sé si se guardó: mirá el Registro antes de volver a intentar.</p>
           <div className="flex flex-wrap gap-2">
             <BotonReintentar onReintentar={reset} />
+            <Link href="/registro" className="tocable inline-flex h-9 items-center rounded-lg px-3 text-sm font-medium text-accent hover:bg-surface-2">
+              Ver el Registro
+            </Link>
             <Link href="/" className="tocable inline-flex h-9 items-center rounded-lg px-3 text-sm font-medium text-accent hover:bg-surface-2">
               Ir a Hoy
             </Link>

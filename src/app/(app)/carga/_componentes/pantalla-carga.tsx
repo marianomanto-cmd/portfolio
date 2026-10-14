@@ -17,6 +17,7 @@ import {
   huellaSaldo,
   resumirBandeja,
   textoBoton,
+  type EleccionAusente,
   type EleccionFila,
   type EleccionSaldo,
   type Elecciones,
@@ -155,19 +156,22 @@ export function PantallaCarga({ contexto }: { contexto: ContextoCarga }) {
   }, [])
 
   const leer = useCallback(
-    async (id: string, archivo: File) => {
+    async (id: string, archivo: File, pista?: NombreCuenta) => {
       const fd = new FormData()
       fd.append('archivo', archivo, archivo.name || 'captura.png')
+      // La pista solo desempata cuando las dos lecturas no se ponen de acuerdo en el banco.
+      if (pista) fd.append('pista', pista)
       try {
         const res = await fetch('/carga/leer', { method: 'POST', body: fd })
         const json = (await res.json().catch(() => null)) as RespuestaLectura | { error?: string } | null
         if (json && 'ok' in json && json.ok) {
-          actualizarFuente(id, { estado: 'leida', cuenta: json.lectura.cuenta, respuesta: json, error: null })
+          actualizarFuente(id, { estado: 'leida', cuenta: json.lectura.cuenta, respuesta: json, error: null, elegir: null })
           return
         }
         const motivo =
           (json && 'error' in json && json.error) || (res.status === 401 ? 'Sesión vencida: volvé a entrar.' : `el servidor respondió ${res.status}.`)
-        actualizarFuente(id, { estado: 'error', error: motivo })
+        const elegir = json && 'elegir' in json && Array.isArray(json.elegir) ? json.elegir : null
+        actualizarFuente(id, { estado: 'error', error: motivo, elegir })
       } catch (e) {
         actualizarFuente(id, {
           estado: 'error',
@@ -321,10 +325,10 @@ export function PantallaCarga({ contexto }: { contexto: ContextoCarga }) {
       return { ...x, saldos }
     })
   }, [])
-  const elegirAusente = useCallback((clave: string, pendiente: boolean) => {
+  const elegirAusente = useCallback((clave: string, e: EleccionAusente | null) => {
     setElecciones((x) => {
       const ausentes = { ...x.ausentes }
-      if (pendiente) ausentes[clave] = 'pendiente'
+      if (e !== null) ausentes[clave] = e
       else delete ausentes[clave]
       return { ...x, ausentes }
     })
@@ -506,6 +510,15 @@ export function PantallaCarga({ contexto }: { contexto: ContextoCarga }) {
                   ))}
                 </ul>
               ) : null}
+              {r.sin_grabar?.length ? (
+                <ul className="text-sm text-muted">
+                  {r.sin_grabar.map((c) => (
+                    <li key={c.cuenta}>
+                      {c.cuenta}: no se grabó nada ({plural(c.pendientes, 'pendiente', 'pendientes')}). Lo que ya tenía del día sigue como estaba.
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
               {guardado.error ? (
                 <p role="alert" className="text-sm text-negative">
                   {guardado.error}
@@ -633,11 +646,11 @@ export function PantallaCarga({ contexto }: { contexto: ContextoCarga }) {
             repetidas={repetidas}
             arrastrando={arrastrando}
             onArchivos={agregarArchivos}
-            onReintentar={(id) => {
+            onReintentar={(id, pista) => {
               const f = fuentes.find((x) => x.id === id)
               if (!f?.archivo) return
-              actualizarFuente(id, { estado: 'leyendo', error: null })
-              void leer(id, f.archivo)
+              actualizarFuente(id, { estado: 'leyendo', error: null, elegir: null })
+              void leer(id, f.archivo, pista)
             }}
             onQuitar={(id) => setFuentes((fs) => fs.filter((f) => f.id !== id))}
             onUsar={(id) => {
@@ -651,7 +664,11 @@ export function PantallaCarga({ contexto }: { contexto: ContextoCarga }) {
             <Bandeja
               resumen={resumen}
               propuesta={lecturas.length ? propuesta : null}
-              eleccionDe={{ fila: (d) => eleccionFila(elecciones, d), saldo: (d) => eleccionSaldo(elecciones, d) }}
+              eleccionDe={{
+                fila: (d) => eleccionFila(elecciones, d),
+                saldo: (d) => eleccionSaldo(elecciones, d),
+                ausente: (clave) => elecciones.ausentes[clave] ?? null,
+              }}
               edicionDe={(clave) => ediciones[clave] ?? null}
               avisos={avisos}
               fecha={fecha}
@@ -680,6 +697,18 @@ export function PantallaCarga({ contexto }: { contexto: ContextoCarga }) {
               {erroresGuardar.map((e) => (
                 <p key={e}>{e}</p>
               ))}
+              {/* Si no sabés si se guardó (se cortó la conexión) o el lote ya se usó: mirá el Registro o empezá de nuevo. */}
+              <div className="flex flex-wrap gap-2 pt-1 [&>*]:max-sm:flex-1">
+                <Link
+                  href="/registro"
+                  className="tocable inline-flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface px-3 text-sm font-medium text-text lg:min-h-9"
+                >
+                  Ver Registro
+                </Link>
+                <Boton variante="fantasma" onClick={nuevaCarga}>
+                  Nueva carga
+                </Boton>
+              </div>
             </div>
           ) : null}
         </div>

@@ -11,11 +11,17 @@ Base: Supabase, proyecto **Portfolio** (`zcgynhzddfjzwswekcvl`). Schema `public`
 | `20261008142244_carga_confirmar` | `confirmar_carga` (ver "Funciones de escritura") |
 | `20261008151535_carga_manual` | `guardar_manual` |
 | `20261008151942_catalogo_activos` | `alta_activo` y `editar_activo` |
-| `20261008160000_carga_revertir` | `revertir_lote`. **Pendiente de aplicar** (ver abajo) |
+| `20261008160000_carga_revertir` | `revertir_lote`. Aplicada a mano desde el editor SQL (ver abajo) |
+| `20261014193803_confirmar_carga_recarga` (revisión de la 1a) | `confirmar_carga`, segunda versión: al recargar un día, lo no tipeado del tipo de cambio conserva lo que el día tenía y la referencia va con su CCL; una captura no pisa el precio que grabó un Excel ese día; guarda la huella del pedido y rechaza el mismo lote con otro contenido (D-119, D-120) |
+| `20261014193834_catalogo_cedear_ratio` | `alta_activo` y `editar_activo`, segunda versión: rechazan un CEDEAR sin ratio, también al editarlo (D-104, D-124) |
+| `20261014193836_auditoria_search_path` | `registrar_auditoria` fija `search_path = public, pg_temp`: la auditoría va siempre a `public.auditoria`, aunque la sesión tenga una tabla temporal con ese nombre (D-17) |
+| `20261014203031_feriados_2026_2027` | 49 feriados de 2026 y 2027: días sin rueda en BYMA (`AR`) y cierres de la NYSE (`US`), con las fuentes oficiales en el encabezado. Solo agrega filas (`on conflict do nothing`) (D-129) |
+
+Las cuatro del 14/10 se aplicaron con el conector (ninguna tiene `DELETE`) y se renombraron a la versión que registró Supabase. Cada función aplicada coincide con su archivo (md5 del cuerpo), y las firmas no cambiaron, así que `database.types.ts` tampoco. Una segunda versión de una función se escribe en una migración nueva con `create or replace`: la de la fase 1a no se edita.
 
 La carga transaccional se aplicó en cinco partes y no en una porque el conector de Supabase cortaba a los 60 s con el archivo entero. Cada parte revoca y otorga los permisos de sus propias funciones. El schema final es el mismo: los tests del schema dan los mismos 143 controles y cada función, check e índice aplicados coinciden byte a byte con los archivos (md5 contra una base local armada desde el repo).
 
-**`carga_revertir` está pendiente.** El conector de Supabase pide confirmar cualquier sentencia con `DELETE` (la reversión borra las filas del lote que deshace) y el pedido vence antes de que se pueda aprobar. Hasta aplicarla, Revertir (Registro) y Deshacer (Cargar) muestran "La base no tiene la función public.revertir_lote: falta aplicar la migración 20261008160000_carga_revertir". Para aplicarla: desde una sesión con el conector, aprobando su confirmación; o con la CLI de Supabase (`supabase db push`). Después, renombrar el archivo a la versión que registre Supabase y regenerar los tipos.
+**Migraciones que el conector no puede aplicar (D-116).** El conector de Supabase pide confirmar toda sentencia que contenga `DELETE`, aunque esté dentro del cuerpo de una función (como en `revertir_lote`, que borra las filas del lote que deshace), y ese pedido vence antes de que alguien lo pueda aprobar. Una migración así la aplica el dueño: pega el archivo entero, sin cambios, en el editor SQL del proyecto y toca Run. Después se registra en `supabase_migrations.schema_migrations` con la versión del nombre del archivo (así no hace falta renombrarlo), se verifica contra el repo y se regeneran los tipos. El editor guarda los fines de línea como CRLF: la verificación compara el md5 del cuerpo de cada función normalizando el fin de línea, y en `revertir_lote` no cambia nada porque ninguna cadena del cuerpo ocupa más de una línea. Así se aplicó `carga_revertir` el 08/10.
 
 Los archivos originales (Excel y capturas) viven en el bucket privado `cargas` de Supabase Storage, en `AAAA/MM/<sha256>.<ext>` (D-105).
 
@@ -24,7 +30,7 @@ Los archivos originales (Excel y capturas) viven en el bucket privado `cargas` d
 1. **Hechos, no estado.** Se guarda lo que pasó: operaciones, precios, tipos de cambio, saldos, cuotas y valuaciones. Posiciones, PPC, resultados, excedente y montos de vencimiento se **calculan** en TypeScript (D-22, D-23).
 2. **"Sin dato" es NULL**, nunca cero ni un estimado. Precios y tipos de cambio no tienen valores por defecto.
 3. **Todo hecho tiene origen.** Cada fila de mercado, cartera, saldos, movimientos, cuotas o valuaciones apunta a la **carga** de la que salió (`carga_id NOT NULL`). La carga guarda el archivo, la lectura cruda y lo confirmado (D-11, D-17).
-4. **Todo cambio queda auditado.** Un trigger registra en `auditoria` cada alta, cambio y baja, con la fila antes y después. La auditoría es de solo lectura para el servidor.
+4. **Todo cambio queda auditado.** Un trigger registra en `auditoria` cada alta, cambio y baja, con la fila antes y después. La auditoría es de solo lectura para el servidor. La función del trigger (`registrar_auditoria`) fija `search_path = public, pg_temp`, como toda función de `public`: una tabla temporal llamada `auditoria` no se puede llevar las filas (lo controla un test del schema).
 5. **Montos exactos.** `numeric` sin precisión fija. Los checks excluyen `NaN` e `Infinity`. Se leen como texto (D-32).
 6. **Base cerrada.** RLS en todas las tablas, sin políticas. `anon` y `authenticated` sin privilegios. El servidor (`service_role`) tiene permisos explícitos y mínimos: no puede truncar ni escribir la auditoría (D-20, D-33).
 
@@ -38,12 +44,12 @@ Los archivos originales (Excel y capturas) viven en el bucket privado `cargas` d
 | `condiciones_bono` | Datos de emisión de bonos indexados o duales | Base CER, rezago, spread TAMAR, regla dual. Sin ellos, el valor técnico es "sin dato" |
 | `ratios_cedear` | Ratio de cada CEDEAR con vigencia | El historial permite cambios de ratio |
 | `flujos_bono` | Cronograma de pagos por 1 VN original | `interes` NULL = a determinar (TAMAR, duales) |
-| `feriados` | Días no hábiles AR y US | Para "precio viejo" y liquidaciones (D-16) |
+| `feriados` | Días de semana sin rueda: `AR` en BYMA, `US` en la NYSE | Para "precio viejo", "Todavía no cargaste hoy" y liquidaciones. Se siembra por migración, con su fuente oficial (D-16, D-129). Cargados: 2026 y 2027 |
 
 ### Origen y auditoría
 | Tabla | Qué guarda |
 |---|---|
-| `cargas` | Cada carga confirmada: fecha, cuenta (null para el tipo de cambio y las cargas manuales), origen (`excel`, `captura`, `manual`), archivo, lectura cruda, lo grabado con sus diferencias de conciliación y estado (`vigente`, `reemplazada`, `revertida`). Desde la 1a: **`lote`** (un Enter = un lote de varias cargas; llave de idempotencia, no única), **`lector`** (`ieb-excel@1`, `captura-claude@1 (…)`, `tipeado`, `manual`), **`archivo_sha256`** (obligatorio si hay archivo; la ruta lo contiene), **`tiempo_activo_ms`** (del lote, repetido en cada carga, D-62) y **`motivo_reversion`** (obligatorio si y solo si está revertida). `confirm_token` queda sin uso |
+| `cargas` | Cada carga confirmada: fecha, cuenta (null para el tipo de cambio y las cargas manuales), origen (`excel`, `captura`, `manual`), archivo, lectura cruda, lo grabado con sus diferencias de conciliación y estado (`vigente`, `reemplazada`, `revertida`). Desde la 1a: **`lote`** (un Enter = un lote de varias cargas; llave de idempotencia, no única), **`lector`** (`ieb-excel@1`, `captura-claude@1 (…)`, `tipeado`, `manual`), **`archivo_sha256`** (obligatorio si hay archivo; la ruta lo contiene), **`tiempo_activo_ms`** (del lote, repetido en cada carga, D-62) y **`motivo_reversion`** (obligatorio si y solo si está revertida). **`listado_completo`** es false si la carga dejó algo sin grabar: la app muestra esa cuenta en ≠ "parcial" y lo pone en Atención hasta la próxima carga (D-118). En **`grabado`**, desde la revisión de la 1a: `huella` (sha256 de lo que mandó el dueño, D-120) y `ausentes` (las tenencias que la fuente ya no lista, con su activo, su cuenta y su resolución: las no registradas de la última carga vigente valen "sin dato" desde la primera carga de su racha, D-117). `confirm_token` queda sin uso |
 | `auditoria` | Antes y después de cada cambio, con la carga que lo produjo. Append-only |
 
 ### Mercado
@@ -95,15 +101,15 @@ Toda escritura de más de una fila pasa por una función de Postgres, en una sol
 | `confirmar_carga(p jsonb) → jsonb` | Graba un lote de la carga diaria (`ConfirmacionCarga`, `src/lib/carga/contratos.ts`): el tipo de cambio tipeado con su referencia (su propia carga), y por cuenta su carga, cotizaciones, saldos, operaciones y **precios que completan compras pendientes**; la nota del día. Devuelve `{lote, cargas, repetido}`. Detalle abajo |
 | `revertir_lote(lote uuid, motivo text) → jsonb` | Revierte un lote entero, con motivo obligatorio (regla 4). Devuelve `{lote, cargas, borradas, restauradas}` |
 | `guardar_manual(p jsonb) → bigint` | Una carga `manual` con valuaciones de bienes (reemplaza la del mismo bien y día), capital pendiente de pasivos (ídem por pasivo y día) y movimientos de capital (impuesto 0 si no se informa). Cada hecho usa su fecha o la de la carga. Idempotente por lote; devuelve el id de la carga |
-| `alta_activo(p jsonb) → integer` | Un activo y, si es CEDEAR, su ratio, juntos: nunca queda un CEDEAR sin ratio. El ratio rige desde hoy (Córdoba) si no se indica otra vigencia. Un ratio solo se acepta en un CEDEAR |
-| `editar_activo(id, p jsonb)` | Cambia solo las claves presentes (una clave con null borra el valor) y agrega o corrige un ratio con su vigencia |
+| `alta_activo(p jsonb) → integer` | Un activo y, si es CEDEAR, su ratio, juntos: nunca queda un CEDEAR sin ratio (desde `catalogo_cedear_ratio`, un CEDEAR sin ratio se rechaza). El ratio rige desde hoy (Córdoba) si no se indica otra vigencia. Un ratio solo se acepta en un CEDEAR |
+| `editar_activo(id, p jsonb)` | Cambia solo las claves presentes (una clave con null borra el valor) y agrega o corrige un ratio con su vigencia. Desde `catalogo_cedear_ratio`, rechaza dejar un CEDEAR sin ningún ratio (también al cambiarle el tipo a CEDEAR) y la transacción se deshace |
 | `leer_monto`, `leer_fecha`, `leer_id` | Leen la entrada JSON. `leer_monto` acepta solo texto decimal (`"-1234.56"`): falla con un número JSON, `NaN`, `Infinity`, exponentes o formato es-AR. Vacío o null = sin dato |
 
 **`confirmar_carga`, en detalle:**
 - Un lock global serializa toda escritura de cargas: un doble Enter espera al primero y lo encuentra.
-- **Lote repetido:** devuelve lo ya grabado con `repetido: true`, sin escribir. Se niega si el lote fue revertido ("empezá una carga nueva"), si es de un alta manual, o si llega con otra fecha, otras cuentas u otro tipo de cambio.
-- **Tipo de cambio:** si los cuatro valores vienen vacíos, no es un dato y no pisa nada. Si no, el día queda con lo tipeado ahora y su carga anterior pasa a `reemplazada`.
-- **Por cuenta:** volver a cargar el mismo día reemplaza la carga anterior de esa cuenta (pasa a `reemplazada`): pisa los precios y saldos que trae, conserva los que no trae y **suma** las operaciones.
+- **Lote repetido:** devuelve lo ya grabado con `repetido: true`, sin escribir. Se niega si el lote fue revertido ("empezá una carga nueva"), si es de un alta manual, o si llega con otra fecha, otras cuentas u otro tipo de cambio. Desde `confirmar_carga_recarga`, cada carga guarda en `grabado.huella` el sha256 de lo que mandó el dueño; si el mismo lote llega con otra huella, se niega ("Ese lote ya se guardó con otro contenido", D-120).
+- **Tipo de cambio:** si los cuatro valores vienen vacíos, no es un dato y no pisa nada. Si no, lo tipeado ahora pisa; lo que no se tipeó conserva lo que el día ya tenía (`coalesce`), y la referencia va con su CCL. La fila pasa a la carga nueva y su carga anterior, a `reemplazada`; revertirla restaura la anterior desde la auditoría (D-119).
+- **Por cuenta:** volver a cargar el mismo día reemplaza la carga anterior de esa cuenta (pasa a `reemplazada`): pisa los precios y saldos que trae, conserva los que no trae y **suma** las operaciones. Un precio que grabó un Excel ese día (de una carga no revertida) no lo pisa una captura posterior; un Excel posterior sí (D-119).
 - **Completar precios:** la compra tiene que seguir pendiente (sin precio ni importe), ser de esa cuenta y no ser posterior a la carga. Se graba el precio y `precio_carga_id`; la auditoría guarda el antes y el después.
 - **Rechaza:** una cuenta repetida, dos cotizaciones del mismo activo en una cuenta, dos saldos en la misma moneda, una carga vacía ("No hay nada para grabar"). Cada error de una fila sale con contexto legible ("IEB · venta de AL30") y aborta todo.
 - `tiempo_activo_ms` se graba en cada carga del lote.

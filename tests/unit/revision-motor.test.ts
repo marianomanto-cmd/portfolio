@@ -1007,7 +1007,7 @@ describe('cobertura', () => {
 
     it('conciliar: compra del día con PPP "-" en el Día cero entra como compra pendiente (D-19)', () => {
       const h = hechos()
-      const p = proponerCarga([lecturaIEB([filaIEB('SPY', '191', { liquidacion: 'liquidar', precio_unitario: '35150' })], '2026-10-01')], h, '2026-10-01', { ccl: D(1500) })
+      const p = proponerCarga([lecturaIEB([filaIEB('SPY', '37', { liquidacion: 'liquidar', precio_unitario: '35150' })], '2026-10-01')], h, '2026-10-01', { ccl: D(1500) })
       expect(p.filas[0].accion).toBe('compra')
       expect(p.filas[0].operacion!.precio).toBeNull()
       expect(p.filas[0].operacion!.ccl_del_dia).toBe('1500')
@@ -1365,7 +1365,9 @@ describe('cuadre (D-66, B04)', () => {
     expect(cuadre(v, h)).toMatchObject({ ars_ok: true, usd_ok: true })
     const roto = { ...v, contribuciones: v.contribuciones.map((c, i) => (i === 0 ? { ...c, activo: { ars: c.activo.ars.plus(1), usd: c.activo.usd } } : c)) }
     expect(cuadre(roto, h)).toMatchObject({ ars_ok: false, usd_ok: true })
-    expect(cuadre(roto, h).detalle).toMatch(/no cierra/)
+    // Por cuánto no cierra lo dice la diferencia, con su traza (Hoy: "no cierra por …"); el detalle no lo repite.
+    expect(cuadre(roto, h).diferencia?.ars.valor?.toFixed(2)).toBe('-1.00')
+    expect(cuadre(roto, h).detalle).toMatch(/es un bug/)
   })
 
   it('una partida financiera sin dato lo deja "no verificable"; un bien sin valuación, no', () => {

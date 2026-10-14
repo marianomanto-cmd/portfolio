@@ -4,6 +4,8 @@
 
 import type { CalcVista, InsumoVista } from '@/lib/domain/calc'
 import { Decimal, monto, numero, porcentaje } from '@/lib/domain/dinero'
+import { fechaCorta, fechaEnCordoba, sumarDias, ZONA } from '@/lib/domain/fechas'
+import type { Fecha } from '@/lib/domain/tipos'
 
 type Unidad = 'ARS' | 'USD' | 'fraccion'
 
@@ -82,6 +84,24 @@ export function sumaColumna(
   }
 }
 
+/**
+ * La suma parcial de un total que el motor dejó en "sin dato" porque le falta
+ * una parte (D-65): se vuelve a sumar con traza a partir de sus insumos, que
+ * son las partes de la suma (sumaCalc). No lee el texto del motivo. null si el
+ * total tiene valor, si no es una suma parcial, si algún insumo no es un monto
+ * en esa moneda (entonces no es una suma de partes) o si no se conoce ninguna.
+ */
+export function parcialDeTotal(total: CalcVista, moneda: 'ARS' | 'USD'): ReturnType<typeof sumaColumna> | null {
+  if (total.valor !== null || !total.etiquetas.includes('parcial') || total.insumos.length === 0) return null
+  if (total.insumos.some((i) => i.unidad !== moneda)) return null
+  const partes = total.insumos.map((i) => ({
+    nombre: i.nombre,
+    calc: i.calc ?? { valor: i.valor, formula: i.valor === null ? 'sin dato' : fmt(i.valor, moneda), insumos: [], etiquetas: [] },
+  }))
+  const r = sumaColumna(partes, moneda, total.explicacion ?? '')
+  return r.parcial && r.contadas > 0 ? r : null
+}
+
 function etiquetas(partes: { calc: CalcVista }[]): CalcVista['etiquetas'] {
   const orden = ['parcial', 'pendiente', 'viejo', 'inferido', 'declarado'] as const
   const todas = new Set(partes.flatMap((p) => p.calc.etiquetas))
@@ -158,6 +178,72 @@ export function fraccionDe(num: CalcVista, den: CalcVista, unidad: 'ARS' | 'USD'
     insumos,
     etiquetas: [...new Set([...num.etiquetas, ...den.etiquetas])],
   }
+}
+
+const DESDE: Record<'compra' | 'declarada' | 'apertura', { formula: string; explicacion: string }> = {
+  compra: { formula: 'desde tu primera compra registrada', explicacion: 'Días corridos desde tu primera compra registrada de esta posición.' },
+  declarada: { formula: 'desde la fecha de compra que declaraste', explicacion: 'Días corridos desde la fecha de compra que declaraste en la apertura.' },
+  apertura: {
+    formula: 'desde la apertura en la app',
+    explicacion: 'Días corridos desde la apertura en la app: la posición ya estaba antes de tu primera carga y no declaraste la fecha de compra (se declara desde la 1b). No es cuánto hace que la tenés.',
+  },
+}
+
+/**
+ * Los días en posición (Cartera), con su traza: de dónde se cuentan. La
+ * fecha de compra que declaraste lleva la etiqueta "declarado". Con la fecha
+ * de inicio, la fórmula muestra la resta: "jue 15/10 − mié 01/10 = 14 días".
+ */
+export function diasEnPosicion(dias: number | null, desde: 'compra' | 'declarada' | 'apertura' | null, inicio: Fecha | null = null): CalcVista {
+  if (dias === null || desde === null) {
+    return { valor: null, motivo: 'La posición no tiene fecha de inicio.', formula: 'sin dato', insumos: [], etiquetas: [] }
+  }
+  const d = DESDE[desde]
+  const cuantos = `${numero(String(dias), 0)} ${dias === 1 ? 'día' : 'días'}`
+  const hasta = inicio ? sumarDias(inicio, dias) : null
+  return {
+    valor: String(dias),
+    formula: inicio && hasta ? `${fechaCorta(hasta)} − ${fechaCorta(inicio)} = ${cuantos} ${d.formula}` : `${cuantos} ${d.formula}`,
+    explicacion: d.explicacion,
+    insumos:
+      inicio && hasta
+        ? [
+            { nombre: desde === 'compra' ? 'Primera compra registrada' : desde === 'declarada' ? 'Fecha de compra que declaraste' : 'Apertura en la app', valor: inicio, unidad: 'fecha' },
+            { nombre: 'Hoy', valor: hasta, unidad: 'fecha' },
+          ]
+        : [],
+    etiquetas: desde === 'declarada' ? ['declarado'] : [],
+  }
+}
+
+/**
+ * Decimales para mostrar un insumo en pesos o en dólares en la traza: los
+ * suyos (un precio de $ 1,124 por VN se ve entero, como en la fórmula), con
+ * un mínimo de 2 y el máximo de un precio de esa magnitud (decimalesPrecio).
+ * Un monto calculado de muchos decimales se ve al centavo.
+ */
+export function decimalesInsumo(v: string | null): number {
+  if (v === null) return 2
+  const exactos = new Decimal(v).decimalPlaces()
+  return Math.min(Math.max(exactos, 2), decimalesPrecio(v))
+}
+
+/** Hora del cierre de BYMA (rueda de 11 a 17), en Córdoba. */
+export const CIERRE_BYMA = { hora: 17, minuto: 0 }
+
+const horaCordoba = new Intl.DateTimeFormat('en-GB', { timeZone: ZONA, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+
+/**
+ * ¿Ya hay algo para cargar hoy? Es día hábil, no cargaste y ya cerró BYMA
+ * (visión §3.2: el punto de Cargar). Antes del cierre, lo del día todavía no
+ * existe: ni el punto ni "Todavía no cargaste hoy". Si la vista es de otro día
+ * que el del reloj (una vista vieja), cuenta como cerrado.
+ */
+export function cargaPendiente(v: { hoy: Fecha; es_habil_hoy: boolean; cargo_hoy: boolean }, ahora: Date): boolean {
+  if (!v.es_habil_hoy || v.cargo_hoy) return false
+  if (fechaEnCordoba(ahora) !== v.hoy) return true
+  const [h, m] = horaCordoba.format(ahora).split(':').map(Number)
+  return h * 60 + m >= CIERRE_BYMA.hora * 60 + CIERRE_BYMA.minuto
 }
 
 /** Decimales para mostrar un precio: los de bonos y letras por 1 VN necesitan más. */

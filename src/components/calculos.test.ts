@@ -2,7 +2,7 @@ import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import type { CalcVista } from '@/lib/domain/calc'
 import { Decimal } from '@/lib/domain/dinero'
-import { aDolares, compararCifras, decimalesPrecio, fraccionDe, porSubaDeCcl, restoMayor, sumaColumna } from './calculos'
+import { aDolares, cargaPendiente, compararCifras, decimalesInsumo, decimalesPrecio, diasEnPosicion, fraccionDe, parcialDeTotal, porSubaDeCcl, restoMayor, sumaColumna } from './calculos'
 
 const c = (valor: string | null, motivo?: string): CalcVista => ({ valor, motivo, formula: valor ?? 'sin dato', insumos: [], etiquetas: [] })
 
@@ -53,6 +53,35 @@ describe('sumaColumna (D-65)', () => {
   })
 })
 
+describe('parcialDeTotal (D-65 en Hoy)', () => {
+  const insumo = (nombre: string, valor: string | null, unidad: 'ARS' | 'USD' | 'ratio' = 'ARS') => ({ nombre, valor, unidad, calc: c(valor) })
+  const total = (insumos: ReturnType<typeof insumo>[], etiquetas: CalcVista['etiquetas'] = ['parcial']): CalcVista => ({
+    valor: null,
+    motivo: 'Falta Camioneta.',
+    formula: 'sin dato',
+    insumos,
+    etiquetas,
+  })
+  it('vuelve a sumar las partes conocidas, con traza', () => {
+    const r = parcialDeTotal(total([insumo('IEB', '80830000'), insumo('Camioneta', null), insumo('Leasing', '-21400000')]), 'ARS')!
+    expect(r.parcial!.valor).toBe('59430000')
+    expect(r.contadas).toBe(2)
+    expect(r.de).toBe(3)
+    expect(r.parcial!.formula).toBe('suma parcial (2 de 3): $ 80.830.000,00 + −$ 21.400.000,00 = $ 59.430.000,00')
+    expect(r.parcial!.etiquetas).toEqual(['parcial'])
+  })
+  it('null si el total tiene valor, si no es una suma parcial o si no se conoce ninguna parte', () => {
+    expect(parcialDeTotal({ ...c('1'), etiquetas: ['parcial'] }, 'ARS')).toBeNull()
+    expect(parcialDeTotal(total([insumo('A', '1'), insumo('B', null)], []), 'ARS')).toBeNull()
+    expect(parcialDeTotal(total([insumo('A', null), insumo('B', null)]), 'ARS')).toBeNull()
+    expect(parcialDeTotal(total([]), 'ARS')).toBeNull()
+  })
+  it('null si algún insumo no es un monto en esa moneda: no es una suma de partes', () => {
+    expect(parcialDeTotal(total([insumo('Pesos', '1000'), insumo('CCL', '1548.2', 'ratio')]), 'USD')).toBeNull()
+    expect(parcialDeTotal(total([insumo('A', '1', 'USD'), insumo('B', null, 'USD')]), 'ARS')).toBeNull()
+  })
+})
+
 describe('conversiones', () => {
   it('pesos a dólares al CCL, y sin dato si falta algo', () => {
     expect(aDolares(c('54183100'), c('1548.2'), 'Pesos', '').valor).toBe(new Decimal('54183100').div('1548.2').toFixed())
@@ -79,5 +108,58 @@ describe('fraccionDe y decimales de precio', () => {
     expect(decimalesPrecio('35150')).toBe(2)
     expect(decimalesPrecio('1.0852')).toBe(4)
     expect(decimalesPrecio('0.000694')).toBe(6)
+  })
+})
+
+describe('diasEnPosicion (Cartera)', () => {
+  it('dice de dónde se cuentan; la fecha declarada lleva "declarado"', () => {
+    const ap = diasEnPosicion(14, 'apertura')
+    expect(ap.valor).toBe('14')
+    expect(ap.formula).toBe('14 días desde la apertura en la app')
+    expect(ap.explicacion).toMatch(/No es cuánto hace que la tenés/)
+    expect(ap.etiquetas).toEqual([])
+    const de = diasEnPosicion(226, 'declarada')
+    expect(de.formula).toBe('226 días desde la fecha de compra que declaraste')
+    expect(de.etiquetas).toEqual(['declarado'])
+    expect(diasEnPosicion(1, 'compra').formula).toBe('1 día desde tu primera compra registrada')
+  })
+  it('sin fecha de inicio, sin dato (nunca cero)', () => {
+    expect(diasEnPosicion(null, null).valor).toBeNull()
+    expect(diasEnPosicion(3, null).valor).toBeNull()
+  })
+})
+
+describe('decimalesInsumo (traza)', () => {
+  it('un precio se ve con sus decimales, como en la fórmula', () => {
+    expect(decimalesInsumo('1.124')).toBe(3)
+    expect(decimalesInsumo('1.0852')).toBe(4)
+    expect(decimalesInsumo('0.000694')).toBe(6)
+    expect(decimalesInsumo('4.62')).toBe(2)
+  })
+  it('un monto, al centavo; nunca menos de 2', () => {
+    expect(decimalesInsumo('10116000')).toBe(2)
+    expect(decimalesInsumo('10116000.5')).toBe(2)
+    expect(decimalesInsumo('52345.678901234')).toBe(2)
+    expect(decimalesInsumo('23.456789123')).toBe(4)
+    expect(decimalesInsumo(null)).toBe(2)
+  })
+})
+
+describe('cargaPendiente (el punto de Cargar y "Todavía no cargaste hoy")', () => {
+  const v = { hoy: '2026-10-15', es_habil_hoy: true, cargo_hoy: false }
+  // Córdoba es UTC−3 todo el año.
+  const a = (hhmm: string) => new Date(`2026-10-15T${hhmm}:00-03:00`)
+  it('un día hábil sin carga: recién después del cierre de BYMA (17 h)', () => {
+    expect(cargaPendiente(v, a('08:05'))).toBe(false)
+    expect(cargaPendiente(v, a('16:59'))).toBe(false)
+    expect(cargaPendiente(v, a('17:00'))).toBe(true)
+    expect(cargaPendiente(v, a('23:59'))).toBe(true)
+  })
+  it('con la carga hecha, o un día no hábil, nunca', () => {
+    expect(cargaPendiente({ ...v, cargo_hoy: true }, a('18:10'))).toBe(false)
+    expect(cargaPendiente({ ...v, es_habil_hoy: false }, a('18:10'))).toBe(false)
+  })
+  it('una vista de otro día que el del reloj cuenta como cerrado', () => {
+    expect(cargaPendiente(v, new Date('2026-10-16T08:00:00-03:00'))).toBe(true)
   })
 })

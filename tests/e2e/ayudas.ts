@@ -32,8 +32,9 @@ export async function sinIndicadorDev(page: Page) {
 
 /**
  * Los controles de D-30 en el navegador: scroll horizontal, elementos fuera de
- * la pantalla, texto cortado en controles, controles superpuestos y, con
- * puntero grueso, tocables de menos de 44 px. Devuelve una línea por problema.
+ * la pantalla o fuera de su tarjeta, texto cortado en controles, controles
+ * superpuestos y, con puntero grueso, tocables de menos de 44 px. Devuelve una
+ * línea por problema.
  */
 export async function revisarLayout(page: Page, grueso: boolean): Promise<string[]> {
   return page.evaluate((grueso) => {
@@ -100,6 +101,38 @@ export async function revisarLayout(page: Page, grueso: boolean): Promise<string
       }
     }
 
+    // Fuera de su tarjeta: nada visible pasa el borde del contenedor con borde
+    // más cercano (D-30 también vale adentro de la pantalla: un monto que pisa
+    // el borde de su tarjeta está cortado aunque entre en la pantalla). Un
+    // panel flotante (absolute o fixed) o algo que un ancestro recorta no cuenta.
+    const fueraDeTarjeta: Element[] = []
+    for (const el of Array.from(document.body.querySelectorAll('*'))) {
+      if (fueraDeTarjeta.some((p) => p.contains(el)) || ignorar(el)) continue
+      const r = el.getBoundingClientRect()
+      if (r.width === 0 || r.height === 0) continue
+      const pe = getComputedStyle(el).position
+      if (pe === 'absolute' || pe === 'fixed') continue
+      let caja: Element | null = null
+      for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+        const ca = getComputedStyle(a)
+        if (parseFloat(ca.borderLeftWidth) > 0 && parseFloat(ca.borderRightWidth) > 0) {
+          caja = a
+          break
+        }
+        if (ca.overflowX !== 'visible' || ca.position === 'absolute' || ca.position === 'fixed') break
+      }
+      if (!caja) continue
+      const rc = caja.getBoundingClientRect()
+      const cc = getComputedStyle(caja)
+      const izq = rc.left + parseFloat(cc.borderLeftWidth)
+      const der = rc.right - parseFloat(cc.borderRightWidth)
+      const exceso = Math.max(r.right - der, izq - r.left)
+      if (exceso > 1 && visible(el)) {
+        out.push(`se sale ${Math.round(exceso * 10) / 10} px de su tarjeta: ${desc(el)} en ${desc(caja)}`)
+        fueraDeTarjeta.push(el)
+      }
+    }
+
     const SEL = 'a[href], button, label, summary, select, input:not([type=hidden]), textarea, [role=button], [role=radio], [role=switch], [role=tab], [role=link], [role=checkbox]'
     const controles = Array.from(document.querySelectorAll(SEL)).filter((el) => !ignorar(el) && visible(el))
 
@@ -114,6 +147,17 @@ export async function revisarLayout(page: Page, grueso: boolean): Promise<string
           break
         }
       }
+    }
+
+    // Texto que se sale de un control con borde y sin recorte: se ve pisando o
+    // pasando el borde ("Transferencia" en un botón de 77 px). Los campos
+    // (input, select, textarea) desplazan su texto adentro y no cuentan.
+    for (const el of controles) {
+      if (el.matches('input, select, textarea')) continue
+      const cs = getComputedStyle(el)
+      if (cs.display === 'inline' || cs.overflowX !== 'visible') continue
+      if (!(parseFloat(cs.borderLeftWidth) > 0 && parseFloat(cs.borderRightWidth) > 0)) continue
+      if (el.scrollWidth > el.clientWidth + 1) out.push(`texto que se sale de su control (${el.scrollWidth} > ${el.clientWidth}): ${desc(el)}`)
     }
 
     // Controles superpuestos (uno fijo y otro que scrollea no cuenta: el contenido pasa por debajo de las barras).
@@ -148,4 +192,35 @@ export async function revisarAxe(page: Page): Promise<string[]> {
   return r.violations
     .filter((v) => v.impact === 'serious' || v.impact === 'critical')
     .map((v) => `axe ${v.impact} · ${v.id}: ${v.help} → ${v.nodes.slice(0, 3).map((n) => n.target.join(' ')).join(' | ')}`)
+}
+
+/**
+ * Modo privado: los montos que se leen en la pantalla (texto visible con "$ " y
+ * un dígito) sin un desenfoque en el camino. Abre antes todos los <details>.
+ * Devuelve cada uno con su contexto; vacío si el modo privado tapa todo.
+ */
+export async function montosALaVista(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    for (const d of Array.from(document.querySelectorAll('details'))) d.open = true
+    const out: string[] = []
+    const caminante = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+    for (let n = caminante.nextNode(); n; n = caminante.nextNode()) {
+      const t = (n.textContent ?? '').replace(/\s+/g, ' ')
+      if (!/\$\s?[−+-]?\d/.test(t)) continue
+      const el = n.parentElement
+      if (!el || el.closest('script, style, title, nextjs-portal, .sr-only, dialog:not([open])')) continue
+      if (typeof el.checkVisibility === 'function' && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue
+      const r = el.getBoundingClientRect()
+      if (r.width === 0 || r.height === 0) continue
+      let tapado = false
+      for (let a: Element | null = el; a; a = a.parentElement) {
+        if (getComputedStyle(a).filter.includes('blur')) {
+          tapado = true
+          break
+        }
+      }
+      if (!tapado) out.push(`"${t.trim().slice(0, 60)}" en <${el.tagName.toLowerCase()}.${(el.getAttribute('class') ?? '').split(' ').slice(0, 3).join('.')}>`)
+    }
+    return out
+  })
 }

@@ -19,21 +19,22 @@ Mapa para quien mantenga la app: dónde está cada cosa, por dónde viajan los d
 | `src/proxy.ts` | Primera barrera de la sesión, CSP con nonce y control de origen (D-112) | Infraestructura y seguridad |
 | `src/app/login/` | Entrada: formulario, acciones (`entrar`, `salir`), rutas públicas, freno a los intentos, encabezados | Infraestructura y seguridad |
 | `src/app/layout.tsx`, `src/app/globals.css` | Layout raíz (idioma, fuentes, tema antes de pintar) y tokens de diseño | Infraestructura y seguridad |
-| `src/app/(app)/layout.tsx` | El shell: barra lateral, barra superior, barra inferior | Infraestructura y seguridad |
+| `src/app/(app)/layout.tsx` | El shell: barra lateral, barra superior, barra inferior (usa el marco de `src/components/shell/marco.tsx` y le suma el chip de datos) | Infraestructura y seguridad |
+| `src/app/not-found.tsx` | La página de "no encontrada" (404), en español y dentro del marco de la app, sin leer la base | Motor y vistas |
 | `src/app/(app)/page.tsx`, `cartera/`, `exposicion/`, `registro/` | Pantallas de lectura: Hoy, Cartera, Exposición, Registro (con su acción de revertir) | Motor y vistas |
 | `src/app/(app)/carga/` | Cargar: `page.tsx`, `acciones.ts` (proponer, guardar, deshacer, alta de activo), `leer/route.ts` (lectura de archivos), `_lib/` (lógica pura con tests), `_componentes/` | Carga |
 | `src/app/(app)/datos/` | Datos: catálogo, cuentas, bienes, leasing y movimientos, con sus acciones | Carga |
 | `src/app/(app)/ajustes/` | Ajustes | Infraestructura y seguridad |
 | `src/components/` | Componentes compartidos: `monto.tsx` (toda cifra), `traza.tsx` (el panel "¿de dónde sale?"), `ui.tsx`, `calculos.ts` (cálculos de presentación con traza), Cartera, Hoy, Registro | Motor y vistas |
-| `src/components/shell/`, `src/components/ajustes/` | Navegación, chip de estado de datos, preferencias | Infraestructura y seguridad |
+| `src/components/shell/`, `src/components/ajustes/` | El marco (barras, ojo y tema, sin leer la base), navegación, chip de estado de datos, preferencias | Infraestructura y seguridad |
 | `src/lib/domain/` | **El motor:** tipos, fechas, posiciones, foto, variación, traza. `dinero.ts` (Decimal y números es-AR) es de Carga | Motor y vistas |
 | `src/lib/vistas/` | Arma lo que recibe cada pantalla: `contratos.ts`, `armar.ts` (puro), `index.ts` (lee la base o el demo), `ejemplo.ts` (datos de ejemplo) | Motor y vistas |
-| `src/lib/carga/` | Lectores (`ieb.ts`, `captura.ts`, `captura-verificacion.ts`), conciliación (`conciliar.ts`) y contratos de la carga (`contratos.ts`) | Carga |
+| `src/lib/carga/` | Lectores (`ieb.ts`, `captura.ts`, `captura-verificacion.ts`), conciliación (`conciliar.ts`), las tenencias ausentes vigentes (`ausentes.ts`, D-117) y contratos de la carga (`contratos.ts`) | Carga |
 | `src/lib/server/` | Lo que solo corre en el servidor: `supabase.ts` (único cliente de la base), `hechos.ts` (lee los hechos), `escritura.ts` (toda escritura), `sesion.ts` (clave y cookie) | Carga (`escritura.ts`); Infraestructura (`sesion.ts`, `supabase.ts`) |
 | `src/lib/database.types.ts` | Tipos generados del schema. No se editan a mano | — |
 | `supabase/migrations/` | El schema, en migraciones versionadas. La base se reconstruye de cero aplicándolas en orden | Carga |
 | `supabase/tests/` | Tests del schema contra un Postgres local (`run.sh`) | Carga |
-| `tests/unit/` | Tests del motor ajenos a un archivo (revisión adversarial) | Motor y vistas |
+| `tests/unit/` | Tests del motor ajenos a un archivo: la revisión adversarial del motor (`revision-motor.test.ts`), la de la 1a desplegada (`fase3-motor.test.ts`) y los cruces entre carga, motor y pantallas (`fase3-integracion.test.ts`) | Motor y vistas |
 | `tests/referencia/` | Implementación de referencia en Python y su cruce con el motor | Motor y vistas |
 | `tests/fixtures/` | Archivos sintéticos con números inventados (el Excel de IEB) | Carga |
 | `tests/e2e/` | Playwright: layout (D-30), interacción y entrada | Infraestructura y seguridad |
@@ -60,10 +61,10 @@ Regla del repo (`CLAUDE.md`): todo cambio de comportamiento, schema o UI actuali
 
 1. **Fuentes.** El Excel "Portafolio" de IEB, capturas de Galicia y de Mercado Pago, el CCL y el cripto tipeados, y los formularios de Datos.
 2. **Lectores.** Cada archivo viaja solo a `POST /carga/leer` (D-105). La ruta verifica la sesión, lee (`leerExcelIEB` o `leerCaptura`) y, **en paralelo**, sube el archivo al bucket privado `cargas` (`subirArchivo`, nombrado por su sha256). Devuelve una `LecturaCuenta` **firmada** con HMAC.
-3. **Propuesta.** `proponerCarga(lecturas, hechos, fecha, { ccl })` compara lo leído con lo que la app deriva de sus operaciones (D-15). Para cada fila decide una acción: `ninguna`, `apertura` (D-14), `compra` (D-15, D-19), `venta`, `completar_precio` (D-110) o `revisar`. Cada saldo trae su valor anterior; cada cuenta, sus controles; y la propuesta lista las posiciones que la fuente no trae.
+3. **Propuesta.** `proponerCarga(lecturas, hechos, fecha, { ccl })` compara lo leído con lo que la app deriva de sus operaciones (D-15). Para cada fila decide una acción: `ninguna`, `apertura` (D-14), `compra` (D-15, D-19), `venta`, `completar_precio` (D-110) o `revisar`. Cada saldo trae su valor anterior; cada cuenta, sus controles; y la propuesta lista las posiciones que la fuente no trae (`ausentes`, con la venta o el vencimiento para registrar, D-117) y el CCL del día (`cclDelDia`: el tipeado o el que ese día ya tiene cargado, nunca el de otro día, D-119).
 4. **Bandeja.** `carga/_lib/bandeja.ts`, puro y con tests: el estado de cada ítem (verificada, aceptada, advertencia, sin alta, error, pendiente), el contador, el texto del botón y las elecciones del dueño. Cada elección lleva la huella de la propuesta sobre la que se hizo (D-106).
 5. **Confirmación.** La acción `guardar` verifica la firma de cada lectura, **vuelve a armar la propuesta contra la base** y arma la `ConfirmacionCarga` (`_lib/confirmacion.ts`). `confirmarCarga()` (`escritura.ts`) la valida y llama a la función `confirmar_carga` de Postgres, que graba el lote entero o nada (D-104).
-6. **Hechos.** `leerHechos()` (envuelta en `cache()` de React: una sola lectura por pedido, aunque la pidan el shell y la página) lee todas las tablas de hechos paginando (PostgREST corta en 1.000 filas sin avisar), con los montos como texto (`::text`), y los convierte a `Decimal` para el motor. Ningún monto pasa por un `number` de JavaScript.
+6. **Hechos.** `leerHechos()` (envuelta en `cache()` de React: una sola lectura por pedido, aunque la pidan el shell y la página) lee todas las tablas de hechos paginando (PostgREST corta en 1.000 filas sin avisar), con los montos como texto (`::text`), y los convierte a `Decimal` para el motor. Ningún monto pasa por un `number` de JavaScript. De cada carga lee también `listado_completo` y solo `grabado->ausentes` (un camino JSON, no el grabado entero). `ausentesVigentes` (`src/lib/carga/ausentes.ts`, pura) arma `Hechos.ausentes`: por cuenta, las ausentes de la última carga vigente cuya resolución no es `'registrada'`, con la fecha y la carga del comienzo de su racha (D-117).
 7. **Motor.** Funciones puras sobre `Hechos` (sección 4).
 8. **Vistas.** `armarHoy`, `armarCartera` y `armarExposicion` (`src/lib/vistas/armar.ts`, puras) arman los modelos de `src/lib/vistas/contratos.ts`: serializables, con cada cifra como `CalcVista`. `src/lib/vistas/index.ts` las llama con los hechos de la base o, en modo demo, con los de `ejemplo.ts`.
 9. **Pantallas.** Server components que solo muestran. Toda cifra pasa por `<Monto>`, que abre `<Traza>`. **Nunca se calcula en el JSX**: un cálculo de presentación (redondeo por resto mayor, suma de una columna filtrada) va en `src/components/calculos.ts`, con traza y test.
@@ -76,14 +77,14 @@ Regla del repo (`CLAUDE.md`): todo cambio de comportamiento, schema o UI actuali
 |---|---|---|
 | `tenencias(ops, hasta)` | `posiciones.ts` | Cantidad y costo (ARS y USD) de cada cuenta y activo, derivados de las operaciones hasta una fecha. Apertura, compra, venta, vencimiento, renta, amortización y ajuste de ratio |
 | `ppcCalc`, `costoCalc`, `cantidadCalc` | `posiciones.ts` | PPC, costo y cantidad con traza, en cada moneda |
-| `foto(h, fecha)` | `foto.ts` | Valuación de todo a una fecha: posiciones, saldos, bienes y pasivos, en ARS y USD, con el precio y el CCL que correspondan y sus etiquetas |
+| `foto(h, fecha)` | `foto.ts` | Valuación de todo a una fecha: posiciones, saldos, bienes y pasivos, en ARS y USD, con el precio y el CCL que correspondan y sus etiquetas. Una tenencia de `Hechos.ausentes` vale "sin dato" desde la fecha de su ausencia, con el motivo y la carga que la declaró en la traza (D-117) |
 | `cclA(ix, fecha)` | `foto.ts` | El CCL para valuar a una fecha: el último tipeado hasta ese día, con su fecha (D-109) |
-| `sumaCalc`, `financieros` | `foto.ts` | Totales con la regla "sin dato" + suma parcial (D-65); las partidas del patrimonio financiero (D-03) |
+| `sumaCalc`, `financieros` | `foto.ts` | Totales con la regla "sin dato" + suma parcial (D-65); sin ninguna parte conocida, "sin dato" sin suma parcial ni etiqueta `parcial` (D-126). Las partidas del patrimonio financiero (D-03) |
 | `variacion(h, d0, d1)` | `variacion.ts` | El cambio entre dos fechas, partida por partida, con sus flujos (compras, ventas, cobros, aportes, aperturas) y su desglose en activo, CCL y sin atribuir (D-35) |
 | `parteCalc`, `porcentajeCalc` | `variacion.ts` | Una parte del desglose (o un porcentaje) sumada sobre una vista (financiero o total), con traza |
-| `cuadre(v, h)` | `variacion.ts` | El control de D-66: patrimonio financiero de hoy recalculado desde los hechos, menos el de la carga anterior, menos los flujos externos, contra la suma de activo + CCL + sin atribuir. Puede fallar, y tiene un test que lo hace fallar a propósito |
-| `desgloseDesdeCompra(h, clave, hasta)` | `variacion.ts` | El desglose de una posición desde su compra: los tramos anteriores a la primera carga (al CCL de compra) más la suma de los intervalos entre observaciones frescas. Lo usa Cartera |
-| `esHabil`, `esViejo`, `hoyCordoba` | `fechas.ts` | Días hábiles con la tabla `feriados`, "viejo" a los 2 días hábiles (D-16) y fechas en hora de Córdoba |
+| `cuadre(v, h)` | `variacion.ts` | El control de D-66: patrimonio financiero de hoy recalculado desde los hechos, menos el de la carga anterior, menos los flujos externos, contra la suma de activo + CCL + sin atribuir. Devuelve la `diferencia` en ARS y USD como `Calc`, con los cuatro insumos; "no verificable" nombra la partida que falta. Nombra la plata que entró o salió de la app por una cuenta sin saldo cargado (D-125). Puede fallar, y tiene un test que lo hace fallar a propósito |
+| `desgloseDesdeCompra(h, clave, hasta)` | `variacion.ts` | El desglose de la tenencia vigente desde su compra: los tramos anteriores a la primera carga (al CCL de compra) más la suma de los intervalos entre observaciones frescas, escalada en cada venta o vencimiento por cantidad después ÷ cantidad antes (D-35). Lo usa Cartera |
+| `esHabil`, `esViejo`, `hoyCordoba` | `fechas.ts` | Días hábiles con la tabla `feriados` (mercado `AR`: los días sin rueda en BYMA, D-129), "viejo" a los 2 días hábiles (D-16) y fechas en hora de Córdoba |
 | `dec`, `leerNumeroAR`, `monto` | `dinero.ts` | `Decimal` desde texto (rechaza números de JavaScript), números escritos en es-AR, formato de montos |
 | `proponerCarga` | `src/lib/carga/conciliar.ts` | La propuesta de la bandeja (sección 3) |
 | `armarHoy`, `armarCartera`, `armarExposicion` | `src/lib/vistas/armar.ts` | Lo que muestra cada pantalla |
@@ -93,13 +94,13 @@ Regla del repo (`CLAUDE.md`): todo cambio de comportamiento, schema o UI actuali
 Cada una tiene tests; romper una es un bug aunque la pantalla "se vea bien".
 
 1. **Nada derivado se guarda.** Posiciones, PPC, resultados, totales, desglose, "sin atribuir", excedentes: todo se calcula (D-22, D-23).
-2. **"Sin dato" es `valor: null` con su motivo**, nunca 0 ni una estimación, y se propaga: lo que depende de un dato faltante también es "sin dato". Un total con partes faltantes es "sin dato", con la etiqueta `parcial` y la suma parcial en sus insumos (D-65).
+2. **"Sin dato" es `valor: null` con su motivo**, nunca 0 ni una estimación, y se propaga: lo que depende de un dato faltante también es "sin dato". Un total con partes faltantes es "sin dato", con la etiqueta `parcial` y la suma parcial en sus insumos (D-65); sin ninguna parte conocida, es "sin dato" a secas, con el motivo de lo que falta (D-126). Sin bienes o sin leasing cargados, el patrimonio total y la deuda son "sin dato", no el financiero ni $ 0. Una tenencia que la fuente ya no lista y quedó pendiente vale "sin dato" desde la primera carga de su racha (D-117).
 3. **Activo + CCL + sin atribuir = resultado, exacto,** por partida y en total, en ARS y en USD. `variacion` lo verifica en cada cálculo y lanza un error si no cierra.
 4. **El desglose se ancla en observaciones frescas** (D-35, provisoria). Cada partida se desglosa por los intervalos entre sus observaciones frescas: su propio precio o saldo, y un CCL tipeado ese mismo día. Lo que no tiene observación fresca queda "sin atribuir" y se devuelve cuando llega. Por eso:
    - un período es la suma exacta de sus días;
    - una carga express entre dos completas no cambia el desglose del período;
    - en un intervalo sin CCL tipeado no se atribuye nada (D-109);
-   - Cartera, desde la compra, usa la misma suma de intervalos que Hoy, más un tramo por lote antes de la primera observación, al CCL de compra (`desgloseDesdeCompra`). Si hubo una venta antes de la primera observación fresca, vuelve a un solo intervalo con el CCL promedio de compra, rotulado;
+   - Cartera, desde la compra, usa la misma suma de intervalos que Hoy, más un tramo por lote antes de la primera observación, al CCL de compra (`desgloseDesdeCompra`), solo de la tenencia vigente: cada venta o vencimiento escala lo acumulado por cantidad después ÷ cantidad antes, como el costo, al precio y al CCL de la observación de ese día; las rentas no entran (D-114). Así activo + TC + sin atribuir = resultado de la fila (una propiedad lo verifica sobre los 310 casos de la referencia). Si hubo una venta antes de la primera observación fresca, una venta sin observación propia o una que cae el mismo día que una compra, una apertura o un cambio de ratio, vuelve a un solo intervalo con el CCL promedio de compra, rotulado;
    - una posición cerrada (cantidad 0) vale 0 exacto y no necesita precio para estar fresca;
    - los bienes y las deudas conservan su último dato en su propia moneda: con un CCL nuevo, su cambio es tipo de cambio (o licuación de la deuda), no "sin atribuir"; solo queda sin atribuir si en el intervalo no hubo ningún CCL tipeado.
 5. **La moneda de riesgo decide dónde aparece el efecto del CCL.** Con V0 y V1 el valor de la partida en cada punta y F los flujos, cada uno al CCL de su fecha:
@@ -112,7 +113,7 @@ Cada una tiene tests; romper una es un bug aunque la pantalla "se vea bien".
 8. **Valuar en dólares usa el último CCL tipeado,** con su fecha en la traza y `viejo` a los 2 días hábiles (D-109). Nunca un CCL estimado ni traído de afuera.
 9. **Exposición:** la vista Financiero netea "pesos financieros − deuda del leasing". La Total suma cada bien en su moneda de riesgo, y es "sin dato" si alguno no la tiene (D-73, D-101). La concentración se mide siempre sobre el patrimonio financiero (D-03).
 10. **Fechas en hora de Córdoba** (`America/Argentina/Cordoba`). "Hoy" lo decide el servidor con `hoyCordoba()`, nunca la zona del servidor.
-11. **Las dos patas de una operación** (el título y la caja) usan el mismo CCL: el de la operación, si no el tipeado ese día, si no el último anterior. Cada flujo dice si es **externo** (aporte, retiro, transferencia, apertura, saldo inicial, cambio de capital de una deuda) o interno (compra, venta, cobro: se cancelan entre el título y la caja).
+11. **Las dos patas de una operación** (el título y la caja) usan el mismo CCL: el de la operación, si no el tipeado ese día, si no el último anterior. Cada flujo dice si es **externo** (aporte, retiro, transferencia, apertura, saldo inicial, cambio de capital de una deuda) o interno (compra, venta, cobro: se cancelan entre el título y la caja). Excepción: una operación en una cuenta sin ningún saldo cargado en esa moneda hasta el fin del intervalo (Galicia) tiene su pata de caja fuera de la app, así que su flujo es externo y el cuadre lo nombra (D-125).
 
 ## 5. El contrato de la traza
 
@@ -145,32 +146,35 @@ Están en `src/lib/carga/contratos.ts`. Todo número viaja como **texto decimal 
   - `controles`: B2, Subtotales y total de Galicia, con lo informado, lo calculado, la tolerancia y `ok` (`null` = no verificable);
   - `tipo_cambio_fuente`: el dólar con el que valúa la fuente (el de IEB), para nombrar la diferencia con tu CCL (D-66);
   - `cruda`: la lectura cruda, que se graba en `cargas.lectura_cruda`.
-- **`PropuestaCarga`**: `DecisionFila` (acción, operación propuesta, cotización, precio a completar), `DecisionSaldo` (con el anterior), controles, advertencias y ausentes.
+- **`PropuestaCarga`**: `DecisionFila` (acción, operación propuesta, cotización, precio a completar y, en una tenencia nueva de una cuenta ya cargada, la `apertura_alternativa` de "Ya la tenía", D-121), `DecisionSaldo` (con el anterior), controles (con su moneda y lo que cubren), advertencias, el CCL del día y las ausentes (`AusentePropuesto`: la venta o el vencimiento para registrar, D-117).
 - **`ConfirmacionCarga`**, lo que recibe `confirmar_carga`:
   - `lote` (uuid), `fecha`;
   - `tipo_cambio` (`ccl`, `cripto_venta`, `mep`, `oficial`, `referencia`), o null;
   - `cuentas`: por cuenta, `origen`, `archivo_path` y `archivo_sha256` (obligatorios con archivo, null en manual), `lector`, `lectura_cruda`, `grabado`, `listado_completo`, `cotizaciones`, `saldos`, `operaciones` y `completar_precios`;
-  - `tiempo_activo_ms` y `nota`.
-- **`ResultadoConfirmacion`**: `{ lote, cargas: [{ carga_id, cuenta_id }], repetido }`.
+  - `tiempo_activo_ms`, `nota` y `huella` (sha256 de lo que mandó el dueño: fecha, firmas de las fuentes, elecciones, ediciones, tipos de cambio, referencia y nota; D-120).
+- **`ResultadoConfirmacion`**: `{ lote, cargas: [{ carga_id, cuenta_id }], repetido }`. Ante un lote repetido, `guardar` muestra lo que de verdad quedó en la base (`leerLote` y `resumenDeLote`), no una propuesta rearmada.
 
 **Reglas para quien escriba:**
 - El lote se genera una vez por intento de confirmación (`crypto.randomUUID()`) y se reusa en un doble Enter o un reintento. Después de Deshacer, la carga siguiente necesita un lote **nuevo**.
 - Toda escritura pasa por `src/lib/server/escritura.ts`, que valida antes de mandar (montos como texto con la misma sintaxis que el SQL, fechas, ids, archivo con sha256) y traduce los errores de la base al castellano (`ErrorEscritura`, con `message` y `codigo`). `confirmar_carga` y `guardar_manual` se reintentan una vez ante un corte de red, porque son idempotentes por lote; `revertir_lote`, nunca.
 - Una Server Action atrapa el `ErrorEscritura` y **devuelve** `e.message`: en producción, Next oculta el texto de los errores lanzados.
 
-**Las funciones de la base** (migración `carga_transaccional`): `confirmar_carga`, `revertir_lote`, `guardar_manual`, `alta_activo` y `editar_activo`. Detalle en `docs/datos.md`.
+**Las funciones de la base:** `confirmar_carga` (migración `carga_confirmar`, reemplazada en `confirmar_carga_recarga`), `revertir_lote` (`carga_revertir`), `guardar_manual` (`carga_manual`), y `alta_activo` y `editar_activo` (`catalogo_activos`, reemplazadas en `catalogo_cedear_ratio`). Los lectores de la entrada que usan (`leer_monto`, `leer_fecha`, `leer_id`) están en `carga_transaccional`. El trigger de la auditoría (`registrar_auditoria`) está en `init`, con el `search_path` fijado en `auditoria_search_path`. Detalle en `docs/datos.md`.
+
+**Datos** (`src/app/(app)/datos/`): cada envío de un formulario lleva su lote (`_lib/envio.ts`): el mismo envío reintentado trae el mismo lote y `guardar_manual` no lo duplica; un corte de red deja el formulario con el aviso. Corregir un bien o un pasivo (`actualizarBien`, `actualizarPasivo` en `escritura.ts`) es un `update` fila por fila, auditado, que no es una carga (D-124).
 
 ## 7. Seguridad
 
 | Capa | Qué hace |
 |---|---|
 | **Clave y sesión** (`sesion.ts`) | Una clave (`APP_PASSWORD`). Cookie `sesion` httpOnly, SameSite=Lax, Secure en producción, 30 días, con forma estricta (`vence.firma`) y verificada en tiempo constante. La firma usa una subclave de una clave maestra: `HMAC(SESSION_SECRET, APP_PASSWORD)` si hay `SESSION_SECRET`, o PBKDF2-SHA256 de `APP_PASSWORD` (210.000 vueltas, una vez por instancia). `claveDerivada(propósito)` da una subclave por uso. Las lecturas de Cargar se firman con otra clave (`carga/_lib/servidor.ts`) |
-| **Entrada** (`src/app/login`) | 800 ms por clave equivocada y una traba creciente (1 s, 2 s, 4 s…, hasta 5 min) desde el tercer error seguido del mismo origen, en la memoria de cada instancia. La vuelta (`?desde=`) solo acepta rutas propias |
+| **Entrada** (`src/app/login`) | 800 ms por clave equivocada y una traba creciente (1 s, 2 s, 4 s…, hasta 5 min) desde el tercer error seguido del mismo origen, en la memoria de cada instancia. Mirar la traba y anotar el intento van en un solo paso, antes de comparar la clave (`reservarIntento`): una ráfaga en paralelo prueba como mucho 3 claves (`acciones.test.ts`); si la clave era la correcta, `anotarExito` deja limpio el origen. El origen sale de `x-real-ip` (o, si falta, de `x-forwarded-for`). La vuelta (`?desde=`) solo acepta rutas propias |
 | **Proxy** (`src/proxy.ts`) | Toda ruta pide sesión salvo `/login` y los estáticos de Next: una página va a la entrada (307) y un POST recibe 401. Agrega la Content-Security-Policy con un nonce por pedido y rechaza los pedidos que cambian algo si no vienen del propio sitio |
 | **Segunda barrera** | Cada Server Action y cada Route Handler llama a `exigirSesion()` (D-57). Un test estático (`sesion.test.ts`, con el compilador de TypeScript) falla si una acción exportada o una ruta no lo hace (excepciones: `entrar` y `salir`). El proxy no es la única defensa |
 | **Encabezados** (`next.config.mjs`, `ENCABEZADOS_SEGURIDAD`) | X-Frame-Options DENY, nosniff, Referrer-Policy same-origin, Permissions-Policy (sin cámara, micrófono, ubicación, pagos ni USB), HSTS de dos años, Cross-Origin-Opener-Policy y Cross-Origin-Resource-Policy same-origin, X-Robots-Tag noindex; sin X-Powered-By. Un test importa `next.config.mjs` y los verifica |
-| **Modo demo** | `PORTFOLIO_DEMO=1` deja entrar sin clave con datos inventados. Se ignora si Vercel dice que el entorno es producción |
+| **Modo demo** | `PORTFOLIO_DEMO=1` deja entrar sin clave con datos inventados. Se ignora si Vercel dice que el entorno es producción, pero anda fuera de ella (un Preview de Vercel, `next start`): no se carga en ningún entorno de Vercel. En modo demo ninguna vista, Server Action ni la ruta de lectura lee o escribe la base |
 | **Base** (D-20, D-33) | RLS en todas las tablas, sin políticas; `anon` y `authenticated` sin privilegios. El servidor usa la clave secreta (`service_role`) con permisos mínimos y explícitos: sin `TRUNCATE` y sin escribir la auditoría. Las funciones de la carga son `security invoker`, con `search_path` fijo, y solo `service_role` puede ejecutarlas |
+| **Auditoría** (`registrar_auditoria`) | Trigger `SECURITY DEFINER` con `search_path = public, pg_temp`: escribe siempre en `public.auditoria`. Un control del schema crea una tabla temporal `auditoria` y verifica que no se lleva nada; otro, que toda función de `public` fija el `search_path` con `pg_temp` al final |
 | **Archivos** | Bucket privado `cargas`. Solo el servidor sube y lee |
 | **Secretos** | Solo en variables de entorno de Vercel. Ninguna lleva `NEXT_PUBLIC_`. El navegador no habla con Supabase ni con Anthropic: la CSP solo permite conectarse al propio sitio |
 
@@ -188,7 +192,7 @@ PORTFOLIO_DEMO=1 npx next dev -p 3100
 
 - Abrí http://localhost:3100. Hoy, Cartera y Exposición muestran el set del Apéndice B de la visión, pasado por el motor real.
 - Variantes en Hoy y Cartera: `?demo=vacio` (Día cero), `?demo=express` (carga express), `?demo=viejo` (datos viejos). Exposición Total: `/exposicion?vista=total`.
-- En Cargar, "Probar con un ejemplo" arma una bandeja con lecturas inventadas. Nada se guarda. Con `PORTFOLIO_DEMO_ESCENARIO=compra_pendiente`, el ejemplo arranca con una compra de SPY con precio pendiente, para ver "completar precio" (D-110).
+- En Cargar, "Probar con un ejemplo" arma una bandeja con lecturas inventadas. Nada se guarda. Con `PORTFOLIO_DEMO_ESCENARIO=compra_pendiente`, el ejemplo arranca con una compra de SPY con precio pendiente, para ver "completar precio" (D-110). Con `PORTFOLIO_DEMO_ESCENARIO=ausente`, con una LECAP vencida que la fuente ya no lista, para ver "Registrar vencimiento" (D-117) y "Ya la tenía" (D-121).
 
 **Contra la base real:** hay un solo entorno, así que es la base de producción. Variables en `.env.local` (ignorado por git): `SUPABASE_SECRET_KEY`, `APP_PASSWORD`, `ANTHROPIC_API_KEY` y, si querés, `SESSION_SECRET`.
 
@@ -209,11 +213,12 @@ Las carpetas `.next-*/` están en `.gitignore`. Si Next agrega `.next-b/types/**
 | Unitarios y de propiedades (Vitest + fast-check) | `src/**/*.test.ts`, `tests/unit/` | `npm test` | Motor, lectores, conciliación, bandeja, escritura, firma de lecturas, entrada y sesión, cálculos de presentación. Las propiedades generan miles de casos al azar |
 | Apéndice B | `src/lib/vistas/ejemplo.test.ts` | `npm test` | Que el motor reproduce, al centavo, el set de ejemplo de la visión |
 | Revisión adversarial del motor | `tests/unit/revision-motor.test.ts` | `npm test` | Un test por hallazgo (B01 a B28) más 30 de cobertura |
+| Revisión de la 1a desplegada | `tests/unit/fase3-motor.test.ts`, `tests/unit/fase3-integracion.test.ts` y los `*.test.ts` junto a cada archivo arreglado | `npm test` | Un test por hallazgo, que falla sin su arreglo: ausentes, cuadre, frase, desglose de la tenencia vigente, leasing y bienes, carga parcial, Registro, sumas sin partes |
 | Lector de IEB, más casos | `src/lib/carga/ieb.test.ts` | `IEB_CORRIDAS=500 npx vitest run src/lib/carga/ieb.test.ts -t propiedades` | 1.000 Excel sintéticos al azar que siempre concilian, y cualquier total adulterado siempre falla |
 | Implementación de referencia | `tests/referencia/` | `python3 tests/referencia/motor_referencia.py` (se verifica sola contra los ejemplos de D-35 y el Apéndice B); el cruce, con `npm test` | Un motor escrito en Python (solo biblioteca estándar, `Decimal` de 50 dígitos) a partir de los documentos, sin mirar el de TypeScript, y 310 casos con semilla fija (`generar_casos.py`) comparados uno por uno. `REFERENCIA_SALIDA=<archivo>` vuelca las diferencias |
-| Schema | `supabase/tests/` | `npm run test:schema` (necesita un Postgres local: `PGHOST`, `PGPORT`, `PGUSER`) | Reconstruye la base de cero con todas las migraciones, sobre un stub que imita los roles y defaults de Supabase, y corre 143 controles como `service_role`: permisos, checks, funciones, idempotencia, reversión |
-| Layout (D-30) | `tests/e2e/layout.spec.ts` | `npm run test:e2e` | Cada pantalla a 360, 390, 412, 768, 1024, 1279, 1280, 1600 y 2560 px, en claro y en oscuro: sin scroll horizontal, nada afuera de la pantalla, nada cortado ni superpuesto, tocables de 44 px con puntero grueso, sin errores de JavaScript y axe-core sin violaciones serias. **Tiene que pasar antes de cualquier deploy** |
-| Interacción | `tests/e2e/interaccion.spec.ts` | `npm run test:e2e` | Hoy arriba del pliegue en un iPhone 13, la traza en el teléfono y en la compu, ordenar y filtrar Cartera, modo privado, revertir con motivo, Día cero |
+| Schema | `supabase/tests/` | `npm run test:schema` (necesita un Postgres local: `PGHOST`, `PGPORT`, `PGUSER`) | Reconstruye la base de cero con todas las migraciones, sobre un stub que imita los roles y defaults de Supabase, y corre 191 controles como `service_role`: permisos, checks, funciones, idempotencia, reversión, la recarga del mismo día, la huella, el ratio de un CEDEAR, la auditoría con una tabla temporal y los feriados |
+| Layout (D-30) | `tests/e2e/layout.spec.ts` | `npm run test:e2e` | Cada pantalla (Cargar, las cinco de Datos y la de "no encontrada" incluidas) a 360, 390, 412, 768, 1024, 1279, 1280, 1600 y 2560 px, en claro y en oscuro: sin scroll horizontal, nada afuera de la pantalla ni de su tarjeta, ningún texto que se salga de un botón, nada cortado ni superpuesto, un h1 por pantalla, tocables de 44 px con puntero grueso, sin errores de JavaScript y axe-core sin violaciones serias. Además, 768 y 1024 px con puntero táctil y el chip de datos abierto a 360, 390 y 412 px. Todas las pantallas frenan el test. **Tiene que pasar antes de cualquier deploy** |
+| Interacción | `tests/e2e/interaccion.spec.ts` | `npm run test:e2e` | Hoy arriba del pliegue en un iPhone 13, la traza en el teléfono y en la compu, la frase con mouse en una ventana angosta, ordenar y filtrar Cartera, los resultados en dólares en verde o rojo, el modo privado en todas las pantallas (ningún monto a la vista, con el ejemplo cargado en Cargar), el foco con teclado, revertir con motivo, el 404, Día cero |
 | Entrada | `tests/e2e/auth.spec.ts` | `npm run test:e2e` (o `npm run test:e2e:auth`) | Que sin sesión no se ve ninguna pantalla, que la clave funciona y vuelve adonde ibas, el freno a los intentos, los encabezados de seguridad y que la Content-Security-Policy no rompa nada |
 
 Playwright tiene dos proyectos, cada uno con su servidor (los levanta o reusa):
@@ -266,7 +271,10 @@ Cosas que ya mordieron una vez. Cada una tiene su arreglo en el código; no lo d
 | Defaults de supabase-js | En un insert de varias filas, una clave que falta viaja como `NULL`, no como el default | Las funciones de la base usan `coalesce` |
 | Permisos por defecto de Supabase | Toda tabla nueva le da todo a `service_role` (`TRUNCATE` incluido) y toda función nueva es ejecutable por `PUBLIC` | Revocar y otorgar explícitamente en cada migración (D-33) |
 | Errores en Server Actions | En producción, Next oculta el texto de un error lanzado | Atrapar el error y **devolver** el mensaje. Si igual llega a `error.tsx`, la pantalla dice que el detalle está en los logs de Vercel, con la referencia |
-| Rutas que no existen | El 404 sale sin el shell | A propósito: un catch-all dentro de `(app)` leería la base sin sesión para rutas que el proxy deja pasar |
+| Rutas que no existen | El 404 es `src/app/not-found.tsx`: en español, dentro del marco de la app (`components/shell/marco.tsx`) y sin el estado de los datos | El marco no lee la base. Un catch-all dentro de `(app)` la leería sin sesión en las rutas que el proxy deja pasar (`/login/…`, `/icons/…`) |
+| Reglas de CSS fuera de las capas de Tailwind | Le ganan a toda utilidad (`text-positive`, `rounded-*`, `outline-none`) | Lo que tiene que poder pisarse va en `@layer base` (el anillo de foco). `.usd` fija su tinta solo sin tono, y `.tocable` queda afuera a propósito, para ganarle a `h-10` y `lg:min-h-10` |
+| Pedidos en paralelo a una Server Action | Un `await` entre mirar un estado y anotarlo deja que todos los pedidos vean el estado viejo (el freno a las claves se salteaba) | Mirar y anotar en un solo paso sincrónico, antes del primer `await` (`reservarIntento`) |
+| Commits de trabajo en un repo público | Lo que estaba en el árbol en cada push queda público en el historial, aunque después se borre | Los datos reales nunca entran al árbol de trabajo; no se suben commits de trabajo al repo público (D-24) |
 | Server Actions en fila | Next las despacha de a una | La lectura de archivos va por un Route Handler (D-105) |
 | Límite de Vercel | Corta los pedidos de más de 4,5 MB | Un archivo por pedido; la ruta rechaza más de 4 MB |
 | `setState` en un listener nativo en fase de captura | Re-renderiza en medio del evento y pisa el valor de un input controlado: se pierden teclas | Anotar el gesto en un `ref` y redibujar en `requestAnimationFrame` (el contador de tiempo activo de Cargar) |

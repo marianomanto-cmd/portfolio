@@ -15,6 +15,7 @@ import { nuevoMovimiento } from '../acciones'
 import { cclAl, describirMovimiento, enDosMonedas, type CCL, type PrecargaMovimiento, type TipoMovimiento } from '../_lib/calculos'
 import type { MovimientoFila } from '../_lib/servidor'
 import { ElegirMoneda, Mensaje, Panel, useFormulario } from './formulario'
+import { M } from '../../carga/_componentes/montos'
 
 type CuentaCorta = { id: number; nombre: string }
 
@@ -31,7 +32,9 @@ function ElegirTipo({ valor, onCambio }: { valor: TipoMovimiento; onCambio: (t: 
     <fieldset className="min-w-0 space-y-1.5">
       <legend className="text-sm font-medium text-text">¿Qué fue?</legend>
       <input type="hidden" name="tipo" value={valor} />
-      <div className="grid grid-cols-3 gap-2">
+      {/* Tres columnas parejas, pero ninguna más angosta que su texto: a 360 px,
+          "Transferencia" se salía de su botón (D-30). */}
+      <div className="grid grid-cols-[repeat(3,minmax(max-content,1fr))] gap-2">
         {TIPOS.map((t) => (
           <button
             key={t.valor}
@@ -223,7 +226,7 @@ export function Movimientos({
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted">
-        Plata que entra, sale o se mueve entre tus cuentas (D-06). Sin registrarla, un depósito se lee como ganancia y un retiro como pérdida.
+        Plata que entra, sale o se mueve entre tus cuentas <span className="whitespace-nowrap">(D-06)</span>. Sin registrarla, un depósito se lee como ganancia y un retiro como pérdida.
       </p>
       {precarga?.monto ? (
         <p className="rounded-lg bg-accent-soft px-3 py-2 text-sm text-text" role="status">
@@ -265,7 +268,11 @@ export function Movimientos({
                       </td>
                       <td className="min-w-0 px-3 py-2 break-words text-text">
                         {describirMovimiento(m, cuentas)}
-                        {!esCero(m.impuesto) ? <span className="num block text-xs text-muted">impuesto {monto(m.impuesto, m.moneda_origen ?? 'ARS', { decimales: 2 })}</span> : null}
+                        {!esCero(m.impuesto) ? (
+                          <span className="num block text-xs text-muted">
+                            impuesto <M usd={m.moneda_origen === 'USD'}>{monto(m.impuesto, m.moneda_origen ?? 'ARS', { decimales: 2 })}</M>
+                          </span>
+                        ) : null}
                         {m.tc_aplicado ? <span className="num block text-xs text-muted">TC {numero(m.tc_aplicado, 2)}</span> : null}
                       </td>
                       <td className="px-3 py-2 text-right">
@@ -305,7 +312,13 @@ export function Movimientos({
                   {m.fecha_acreditacion && m.fecha_acreditacion !== m.fecha ? <p className="mt-1 text-xs text-muted">Acreditado el {fechaCorta(m.fecha_acreditacion)}.</p> : null}
                   {!esCero(m.impuesto) || m.tc_aplicado ? (
                     <p className="num mt-1 text-xs text-muted">
-                      {!esCero(m.impuesto) ? `Impuesto ${monto(m.impuesto, m.moneda_origen ?? 'ARS', { decimales: 2 })}` : ''}
+                      {!esCero(m.impuesto) ? (
+                        <>
+                          Impuesto <M usd={m.moneda_origen === 'USD'}>{monto(m.impuesto, m.moneda_origen ?? 'ARS', { decimales: 2 })}</M>
+                        </>
+                      ) : (
+                        ''
+                      )}
                       {!esCero(m.impuesto) && m.tc_aplicado ? ' · ' : ''}
                       {m.tc_aplicado ? `TC ${numero(m.tc_aplicado, 2)}` : ''}
                     </p>

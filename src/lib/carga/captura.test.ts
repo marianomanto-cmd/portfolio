@@ -5,7 +5,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import fc from 'fast-check'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Decimal, numero } from '@/lib/domain/dinero'
-import type { Cuenta, Hechos } from '@/lib/domain/tipos'
+import type { Activo, Cuenta, Hechos, Operacion } from '@/lib/domain/tipos'
 import {
   armarPedido,
   leerCaptura,
@@ -20,6 +20,8 @@ import {
 import {
   armarLecturaCaptura,
   chequeoAritmetico,
+  MAX_TICKER,
+  tickerDeNombre,
   decidirFuente,
   ErrorCaptura,
   ESCALAS,
@@ -36,6 +38,7 @@ import {
   type NumeroLeido,
   type SalidaModelo,
 } from './captura-verificacion'
+import { editarFila } from '@/app/(app)/carga/_lib/ediciones'
 import { proponerCarga } from './conciliar'
 import type { LecturaCuenta, NombreCuenta } from './contratos'
 
@@ -459,7 +462,8 @@ describe('Galicia: dos lecturas', () => {
     const l = armar(fondos())
     const f = l.filas[0]
     expect(f).toMatchObject({
-      ticker: 'FIMA PREMIUM CLASE A',
+      // D-108: el nombre, en una forma que el catálogo acepta (sin espacios).
+      ticker: 'FIMA-PREMIUM-CLASE-A',
       seccion: 'fci',
       tipo_sugerido: 'fci',
       escala: '0.001',
@@ -1066,7 +1070,7 @@ describe('la lectura encaja en proponerCarga', () => {
     expect(t?.activo_nuevo?.tipo).toBe('bono')
     expect(new Decimal(t!.operacion!.precio!).times(2_000_000).toDecimalPlaces(2).toFixed()).toBe('2481345.67')
 
-    const f = p.filas.find((x) => x.ticker === 'FIMA PREMIUM CLASE A')
+    const f = p.filas.find((x) => x.ticker === 'FIMA-PREMIUM-CLASE-A')
     expect(f?.cotizacion).toEqual({ precio_pesos: '45.67812' })
     expect(f?.activo_nuevo).toMatchObject({ tipo: 'fci', indexacion: null })
 
@@ -1081,5 +1085,138 @@ describe('la lectura encaja en proponerCarga', () => {
     const l = armar(bonos([{ ...S28F7, valorizado: '$5.248.750,00' }, T15E7], '$7.717.750,00'))
     const p = proponerCarga([l], hechos, '2026-10-14', { ccl: new Decimal('1500') })
     expect(p.filas.find((f) => f.ticker === 'S28F7')?.estado).toBe('error')
+  })
+})
+
+// ───────────── Revisión de la fase 1a (números inventados) ─────────────
+
+// 1.000 VN × U$D 0,65 = U$D 650,00 · costo U$D 600,00 · PPC 0,60 · 8,33 %
+const GD30D = fila({
+  ticker: 'GD30D',
+  nombre: 'BONO GLOBAL 2030 USD',
+  cantidad: '1.000',
+  precio: 'U$D0,65',
+  ppc: 'U$D0,60',
+  rendimiento_monto: 'U$D50,00',
+  rendimiento_porcentaje: '8,33%',
+  rendimiento_direccion: 'sube',
+  valorizado: 'U$D650,00',
+})
+
+function bonosConDolares(): SalidaModelo {
+  const s = bonos([S28F7, GD30D], '$5.218.750,00')
+  s.galicia!.secciones[0].totales = [
+    { etiqueta: 'Bonos en pesos', valor: '$5.218.750,00' },
+    { etiqueta: 'Bonos en dólares', valor: 'U$D650,00' },
+  ]
+  s.galicia!.secciones[0].rendimiento_acumulado = null
+  return s
+}
+
+describe('Galicia: "Bonos en dólares" (revisión fase 1a)', () => {
+  const cuentas: Cuenta[] = [{ id: 2, nombre: 'Galicia', tipo: 'banco', formato_carga: 'captura', activa: true }]
+  const vacio: Hechos = {
+    cuentas, activos: [], operaciones: [], cotizaciones: [], tipos_cambio: [], saldos: [], movimientos: [], pasivos: [],
+    pasivo_saldos: [], bienes: [], valuaciones: [], feriados: [], cargas: [],
+  }
+
+  it('el lector marca la fila en dólares y el control lleva su moneda', () => {
+    const l = armar(bonosConDolares())
+    const gd = l.filas.find((f) => f.ticker === 'GD30D')!
+    expect(gd).toMatchObject({ moneda_emision: 'USD', moneda_precio: 'USD', estado: 'verificada', precio_unitario: '0.65' })
+    expect(l.filas.find((f) => f.ticker === 'S28F7')?.moneda_precio).toBeUndefined()
+    expect(l.controles.map((c) => [c.seccion, c.moneda, c.ok, c.cobertura])).toEqual([
+      ['Bonos en pesos', 'ARS', true, { seccion: 'bonos', moneda: 'ARS' }],
+      ['Bonos en dólares', 'USD', true, { seccion: 'bonos', moneda: 'USD' }],
+    ])
+  })
+
+  it('en la propuesta, la fila en dólares queda en error: ni precio en pesos ni apertura en ARS', () => {
+    const p = proponerCarga([armar(bonosConDolares())], vacio, '2026-10-14', { ccl: new Decimal('1500') })
+    const gd = p.filas.find((f) => f.ticker === 'GD30D')!
+    expect(gd).toMatchObject({ estado: 'error', cotizacion: null, operacion: null })
+    expect(gd.motivos[0]).toMatch(/Galicia muestra este título en dólares/)
+    // La fila en pesos sigue igual.
+    expect(p.filas.find((f) => f.ticker === 'S28F7')?.cotizacion).toEqual({ precio_pesos: '1.04375' })
+  })
+})
+
+describe('Galicia: una tenencia que la captura ya no muestra (revisión fase 1a)', () => {
+  const cuentas: Cuenta[] = [{ id: 2, nombre: 'Galicia', tipo: 'banco', formato_carga: 'captura', activa: true }]
+  const activo = (id: number, ticker: string, tipo: Activo['tipo'], fecha_vencimiento: string | null): Activo => ({
+    id, ticker, nombre: ticker, tipo, moneda_riesgo: 'ARS', geografia: 'AR', indexacion: tipo === 'fci' ? null : 'fija',
+    ticker_subyacente: null, fecha_vencimiento, color: null, activo_bool: true,
+  })
+  const apertura = (id: number, activo_id: number, cantidad: string): Operacion => ({
+    id, fecha: '2026-10-01', fecha_origen: null, cuenta_id: 2, activo_id, tipo: 'apertura', cantidad: new Decimal(cantidad), moneda: 'ARS',
+    precio: new Decimal(1), importe: null, comisiones: new Decimal(0), ccl_del_dia: null, carga_id: 1, notas: null,
+  })
+  const hechos: Hechos = {
+    cuentas,
+    activos: [activo(30, 'S28F7', 'lecap', '2027-02-26'), activo(31, 'T15E7', 'bono', '2027-01-15'), activo(32, 'S10O6', 'lecap', '2026-10-10'), activo(33, 'FIMA-PREMIUM-CLASE-A', 'fci', null)],
+    operaciones: [apertura(1, 30, '5000000'), apertura(2, 31, '2000000'), apertura(3, 32, '3000000'), apertura(4, 33, '120000')],
+    cotizaciones: [{ fecha: '2026-10-09', activo_id: 32, precio_pesos: new Decimal('1.0498'), precio_usd_subyacente: null, carga_id: 1 }],
+    tipos_cambio: [], saldos: [], movimientos: [], pasivos: [], pasivo_saldos: [], bienes: [], valuaciones: [], feriados: [],
+    cargas: [{ id: 1, lote: null, fecha: '2026-10-01', cuenta_id: 2, origen: 'captura', archivo_path: 'x', estado: 'vigente', creado_en: '', reemplaza_a: null, lector: null, tiempo_activo_ms: null }],
+  }
+
+  it('si el total de "Bonos en pesos" cierra sin la LECAP vencida, se propone registrar su vencimiento (el fondo no está cubierto)', () => {
+    const p = proponerCarga([armar(bonos())], hechos, '2026-10-14', { ccl: new Decimal('1500') })
+    expect(p.ausentes).toEqual([
+      {
+        cuenta: 'Galicia', cuenta_id: 2, activo_id: 32, ticker: 'S10O6', tipo_activo: 'lecap', cantidad_app: '3000000',
+        sugerida: 'vencimiento', opciones: ['vencimiento', 'venta'], ultimo_precio: { fecha: '2026-10-09', precio_pesos: '1.0498' }, ccl_del_dia: '1500',
+      },
+    ])
+  })
+
+  it('si el total no cierra (falta una fila o hay un número mal leído), no se declara ninguna ausente', () => {
+    const p = proponerCarga([armar(bonos([S28F7], '$7.687.750,00'))], hechos, '2026-10-14', { ccl: new Decimal('1500') })
+    expect(p.controles.find((c) => c.control.seccion === 'Bonos en pesos')?.control.ok).toBe(false)
+    expect(p.ausentes).toEqual([])
+  })
+})
+
+describe('FIMA: el ticker que sale del nombre se puede dar de alta (revisión fase 1a)', () => {
+  it('tickerDeNombre: mayúsculas, sin tildes, guiones en lugar de espacios y signos; estable', () => {
+    expect(tickerDeNombre('Fima Premium Clase A')).toBe('FIMA-PREMIUM-CLASE-A')
+    expect(tickerDeNombre('  FIMA  PREMIUM   clase a ')).toBe('FIMA-PREMIUM-CLASE-A')
+    expect(tickerDeNombre('Fondo Ahorro Pesos (Clase B)')).toBe('FONDO-AHORRO-PESOS-CLASE-B')
+    expect(tickerDeNombre('Renta Fija Dólar')).toBe('RENTA-FIJA-DOLAR')
+  })
+
+  it('un nombre que da más de 30 caracteres no se recorta (Clase A y Clase B chocarían): error claro', () => {
+    const largo = structuredClone(fondos())
+    largo.galicia!.secciones[0].filas[0].nombre = 'FIMA AHORRO PLUS PESOS CLASE A EXTENDIDO'
+    const f = armar(largo).filas[0]
+    expect(f.ticker.length).toBeGreaterThan(MAX_TICKER)
+    expect(f.estado).toBe('error')
+    expect(f.motivos[0]).toMatch(/más de 30 caracteres/)
+  })
+})
+
+describe('Galicia: corregir a mano la cantidad vuelve a armar el costo (revisión fase 1a)', () => {
+  // Las dos lecturas ven 500.000 en vez de 5.000.000: la cuenta no cierra y el lector no arma costo.
+  const mal = () => armar(bonos([{ ...S28F7, cantidad: '500.000' }, T15E7]))
+
+  it('con la cantidad corregida, PPC = (valorizado − rendimiento $) ÷ cantidad, como el lector', () => {
+    const f = mal().filas.find((x) => x.ticker === 'S28F7')!
+    expect(f).toMatchObject({ estado: 'error', ppc_unitario: null, costo_total: null, rendimiento: '63512.35' })
+    const e = editarFila(f, { cantidad: '5000000', precio_unitario: '1.04375' })
+    expect(e).toMatchObject({ estado: 'verificada', ppc_unitario: '1.03104753', costo_total: '5155237.65' })
+    expect(e.motivos[1]).toMatch(/^Costo con la cantidad corregida/)
+  })
+
+  it('si el costo armado no redondea al PPC que muestra la fuente, queda en advertencia', () => {
+    const f = mal().filas.find((x) => x.ticker === 'S28F7')!
+    const e = editarFila({ ...f, ppc_mostrado: '1.10' }, { cantidad: '5000000', precio_unitario: '1.04375' })
+    expect(e.estado).toBe('advertencia')
+    expect(e.motivos.at(-1)).toMatch(/No redondea al PPC que muestra la fuente/)
+  })
+
+  it('sin el rendimiento $ no se puede armar: costo sin dato, nunca verificada en silencio', () => {
+    const f = { ...mal().filas.find((x) => x.ticker === 'S28F7')!, rendimiento: null }
+    const e = editarFila(f, { cantidad: '5000000', precio_unitario: '1.04375' })
+    expect(e).toMatchObject({ estado: 'advertencia', ppc_unitario: null, costo_total: null })
   })
 })

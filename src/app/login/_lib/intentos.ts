@@ -2,8 +2,12 @@
 // DEMORA_FALLO_MS en contestar; desde el tercer error seguido del mismo origen
 // (la IP que informa Vercel), además, la entrada queda trabada un rato que se
 // duplica con cada error: 1 s, 2 s, 4 s… hasta 5 minutos. Mientras está
-// trabada, la clave ni se mira, así que mandar muchos intentos en paralelo no
-// sirve. Equivocarte una o dos veces no te frena.
+// trabada, la clave ni se mira. Equivocarte una o dos veces no te frena.
+//
+// Mandar muchos intentos en paralelo tampoco sirve: reservarIntento mira la
+// traba y anota el intento como error en un solo paso, antes de comparar la
+// clave (D-112). Sin un await en el medio, cada pedido ya ve los anteriores,
+// y una ráfaga prueba como mucho 3 claves, lo mismo que en serie.
 //
 // Vive en la memoria de cada instancia del servidor: no es un candado
 // perfecto (otra instancia arranca de cero), es un freno barato. Funciones
@@ -60,6 +64,20 @@ export function anotarError(r: Registro, origen: string, ahora: number): number 
     r.delete(masViejo)
   }
   return traba
+}
+
+export type Reserva = { trabado: true; espera: number } | { trabado: false; traba: number }
+
+/**
+ * Mira la traba y, si no hay, anota el intento como error por adelantado, en
+ * un solo paso: así ningún pedido en paralelo se saltea el freno. Trabado,
+ * devuelve cuánto falta; si no, cuánto queda trabado el origen si la clave
+ * está mal. Si está bien, anotarExito borra la anotación.
+ */
+export function reservarIntento(r: Registro, origen: string, ahora: number): Reserva {
+  const espera = esperaPendiente(r, origen, ahora)
+  if (espera > 0) return { trabado: true, espera }
+  return { trabado: false, traba: anotarError(r, origen, ahora) }
 }
 
 /** Entró: el origen queda limpio. */

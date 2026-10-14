@@ -46,7 +46,9 @@ export const esquemaActivo = z
       .trim()
       .toUpperCase()
       .min(1, 'Falta el ticker.')
-      .max(20, 'Hasta 20 caracteres.')
+      // El mismo largo que acepta la base (escritura.tickerValido): un fondo sin
+      // código usa su nombre con guiones ("FIMA-AHORRO-PESOS-CLASE-A", D-108).
+      .max(30, 'Hasta 30 caracteres.')
       .regex(/^[A-Z0-9.\-]+$/, 'Solo letras, números, punto y guion.'),
     nombre: texto(120, 'Falta el nombre.'),
     tipo: z.enum(TIPOS_ACTIVO, { message: 'Elegí el tipo.' }),
@@ -83,12 +85,16 @@ export const esquemaEdicionActivo = z
     activo_bool: z.preprocess((v) => v === 'on' || v === 'true' || v === true, z.boolean()),
     ratio: z.preprocess(vacio, numeroAR({ min: 'positivo' }).optional()).transform((v) => v ?? null),
     ratio_desde: fechaOpcional,
+    /** El activo ya tiene algún ratio cargado (lo manda el formulario; la base igual lo controla). */
+    tiene_ratio: z.preprocess((v) => v === '1' || v === 'true' || v === true, z.boolean()),
   })
   .superRefine((a, ctx) => {
     const esBono = a.tipo === 'bono' || a.tipo === 'lecap'
     if (esBono && !a.indexacion) ctx.addIssue({ code: 'custom', path: ['indexacion'], message: 'Un bono o una letra necesita su indexación.' })
     if (!esBono && a.indexacion) ctx.addIssue({ code: 'custom', path: ['indexacion'], message: 'Solo los bonos y las letras tienen indexación.' })
     if (a.tipo === 'cedear' && !a.ticker_subyacente) ctx.addIssue({ code: 'custom', path: ['ticker_subyacente'], message: 'Un CEDEAR necesita el ticker del subyacente.' })
+    // D-104: nunca queda un CEDEAR sin ratio (también al cambiar el tipo a CEDEAR).
+    if (a.tipo === 'cedear' && !a.ratio && !a.tiene_ratio) ctx.addIssue({ code: 'custom', path: ['ratio'], message: 'Un CEDEAR necesita su ratio (CEDEARs por acción), con su fecha.' })
     if (a.ratio && !a.ratio_desde) ctx.addIssue({ code: 'custom', path: ['ratio_desde'], message: '¿Desde cuándo vale el ratio nuevo?' })
   })
 
@@ -101,6 +107,9 @@ export const esquemaBien = z.object({
   geografia: z.enum(GEOGRAFIAS).default('AR'),
   pasivo_id: z.preprocess(vacio, id.optional()).transform((v) => v ?? null),
 })
+
+/** Corregir un bien cargado con un dato equivocado (la moneda, por ejemplo). */
+export const esquemaEdicionBien = esquemaBien.extend({ id })
 
 export const esquemaValuacion = z.object({
   bien_id: id,
@@ -122,6 +131,9 @@ export const esquemaPasivo = z.object({
   valor_bien: z.preprocess(vacio, numeroAR({ min: 'positivo' }).optional()).transform((v) => v ?? null),
   notas: z.preprocess(vacio, z.string().trim().max(500).optional()).transform((v) => v ?? null),
 })
+
+/** Corregir el contrato de un pasivo. */
+export const esquemaEdicionPasivo = esquemaPasivo.extend({ id })
 
 export const esquemaPasivoSaldo = z.object({
   pasivo_id: id,

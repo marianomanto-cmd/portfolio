@@ -118,6 +118,36 @@ export async function confirmarCarga(c: ConfirmacionCarga): Promise<ResultadoCon
 }
 
 /**
+ * Las cargas (no revertidas) de un lote y la huella con la que se confirmó: para
+ * reconocer un reintento del mismo Enter (la respuesta anterior se perdió) sin
+ * volver a armarlo contra una base que ya lo tiene.
+ */
+export async function leerLote(lote: string): Promise<{ huella: string | null; cargas: { id: number; cuenta_id: number | null; listado_completo: boolean }[] }> {
+  const l = loteValido(lote)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase() as any
+  const { data, error } = await db
+    .from('cargas')
+    .select('id,cuenta_id,listado_completo,huella:grabado->>huella')
+    .eq('lote', l)
+    .neq('estado', 'revertida')
+    .order('id', { ascending: true })
+  if (error) throw traducirErrorBase(error, 'leer el lote')
+  const filas: unknown[] = Array.isArray(data) ? data : []
+  let huella: string | null = null
+  const cargas: { id: number; cuenta_id: number | null; listado_completo: boolean }[] = []
+  for (const f of filas) {
+    if (!esObjeto(f)) throw respuestaInesperada('leer el lote', 'una carga sin forma')
+    const id = enteroPositivo(f.id)
+    if (id === null) throw respuestaInesperada('leer el lote', 'una carga sin id')
+    const cuenta_id = f.cuenta_id === null ? null : enteroPositivo(f.cuenta_id)
+    cargas.push({ id, cuenta_id, listado_completo: f.listado_completo !== false })
+    if (huella === null && typeof f.huella === 'string' && RE_SHA256.test(f.huella)) huella = f.huella
+  }
+  return { huella, cargas }
+}
+
+/**
  * Revierte todas las cargas de un lote: borra sus hechos, restaura desde la
  * auditoría lo que habían pisado y las deja en el registro como revertidas.
  * Se niega si alguna cuenta del lote tiene una carga posterior.
@@ -167,24 +197,51 @@ export async function crearPasivo(p: PasivoAlta): Promise<number> {
   return leerId(data?.id, 'dar de alta el pasivo')
 }
 
+/**
+ * Corrige un bien cargado con un dato equivocado (nombre, tipo, moneda de
+ * valuación, geografía, deuda que lo financia). Fila por fila: la auditoría
+ * guarda el antes y el después.
+ */
+export async function actualizarBien(id: number, b: BienAlta): Promise<void> {
+  const bienId = idPositivo(id, 'el bien')
+  const fila = normalizarBien(b)
+  const { data, error } = await supabase().from('bienes').update(fila).eq('id', bienId).select('id')
+  if (error) throw traducirErrorBase(error, 'corregir el bien')
+  if (!Array.isArray(data) || data.length !== 1) throw new ErrorEscritura(`No existe el bien #${bienId}.`)
+}
+
+/** Corrige un pasivo (el contrato): como actualizarBien, con la auditoría. */
+export async function actualizarPasivo(id: number, p: PasivoAlta): Promise<void> {
+  const pasivoId = idPositivo(id, 'el pasivo')
+  const fila = normalizarPasivo(p)
+  const { data, error } = await supabase()
+    .from('pasivos')
+    // Los montos van como texto (D-32); los tipos generados los declaran number.
+    .update(fila as unknown as Database['public']['Tables']['pasivos']['Update'])
+    .eq('id', pasivoId)
+    .select('id')
+  if (error) throw traducirErrorBase(error, 'corregir el pasivo')
+  if (!Array.isArray(data) || data.length !== 1) throw new ErrorEscritura(`No existe el pasivo #${pasivoId}.`)
+}
+
 /** Graba (o corrige, si ya hay una ese día) la valuación de un bien. Devuelve el id de la carga. */
-export async function guardarValuacionBien(v: { bien_id: number; fecha: Fecha; valor: string; fuente: string }): Promise<number> {
-  const p = altaManual({ bienes_valuaciones: [normalizarValuacion(v)] }, v.fecha)
+export async function guardarValuacionBien(v: { bien_id: number; fecha: Fecha; valor: string; fuente: string }, lote?: string | null): Promise<number> {
+  const p = altaManual({ bienes_valuaciones: [normalizarValuacion(v)] }, v.fecha, lote)
   const data = await llamar('guardar_manual', { p }, 'guardar la valuación', { reintentable: true })
   return leerId(data, 'guardar la valuación')
 }
 
 /** Graba (o corrige) el capital pendiente informado de un pasivo. Devuelve el id de la carga. */
-export async function guardarPasivoSaldo(s: { pasivo_id: number; fecha: Fecha; capital_pendiente: string }): Promise<number> {
-  const p = altaManual({ pasivo_saldos: [normalizarPasivoSaldo(s)] }, s.fecha)
+export async function guardarPasivoSaldo(s: { pasivo_id: number; fecha: Fecha; capital_pendiente: string }, lote?: string | null): Promise<number> {
+  const p = altaManual({ pasivo_saldos: [normalizarPasivoSaldo(s)] }, s.fecha, lote)
   const data = await llamar('guardar_manual', { p }, 'guardar el capital pendiente', { reintentable: true })
   return leerId(data, 'guardar el capital pendiente')
 }
 
 /** Graba un aporte, un retiro o una transferencia entre cuentas propias (D-06). Devuelve el id de la carga. */
-export async function guardarMovimientoCapital(m: MovimientoCapitalAlta): Promise<number> {
+export async function guardarMovimientoCapital(m: MovimientoCapitalAlta, lote?: string | null): Promise<number> {
   const mov = normalizarMovimiento(m)
-  const p = altaManual({ movimientos_capital: [mov] }, mov.fecha)
+  const p = altaManual({ movimientos_capital: [mov] }, mov.fecha, lote)
   const data = await llamar('guardar_manual', { p }, 'guardar el movimiento', { reintentable: true })
   return leerId(data, 'guardar el movimiento')
 }
@@ -902,6 +959,8 @@ export function normalizarConfirmacion(c: ConfirmacionCarga): ConfirmacionCarga 
   if (tipo_cambio === null && cuentas.length === 0) {
     throw new ErrorEscritura('No hay nada para grabar: falta el tipo de cambio y no hay ninguna cuenta.')
   }
+  const huella = c.huella === null || c.huella === undefined ? null : typeof c.huella === 'string' ? c.huella.trim().toLowerCase() : ''
+  if (huella !== null && !RE_SHA256.test(huella)) throw new ErrorEscritura('La huella de la carga no es válida.')
   return {
     lote,
     fecha,
@@ -909,6 +968,7 @@ export function normalizarConfirmacion(c: ConfirmacionCarga): ConfirmacionCarga 
     cuentas,
     tiempo_activo_ms: tiempoActivo(c.tiempo_activo_ms),
     nota: textoOpcional(c.nota, 'la nota del día'),
+    ...(huella ? { huella } : {}),
   }
 }
 
@@ -1106,9 +1166,12 @@ export function normalizarMovimiento(m: MovimientoCapitalAlta) {
   }
 }
 
-/** Payload de guardar_manual, con un lote nuevo. */
-function altaManual(hechos: Record<string, unknown[]>, fecha: Fecha): Record<string, unknown> {
-  return { lote: randomUUID(), fecha: fechaRequerida(fecha, 'la fecha'), ...hechos }
+/**
+ * Payload de guardar_manual. El lote lo manda el formulario (el mismo envío
+ * reintentado trae el mismo: guardar_manual no lo duplica); sin lote, uno nuevo.
+ */
+function altaManual(hechos: Record<string, unknown[]>, fecha: Fecha, lote?: string | null): Record<string, unknown> {
+  return { lote: lote ? loteValido(lote) : randomUUID(), fecha: fechaRequerida(fecha, 'la fecha'), ...hechos }
 }
 
 // ───────────── Archivos ─────────────

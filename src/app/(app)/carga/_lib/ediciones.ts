@@ -71,6 +71,20 @@ export function editarFila(f: FilaLeida, e: EdicionFila): FilaLeida {
   const original = f.chequeo && /^\d+(\.\d+)?$/.test(f.chequeo.tolerancia) ? new Decimal(f.chequeo.tolerancia) : null
   const tolerancia = original && original.lt(tipeada) ? original : tipeada
   const ok = calculado.minus(valorizado).abs().lte(tolerancia)
+  // El costo de una captura depende de la cantidad: si la corregiste (o el lector no
+  // lo pudo armar porque la cuenta no cerraba), se vuelve a armar como lo arma el
+  // lector. Si no se puede, no queda "verificada" con el costo sin dato en silencio.
+  const costo = ok ? costoEditado(f, cantidad, valorizado, e.cantidad !== null && e.cantidad !== f.cantidad) : null
+  if (ok && costo) {
+    return {
+      ...base,
+      ppc_unitario: costo.ppc_unitario,
+      costo_total: costo.costo_total,
+      estado: costo.aviso ? 'advertencia' : 'verificada',
+      motivos: [`Editada a mano (${queCambio}); cierra contra el valorizado de la fuente.`, costo.detalle, ...(costo.aviso ? [costo.aviso] : [])],
+      chequeo: chequeoEditado(valorizado, calculado, tolerancia, ok),
+    }
+  }
   return {
     ...base,
     estado: ok ? 'verificada' : 'error',
@@ -79,13 +93,66 @@ export function editarFila(f: FilaLeida, e: EdicionFila): FilaLeida {
       : [
           `Editada a mano (${queCambio}), pero no cierra: ${numero(cantidad, 4, { min: 0 })} × ${numero(precio, 6, { min: 2 })} = ${monto(calculado, 'ARS', { decimales: 2 })} y la fuente dice ${monto(valorizado, 'ARS', { decimales: 2 })}.`,
         ],
-    chequeo: {
-      regla: 'cantidad × precio por 1 VN ≈ valorizado (editada a mano)',
-      esperado: new Decimal(valorizado).toFixed(),
-      calculado: calculado.toFixed(),
-      tolerancia: tolerancia.toFixed(),
-      ok,
-    },
+    chequeo: chequeoEditado(valorizado, calculado, tolerancia, ok),
+  }
+}
+
+function chequeoEditado(valorizado: string, calculado: Decimal, tolerancia: Decimal, ok: boolean): NonNullable<FilaLeida['chequeo']> {
+  return {
+    regla: 'cantidad × precio por 1 VN ≈ valorizado (editada a mano)',
+    esperado: new Decimal(valorizado).toFixed(),
+    calculado: calculado.toFixed(),
+    tolerancia: tolerancia.toFixed(),
+    ok,
+  }
+}
+
+/** Escalas en las que una captura muestra precio y PPC (por 1 VN, cada 100, cada 1000). */
+const ESCALAS_PPC = ['1', '0.01', '0.001'] as const
+
+/**
+ * Captura con la cantidad corregida (o sin costo porque la cuenta no cerraba):
+ * PPC = (valorizado − rendimiento $) ÷ cantidad, como en el lector, controlado
+ * contra el PPC que muestra la fuente. null si no es una captura o no hace falta.
+ */
+function costoEditado(
+  f: FilaLeida,
+  cantidad: string,
+  valorizado: string,
+  cambioCantidad: boolean,
+): { ppc_unitario: string | null; costo_total: string | null; detalle: string; aviso: string | null } | null {
+  if (!('rendimiento' in f)) return null // el PPP del Excel no depende de la cantidad
+  if (!cambioCantidad && f.ppc_unitario !== null) return null
+  const q = new Decimal(cantidad)
+  if (f.rendimiento === null || f.rendimiento === undefined || q.lte(0)) {
+    return {
+      ppc_unitario: null,
+      costo_total: null,
+      detalle: 'El costo queda sin dato: sin el rendimiento $ de la fuente no se puede armar.',
+      aviso: 'Revisá el costo: la apertura se grabaría con el costo sin dato.',
+    }
+  }
+  const c = new Decimal(valorizado).minus(f.rendimiento)
+  if (!c.gt(0)) {
+    return {
+      ppc_unitario: null,
+      costo_total: null,
+      detalle: `El costo queda sin dato: valorizado − rendimiento $ = ${monto(c, 'ARS', { decimales: 2 })}, y un costo tiene que ser mayor que cero.`,
+      aviso: 'Revisá el rendimiento $ de la fuente.',
+    }
+  }
+  const ppc = c.div(q).toDecimalPlaces(12, Decimal.ROUND_HALF_EVEN)
+  const detalle = `Costo con la cantidad corregida: (${monto(valorizado, 'ARS', { decimales: 2 })} − ${monto(f.rendimiento, 'ARS', { decimales: 2 })}) ÷ ${numero(cantidad, 4, { min: 0 })} = ${numero(ppc, 8, { min: 2 })} por 1 VN.`
+  // Contra el PPC mostrado (redondeado a sus decimales, en alguna escala de la fuente).
+  const mostrado = f.ppc_mostrado
+  if (mostrado === null || !/^\d+(\.\d+)?$/.test(mostrado)) return { ppc_unitario: ppc.toFixed(), costo_total: c.toFixed(), detalle, aviso: null }
+  const medio = new Decimal(5).times(new Decimal(10).pow(-(decimalesDe(mostrado) + 1)))
+  const coincide = ESCALAS_PPC.some((e) => ppc.minus(new Decimal(mostrado).times(e)).abs().lte(medio.times(e).plus(ppc.times('1e-9'))))
+  return {
+    ppc_unitario: ppc.toFixed(),
+    costo_total: c.toFixed(),
+    detalle,
+    aviso: coincide ? null : `No redondea al PPC que muestra la fuente (${numero(mostrado, 6, { min: 2 })}): revisá la cantidad o el rendimiento $.`,
   }
 }
 

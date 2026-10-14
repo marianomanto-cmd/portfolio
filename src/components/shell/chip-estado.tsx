@@ -88,10 +88,15 @@ export function ChipEstado({
         <span className="whitespace-nowrap lg:hidden">{fecha ? fechaCorta(fecha) : 'sin datos'}</span>
       </button>
       {abierto ? (
+        // Desde 768 px, anclado al chip. En el teléfono el chip termina a 112 px
+        // del borde derecho y un panel anclado a él se salía por la izquierda:
+        // va fijo debajo de la barra superior, a 16 px de cada borde (D-30).
+        // (El header tiene backdrop-filter y es el bloque contenedor de lo
+        // fijo: está pegado arriba y ocupa todo el ancho, así que da lo mismo.)
         <div
           role="dialog"
           aria-label="Estado de las fuentes"
-          className="absolute right-0 top-full z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-3 shadow-lg"
+          className="absolute right-0 top-full z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-3 shadow-lg max-md:fixed max-md:inset-x-4 max-md:top-[calc(var(--barra-sup)+0.5rem)] max-md:mt-0 max-md:max-h-[calc(100dvh-var(--barra-sup)-var(--barra-inf)-1.5rem)] max-md:w-auto max-md:overflow-y-auto"
         >
           <p className="text-sm font-medium">{largo}</p>
           <p className="mt-0.5 text-[13px] text-muted">
