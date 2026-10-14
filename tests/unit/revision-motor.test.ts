@@ -143,7 +143,7 @@ const CASA: Bien = { id: 1, nombre: 'Casa', tipo: 'inmueble', moneda_valuacion: 
 const CAMIONETA: Bien = { id: 2, nombre: 'Camioneta', tipo: 'vehiculo', moneda_valuacion: 'ARS', geografia: 'AR', pasivo_id: 1, activo_bool: true }
 const LEASING: Pasivo = { id: 1, nombre: 'Leasing', tipo: 'leasing', moneda: 'ARS', fecha_inicio: '2025-08-17', cuotas_totales: 48, opcion_compra_fecha: null }
 const valuacion = (bien_id: number, fecha: Fecha, valor: string | number): BienValuacion => ({ bien_id, fecha, valor: D(valor), fuente: 'tasación', carga_id: 1 })
-const capital = (pasivo_id: number, fecha: Fecha, c: string | number): PasivoSaldo => ({ pasivo_id, fecha, capital_pendiente: D(c), carga_id: 1 })
+const capital = (pasivo_id: number, fecha: Fecha, c: string | number): PasivoSaldo => ({ pasivo_id, fecha, capital_pendiente: D(c), naturaleza: 'informado', fuente: null, carga_id: 1 })
 
 function hechos(p: Partial<Hechos> = {}): Hechos {
   return {

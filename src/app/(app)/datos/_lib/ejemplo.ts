@@ -46,7 +46,9 @@ export function ejemploDatos(): Omit<DatosPantalla, 'modo' | 'aviso'> {
         notas: null,
       },
     ],
-    saldosPasivo: [{ pasivo_id: 1, fecha: '2026-09-30', capital_pendiente: '21400000', carga_id: null }],
+    saldosPasivo: [
+      { pasivo_id: 1, fecha: '2026-09-30', capital_pendiente: '21400000', naturaleza: 'estimado', fuente: 'Valor presente de las cuotas que faltan (ejemplo)', carga_id: null },
+    ],
     ccl: { fecha: '2026-10-14', valor: '1548.2' },
     movimientos: [
       {

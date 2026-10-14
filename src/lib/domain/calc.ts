@@ -13,14 +13,35 @@ export type Etiqueta =
   | 'inferido' // calculado a partir de otro dato (precio de una compra desde el PPP)
   | 'pendiente' // falta un dato que llega después (compra del día con PPP "-")
   | 'parcial' // suma con partes "sin dato" (el valor es null; la suma parcial va en insumos)
+  | 'estimado' // un valor que no informó la fuente sino un cálculo: la deuda estimada de un pasivo (D-154)
+  | 'supuesto' // un valor que eligió el dueño para proyectar, o que su planilla marca SUPUESTO
+  | 'a_confirmar' // un valor que su planilla marca CONFIRMAR
+  | 'proyectado' // algo que todavía no pasó: una cuota sin factura, un mes futuro
 
 /** Gravedad para mostrar una sola etiqueta cuando hay varias. */
 export const GRAVEDAD: Record<Etiqueta, number> = {
-  parcial: 5,
-  pendiente: 4,
+  parcial: 9,
+  pendiente: 8,
+  supuesto: 7,
+  estimado: 6,
+  a_confirmar: 5,
+  proyectado: 4,
   viejo: 3,
   inferido: 2,
   declarado: 1,
+}
+
+/** Texto del chip de cada etiqueta (D-67: un solo chip gris, el de la más grave). */
+export const NOMBRE_ETIQUETA: Record<Etiqueta, string> = {
+  parcial: 'suma parcial',
+  pendiente: 'pendiente',
+  supuesto: 'supuesto',
+  estimado: 'estimado',
+  a_confirmar: 'a confirmar',
+  proyectado: 'proyectado',
+  viejo: 'viejo',
+  inferido: 'inferido',
+  declarado: 'declarado',
 }
 
 export interface Origen {
@@ -143,4 +164,10 @@ export function vista(c: Calc): CalcVista {
       calc: i.calc ? vista(i.calc) : undefined,
     })),
   }
+}
+
+/** Un mismo monto en pesos y en dólares, cada uno con su traza (toda cifra existe en ARS y en USD). */
+export interface DobleCalc {
+  ars: Calc
+  usd: Calc
 }

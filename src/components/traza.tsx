@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import type { CalcVista, InsumoVista } from '@/lib/domain/calc'
+import { NOMBRE_ETIQUETA, type CalcVista, type InsumoVista } from '@/lib/domain/calc'
 import { monto, numero, porcentaje } from '@/lib/domain/dinero'
 import { decimalesInsumo } from './calculos'
 
@@ -10,13 +10,6 @@ import { decimalesInsumo } from './calculos'
 // carga y el archivo, y "¿Qué es esto?". En el teléfono es una hoja inferior
 // que entra en 360 px; en desktop, un panel anclado a la cifra.
 
-const NOMBRE_ETIQUETA: Record<string, string> = {
-  viejo: 'viejo',
-  declarado: 'declarado',
-  inferido: 'inferido',
-  pendiente: 'pendiente',
-  parcial: 'suma parcial',
-}
 
 export function formatearInsumo(i: InsumoVista): string {
   if (i.valor === null) return 'sin dato'

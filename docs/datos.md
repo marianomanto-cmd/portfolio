@@ -16,6 +16,7 @@ Base: Supabase, proyecto **Portfolio** (`zcgynhzddfjzwswekcvl`). Schema `public`
 | `20261014193834_catalogo_cedear_ratio` | `alta_activo` y `editar_activo`, segunda versión: rechazan un CEDEAR sin ratio, también al editarlo (D-104, D-124) |
 | `20261014193836_auditoria_search_path` | `registrar_auditoria` fija `search_path = public, pg_temp`: la auditoría va siempre a `public.auditoria`, aunque la sesión tenga una tabla temporal con ese nombre (D-17) |
 | `20261014203031_feriados_2026_2027` | 49 feriados de 2026 y 2027: días sin rueda en BYMA (`AR`) y cierres de la NYSE (`US`), con las fuentes oficiales en el encabezado. Solo agrega filas (`on conflict do nothing`) (D-129) |
+| `20261014212152_pasivo_saldos_naturaleza` | `pasivo_saldos.naturaleza` (`informado` o `estimado`) y `fuente`, obligatoria para un estimado. Marca como estimado el saldo que ya había (el estimado provisorio del leasing, D-131) y copia su fuente de lo grabado de su carga. `guardar_manual` exige la naturaleza de cada saldo (D-154) |
 
 Las cuatro del 14/10 se aplicaron con el conector (ninguna tiene `DELETE`) y se renombraron a la versión que registró Supabase. Cada función aplicada coincide con su archivo (md5 del cuerpo), y las firmas no cambiaron, así que `database.types.ts` tampoco. Una segunda versión de una función se escribe en una migración nueva con `create or replace`: la de la fase 1a no se edita.
 
@@ -71,7 +72,7 @@ Los archivos originales (Excel y capturas) viven en el bucket privado `cargas` d
 |---|---|
 | `pasivos` | Contrato: montos **netos de IVA**, opción de compra, valor del bien, alícuota de Ganancias de quien deduce el canon |
 | `pasivo_cuotas` | Cuadro de marcha: canon neto, IVA, seguro, otros, total (calculado), pago real, cuenta y CCL del día de pago |
-| `pasivo_saldos` | Capital pendiente informado por el acreedor. Es lo que netea Exposición desde la fase 1 |
+| `pasivo_saldos` | Deuda pendiente de un pasivo a una fecha. `naturaleza`: `informado` (lo informó el acreedor; en un leasing, el valor de cancelación sin penalidad, D-130) o `estimado` (un cálculo que aprobó el dueño, con su `fuente` obligatoria, D-154). Es lo que netea Exposición y resta en el patrimonio total; un estimado lleva la etiqueta `estimado` en toda cifra que lo incluya |
 | `bienes` | Casa, auto. El auto se vincula a su pasivo (D-03) |
 | `bienes_valuaciones` | Valuaciones fechadas con su fuente (D-04) |
 
@@ -100,7 +101,7 @@ Toda escritura de más de una fila pasa por una función de Postgres, en una sol
 |---|---|
 | `confirmar_carga(p jsonb) → jsonb` | Graba un lote de la carga diaria (`ConfirmacionCarga`, `src/lib/carga/contratos.ts`): el tipo de cambio tipeado con su referencia (su propia carga), y por cuenta su carga, cotizaciones, saldos, operaciones y **precios que completan compras pendientes**; la nota del día. Devuelve `{lote, cargas, repetido}`. Detalle abajo |
 | `revertir_lote(lote uuid, motivo text) → jsonb` | Revierte un lote entero, con motivo obligatorio (regla 4). Devuelve `{lote, cargas, borradas, restauradas}` |
-| `guardar_manual(p jsonb) → bigint` | Una carga `manual` con valuaciones de bienes (reemplaza la del mismo bien y día), capital pendiente de pasivos (ídem por pasivo y día) y movimientos de capital (impuesto 0 si no se informa). Cada hecho usa su fecha o la de la carga. Idempotente por lote; devuelve el id de la carga |
+| `guardar_manual(p jsonb) → bigint` | Una carga `manual` con valuaciones de bienes (reemplaza la del mismo bien y día), deuda pendiente de pasivos (ídem por pasivo y día; cada una con su `naturaleza`, `informado` o `estimado`, y la `fuente`, obligatoria para un estimado, D-154) y movimientos de capital (impuesto 0 si no se informa). Cada hecho usa su fecha o la de la carga. Idempotente por lote; devuelve el id de la carga |
 | `alta_activo(p jsonb) → integer` | Un activo y, si es CEDEAR, su ratio, juntos: nunca queda un CEDEAR sin ratio (desde `catalogo_cedear_ratio`, un CEDEAR sin ratio se rechaza). El ratio rige desde hoy (Córdoba) si no se indica otra vigencia. Un ratio solo se acepta en un CEDEAR |
 | `editar_activo(id, p jsonb)` | Cambia solo las claves presentes (una clave con null borra el valor) y agrega o corrige un ratio con su vigencia. Desde `catalogo_cedear_ratio`, rechaza dejar un CEDEAR sin ningún ratio (también al cambiarle el tipo a CEDEAR) y la transacción se deshace |
 | `leer_monto`, `leer_fecha`, `leer_id` | Leen la entrada JSON. `leer_monto` acepta solo texto decimal (`"-1234.56"`): falla con un número JSON, `NaN`, `Infinity`, exponentes o formato es-AR. Vacío o null = sin dato |

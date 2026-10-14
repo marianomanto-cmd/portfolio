@@ -171,7 +171,7 @@ function operaciones(): Operacion[] {
 const PASIVOS: Pasivo[] = [
   { id: 1, nombre: 'Leasing de la camioneta', tipo: 'leasing', moneda: 'ARS', fecha_inicio: '2025-08-17', cuotas_totales: 48, opcion_compra_fecha: '2029-08-17' },
 ]
-const PASIVO_SALDOS: PasivoSaldo[] = [{ pasivo_id: 1, fecha: '2026-09-30', capital_pendiente: D(21_400_000), carga_id: idCarga(0, 'tc') }]
+const PASIVO_SALDOS: PasivoSaldo[] = [{ pasivo_id: 1, fecha: '2026-09-30', capital_pendiente: D(21_400_000), naturaleza: 'informado', fuente: null, carga_id: idCarga(0, 'tc') }]
 const BIENES: Bien[] = [
   { id: 1, nombre: 'Casa', tipo: 'inmueble', moneda_valuacion: 'USD', geografia: 'AR', pasivo_id: null, activo_bool: true },
   { id: 2, nombre: 'Camioneta', tipo: 'vehiculo', moneda_valuacion: 'ARS', geografia: 'AR', pasivo_id: 1, activo_bool: true },

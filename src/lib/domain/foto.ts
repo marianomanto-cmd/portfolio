@@ -336,7 +336,7 @@ function armarFoto(h: Hechos, fecha: Fecha, opciones: { hoy?: Fecha; ix?: Indice
     items.push(itemBien(b, v, ccl, insCcl))
   }
 
-  // Pasivos (capital pendiente informado), con signo negativo
+  // Pasivos (capital pendiente informado o estimado), con signo negativo
   for (const p of h.pasivos) {
     const s = ultimoA(ix.pasivoSaldos.get(String(p.id)) ?? [], fecha)
     items.push(itemPasivo(p, s, ccl, insCcl, hoy, ix))
@@ -403,12 +403,30 @@ function itemBien(b: Bien, v: BienValuacion | null, ccl: Calc, insCcl: Insumo): 
 
 function itemPasivo(p: Pasivo, s: PasivoSaldo | null, ccl: Calc, insCcl: Insumo, hoy: Fecha, ix: Indices): ItemFoto {
   const viejo = s ? esViejo(s.fecha, hoy, ix.feriados) : false
+  // Una deuda estimada no es un dato del acreedor: lleva la etiqueta "estimado"
+  // (D-154), que se propaga a todo total que la incluya, y la traza dice cómo se estimó.
+  const estimado = s?.naturaleza === 'estimado'
   const base: Calc = s
     ? trazado(
         s.capital_pendiente.negated(),
-        () => `− capital pendiente informado del ${fechaCorta(s.fecha)} = ${monto(s.capital_pendiente.negated(), p.moneda, { decimales: 2 })}`,
-        () => [{ nombre: `Capital pendiente de ${p.nombre}`, valor: s.capital_pendiente.toFixed(), unidad: p.moneda, origen: { carga_id: s.carga_id } }],
-        { explicacion: 'Lo que falta pagar de capital según el acreedor. Resta en el patrimonio total.' },
+        () =>
+          `− ${estimado ? 'deuda estimada' : 'capital pendiente informado'} del ${fechaCorta(s.fecha)} = ${monto(s.capital_pendiente.negated(), p.moneda, { decimales: 2 })}`,
+        () => [
+          {
+            nombre: estimado ? `Deuda estimada de ${p.nombre}` : `Capital pendiente de ${p.nombre}`,
+            valor: s.capital_pendiente.toFixed(),
+            unidad: p.moneda,
+            origen: { carga_id: s.carga_id },
+          },
+          ...(s.fuente ? [{ nombre: estimado ? 'Cómo se estimó' : 'Quién lo informó', valor: s.fuente, unidad: 'texto' as const }] : []),
+        ],
+        estimado
+          ? {
+              etiquetas: ['estimado'],
+              explicacion:
+                'Un estimado de lo que falta pagar, no un valor que informó el acreedor. Resta en el patrimonio total con la etiqueta "estimado" hasta que cargues el valor de cancelación que informe el acreedor.',
+            }
+          : { explicacion: 'Lo que falta pagar de capital según el acreedor. Resta en el patrimonio total.' },
       )
     : sinDato(`No cargaste el capital pendiente de ${p.nombre}.`)
   const par =

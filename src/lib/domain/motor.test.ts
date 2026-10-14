@@ -290,7 +290,7 @@ describe('armado de pantallas', () => {
     h.bienes = [{ id: 1, nombre: 'Casa', tipo: 'inmueble', moneda_valuacion: 'USD', geografia: 'AR', pasivo_id: null, activo_bool: true }]
     h.valuaciones = [{ bien_id: 1, fecha: '2026-09-15', valor: D(200000), fuente: 'tasación', carga_id: 1 }]
     h.pasivos = [{ id: 1, nombre: 'Leasing', tipo: 'leasing', moneda: 'ARS', fecha_inicio: '2025-06-01', cuotas_totales: 36, opcion_compra_fecha: null }]
-    h.pasivo_saldos = [{ pasivo_id: 1, fecha: '2026-10-01', capital_pendiente: D(30000000), carga_id: 1 }]
+    h.pasivo_saldos = [{ pasivo_id: 1, fecha: '2026-10-01', capital_pendiente: D(30000000), naturaleza: 'informado', fuente: null, carga_id: 1 }]
     return h
   }
 

@@ -126,12 +126,12 @@ interface Calc<T = Decimal> {
   formula: string          // con los valores reales: "1.240 × $35.150 ÷ 1.548,20 = US$ 28.152,69"
   explicacion?: string     // "¿Qué es esto?", en castellano
   insumos: Insumo[]        // cada uno con nombre, valor, unidad, su carga de origen ({ carga_id, lugar }) y, si es un cálculo, su Calc
-  etiquetas: Etiqueta[]    // 'viejo' | 'declarado' | 'inferido' | 'pendiente' | 'parcial'
+  etiquetas: Etiqueta[]    // 'viejo' | 'declarado' | 'inferido' | 'pendiente' | 'parcial' | 'estimado' | 'supuesto' | 'a_confirmar' | 'proyectado'
 }
 ```
 
 - `calc()` construye uno y **hereda las etiquetas de sus insumos**. `sinDato(motivo)` construye uno vacío.
-- Si una cifra hereda varias etiquetas, la pantalla muestra la más grave (`GRAVEDAD`: parcial > pendiente > viejo > inferido > declarado).
+- Si una cifra hereda varias etiquetas, la pantalla muestra la más grave (`GRAVEDAD`: parcial > pendiente > supuesto > estimado > a confirmar > proyectado > viejo > inferido > declarado). El texto de cada chip está en `NOMBRE_ETIQUETA`, en `calc.ts`. `estimado` lo usa hoy la deuda estimada de un pasivo (D-154); `supuesto`, `a_confirmar` y `proyectado` quedan para los escenarios y el cuadro de marcha del leasing.
 - `vista(c)` lo convierte en `CalcVista`: lo mismo con los montos como texto decimal, para que viaje al navegador. Las pantallas reciben solo `CalcVista`.
 - Toda cifra en pantalla pasa por `<Monto>` (`src/components/monto.tsx`), que dibuja el par ARS/USD, la etiqueta principal y "sin dato", y abre `<Traza>` al tocarla.
 

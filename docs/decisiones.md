@@ -452,7 +452,22 @@ Detalla D-16. Migración `20261014203031_feriados_2026_2027` (49 días). Encaja 
 - **Qué es:** el valor presente de las cuotas que faltan (el canon, neto de IVA) más la opción de compra, descontado a la tasa implícita del contrato. Lo calculó el dueño fuera de la app y el 14/10 aprobó usarlo como deuda provisoria.
 - **Cómo se cargó:** como capital pendiente del leasing, con la fecha del cálculo, en una carga manual. Su fuente ("estimado, provisorio", la fórmula y la tasa) queda en lo grabado de esa carga.
 - **Es una excepción que decidió el dueño, no una regla:** la app no calcula ni propone estimados, y sin este dato la deuda volvería a ser "sin dato" (D-126). Se reemplaza por el valor de cancelación anticipada que informe la leasera, sin la penalidad.
-- **Falta:** que la pantalla del leasing diga "estimado" en el número y en su traza, y que la app lo calcule sola desde el cuadro de marcha, con su fórmula (fase 2).
+- **Falta:** que la app lo calcule sola desde el cuadro de marcha, con su fórmula (entrega 4). Que diga "estimado" en el número y en su traza ya está: D-154.
+
+### D-154 · Un saldo de deuda dice si lo informó el acreedor o es un estimado — P (provisoria, a confirmar)
+- **Qué pasaba:** `pasivo_saldos` no distinguía un valor informado de un estimado. El estimado que el dueño aprobó el 14/10 (D-131) se restaba en el patrimonio total y en Exposición sin ninguna marca, y su traza decía "capital pendiente informado" y "según el acreedor". Era un estimado presentado como dato.
+- **Qué cambia:**
+  - cada saldo tiene `naturaleza`, `informado` o `estimado`, y `fuente`, que es obligatoria para un estimado;
+  - el saldo que ya había quedó marcado como estimado, con la fuente que estaba en lo grabado de su carga;
+  - `guardar_manual` exige la naturaleza de cada saldo.
+- **Cómo se ve:**
+  - la deuda estimada lleva la etiqueta `estimado`, que se propaga a toda cifra que la incluye: el patrimonio total de Hoy y su variación, la deuda y el neto de Exposición;
+  - su traza dice "deuda estimada" y "Cómo se estimó";
+  - Datos › Leasing la muestra con su chip, su fecha y su fuente.
+- **Cargar el valor real:** el formulario de Datos › Leasing es el del valor que informa el acreedor (en un leasing, el de cancelación sin penalidad, D-130), y el valor informado reemplaza al estimado desde su fecha. Un estimado no se carga desde la app: el único lo aprobó el dueño.
+- **Por qué así:** "sin dato, nunca cero" y "no se inventan valuaciones" valen también para la forma. Un número que no salió de la fuente tiene que decirlo donde se lo vea.
+- **El chip:** `estimado` es una de las cuatro etiquetas nuevas del motor, junto con `supuesto`, `a_confirmar` y `proyectado`, que llegan con los escenarios y el cuadro de marcha. Su gravedad va entre `supuesto` y `a confirmar`.
+- **Rotular de más:** se trata como estimado todo lo que no diga "informado". Es el error conservador.
 
 ## Propuestas que la 1a implementa en forma provisoria
 

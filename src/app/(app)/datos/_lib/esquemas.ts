@@ -135,10 +135,12 @@ export const esquemaPasivo = z.object({
 /** Corregir el contrato de un pasivo. */
 export const esquemaEdicionPasivo = esquemaPasivo.extend({ id })
 
+/** El valor que informó el acreedor (para un leasing, el de cancelación sin penalidad; D-130). */
 export const esquemaPasivoSaldo = z.object({
   pasivo_id: id,
   fecha,
   capital_pendiente: numeroAR({ min: 'cero' }),
+  fuente: z.preprocess(vacio, z.string().trim().max(500).optional()).transform((v) => v ?? null),
 })
 
 const idOpcional = z.preprocess(vacio, id.optional()).transform((v) => v ?? null)

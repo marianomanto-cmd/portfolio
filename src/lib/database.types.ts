@@ -904,18 +904,24 @@ export type Database = {
           capital_pendiente: number
           carga_id: number
           fecha: string
+          fuente: string | null
+          naturaleza: string
           pasivo_id: number
         }
         Insert: {
           capital_pendiente: number
           carga_id: number
           fecha: string
+          fuente?: string | null
+          naturaleza?: string
           pasivo_id: number
         }
         Update: {
           capital_pendiente?: number
           carga_id?: number
           fecha?: string
+          fuente?: string | null
+          naturaleza?: string
           pasivo_id?: number
         }
         Relationships: [

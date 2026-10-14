@@ -4,6 +4,22 @@ Todo cambio de la app se registra acá, el más nuevo primero. Cada entrada dice
 
 ## [Sin publicar]
 
+### 2026-10-14 — La deuda estimada del leasing se ve como estimada
+La deuda del leasing que cargamos el 14/10 es un estimado que aprobaste (D-131), pero la app la restaba como si te la hubiera informado la leasera. Ahora cada saldo de deuda dice qué es (D-154):
+
+- **Base:**
+  - `pasivo_saldos` tiene `naturaleza` (informado o estimado) y `fuente`, que es obligatoria para un estimado;
+  - el saldo del 08/10 quedó como estimado, con la fuente que tenía en su carga;
+  - `guardar_manual` exige la naturaleza (migración `20261014212152_pasivo_saldos_naturaleza`, ya aplicada).
+- **Motor:**
+  - etiqueta nueva `estimado`: la deuda estimada la lleva, y también toda cifra que la incluye, como el patrimonio total de Hoy y la deuda y el neto de Exposición;
+  - la traza dice "deuda estimada" y cómo se estimó;
+  - se sumaron también las etiquetas `supuesto`, `a confirmar` y `proyectado`, para los escenarios y el cuadro de marcha.
+- **Pantallas:**
+  - Hoy y Exposición muestran el chip "estimado";
+  - Datos › Leasing muestra la deuda estimada con su chip, su fecha y cómo se calculó;
+  - el formulario pasa a ser el del valor de cancelación que informe la leasera ("Cargar el valor que informó la leasera"), y el valor informado reemplaza al estimado desde su fecha.
+
 ### 2026-10-14 — Revisión de la 1a: correcciones
 La 1a desplegada pasó por una revisión adversarial de todo el código, y cada arreglo tiene un test que falla sin él. Las decisiones de esta ronda son D-117 a D-131; las que esperan tu confirmación están marcadas como provisorias.
 

@@ -10,7 +10,7 @@ import { porSubaDeCcl } from '@/components/calculos'
 import { ErrorVista } from '@/components/error-vista'
 import { Monto, MontoTrazado, Porcentaje, TextoConMontos } from '@/components/monto'
 import { Traza } from '@/components/traza'
-import { Aviso, ParMonto, Rotulo, Tarjeta } from '@/components/ui'
+import { Aviso, ChipEtiqueta, ParMonto, Rotulo, Tarjeta } from '@/components/ui'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Exposición' }
@@ -204,8 +204,11 @@ function LargoCorto({ v, pesosUsd, deudaUsd }: { v: VistaExposicion; pesosUsd: C
   const fila = (nombre: string, detalle: string, ars: CalcVista, usd: CalcVista, barra: string | null, signo: '' | '−') => (
     <div className="py-2">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-        <span className="text-sm">
-          {nombre} <span className="text-[13px] text-muted">· {detalle}</span>
+        <span className="flex flex-wrap items-center gap-x-2 text-sm">
+          <span>
+            {nombre} <span className="text-[13px] text-muted">· {detalle}</span>
+          </span>
+          <ChipEtiqueta calc={ars} omitir={['parcial']} />
         </span>
         <span className="flex flex-wrap items-baseline gap-x-2">
           {signo ? <span className="num text-muted">{signo}</span> : null}
@@ -223,9 +226,12 @@ function LargoCorto({ v, pesosUsd, deudaUsd }: { v: VistaExposicion; pesosUsd: C
   return (
     <div className="divide-y divide-border">
       {fila('Tus pesos financieros', 'largo', r.pesos_financieros.ars, pesosUsd, pesos, '')}
-      {fila('Capital pendiente del leasing', 'corto', r.deuda_pesos.ars, deudaUsd, deuda, '−')}
+      {fila('Deuda del leasing', 'corto', r.deuda_pesos.ars, deudaUsd, deuda, '−')}
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 py-2.5">
-        <span className="text-sm font-semibold">Neto {v.vista === 'total' ? 'total' : '(pesos financieros − deuda del leasing)'}</span>
+        <span className="flex flex-wrap items-center gap-x-2 text-sm font-semibold">
+          Neto {v.vista === 'total' ? 'total' : '(pesos financieros − deuda del leasing)'}
+          <ChipEtiqueta calc={r.neto_ars} omitir={['parcial']} />
+        </span>
         <span className="flex flex-wrap items-baseline gap-x-2 font-semibold">
           <MontoTrazado calc={r.neto_ars} moneda="ARS" titulo="Neto en pesos" signo />
           <MontoTrazado calc={r.neto_usd} moneda="USD" titulo="Neto en dólares" signo decimales={0} />

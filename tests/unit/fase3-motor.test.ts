@@ -607,7 +607,7 @@ describe('día cero sin el leasing ni los bienes: la deuda y el total son "sin d
   it('con el leasing y la casa cargados, todo tiene valor', () => {
     const h = diaCero({
       pasivos: [{ id: 1, nombre: 'Leasing', tipo: 'leasing', moneda: 'ARS', fecha_inicio: '2026-01-01', cuotas_totales: 48, opcion_compra_fecha: null }],
-      pasivo_saldos: [{ pasivo_id: 1, fecha: '2026-10-05', capital_pendiente: D(300000), carga_id: 1 }],
+      pasivo_saldos: [{ pasivo_id: 1, fecha: '2026-10-05', capital_pendiente: D(300000), naturaleza: 'informado', fuente: null, carga_id: 1 }],
       bienes: [{ id: 1, nombre: 'Casa', tipo: 'inmueble', moneda_valuacion: 'USD', geografia: 'AR', pasivo_id: null, activo_bool: true }],
       valuaciones: [{ bien_id: 1, fecha: '2026-10-05', valor: D(200000), fuente: 'tasación', carga_id: 1 }],
     })
@@ -617,12 +617,45 @@ describe('día cero sin el leasing ni los bienes: la deuda y el total son "sin d
     const v = armarHoy(h, '2026-10-06')
     expect(v.total.valor.ars.valor).toBe(D(1600000).plus(200000000).minus(300000).toFixed())
     expect(v.total.variacion?.ars.valor).not.toBeNull()
+    // Una deuda informada no lleva etiqueta (D-154).
+    expect(v.total.valor.ars.etiquetas).not.toContain('estimado')
+  })
+
+  it('una deuda estimada resta con la etiqueta "estimado" en Hoy, en Exposición y en su traza (D-154)', () => {
+    const h = diaCero({
+      pasivos: [{ id: 1, nombre: 'Leasing', tipo: 'leasing', moneda: 'ARS', fecha_inicio: '2026-01-01', cuotas_totales: 48, opcion_compra_fecha: null }],
+      pasivo_saldos: [
+        { pasivo_id: 1, fecha: '2026-10-05', capital_pendiente: D(300000), naturaleza: 'estimado', fuente: 'VP de las cuotas que faltan', carga_id: 1 },
+      ],
+      bienes: [{ id: 1, nombre: 'Casa', tipo: 'inmueble', moneda_valuacion: 'USD', geografia: 'AR', pasivo_id: null, activo_bool: true }],
+      valuaciones: [{ bien_id: 1, fecha: '2026-10-05', valor: D(200000), fuente: 'tasación', carga_id: 1 }],
+    })
+    const deuda = foto(h, '2026-10-05', { hoy: '2026-10-06' }).items.find((i) => i.clase === 'pasivo')!
+    expect(deuda.valor_ars.valor?.toFixed()).toBe('-300000')
+    expect(deuda.valor_ars.etiquetas).toEqual(['estimado'])
+    expect(deuda.valor_usd.etiquetas).toContain('estimado')
+    expect(deuda.valor_ars.formula).toContain('deuda estimada del')
+    expect(deuda.valor_ars.formula).not.toContain('informado')
+    expect(deuda.valor_ars.insumos.map((i) => [i.nombre, i.valor])).toEqual([
+      ['Deuda estimada de Leasing', '300000'],
+      ['Cómo se estimó', 'VP de las cuotas que faltan'],
+    ])
+    const e = armarExposicion(h, '2026-10-06', 'financiero')
+    expect(e.resumen.deuda_pesos.ars.valor).toBe('300000')
+    expect(e.resumen.deuda_pesos.ars.etiquetas).toContain('estimado')
+    expect(e.resumen.neto_ars.etiquetas).toContain('estimado')
+    const v = armarHoy(h, '2026-10-06')
+    expect(v.total.valor.ars.valor).toBe(D(1600000).plus(200000000).minus(300000).toFixed())
+    expect(v.total.valor.ars.etiquetas).toContain('estimado')
+    expect(v.total.valor.usd.etiquetas).toContain('estimado')
+    // El financiero no incluye la deuda: no lleva la etiqueta.
+    expect(v.financiero.valor.ars.etiquetas).not.toContain('estimado')
   })
 
   it('una deuda solo en dólares no es "sin dato" en pesos: la deuda en pesos es $ 0 porque se sabe', () => {
     const h = diaCero({
       pasivos: [{ id: 1, nombre: 'Préstamo', tipo: 'prestamo', moneda: 'USD', fecha_inicio: '2026-01-01', cuotas_totales: 12, opcion_compra_fecha: null }],
-      pasivo_saldos: [{ pasivo_id: 1, fecha: '2026-10-05', capital_pendiente: D(100), carga_id: 1 }],
+      pasivo_saldos: [{ pasivo_id: 1, fecha: '2026-10-05', capital_pendiente: D(100), naturaleza: 'informado', fuente: null, carga_id: 1 }],
     })
     expect(armarExposicion(h, '2026-10-06', 'financiero').resumen.deuda_pesos.ars.valor).toBe('0')
   })

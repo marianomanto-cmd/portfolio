@@ -29,8 +29,8 @@ describe('ultimaValuacion y ultimoSaldoPasivo', () => {
     expect(ultimaValuacion(vs, 1)?.valor).toBe('200000')
     expect(ultimaValuacion(vs, 3)).toBeNull()
     const ss = [
-      { pasivo_id: 1, fecha: '2026-09-30', capital_pendiente: '21400000', carga_id: 1 },
-      { pasivo_id: 1, fecha: '2026-08-31', capital_pendiente: '22100000', carga_id: 2 },
+      { pasivo_id: 1, fecha: '2026-09-30', capital_pendiente: '21400000', naturaleza: 'informado' as const, fuente: null, carga_id: 1 },
+      { pasivo_id: 1, fecha: '2026-08-31', capital_pendiente: '22100000', naturaleza: 'estimado' as const, fuente: 'cálculo', carga_id: 2 },
     ]
     expect(ultimoSaldoPasivo(ss, 1)?.capital_pendiente).toBe('21400000')
   })
@@ -59,6 +59,12 @@ describe('enDosMonedas', () => {
     const r = enDosMonedas(null, 'USD', ccl, { nombre: 'una valuación', fecha: null })
     expect(r.ars.valor).toBeNull()
     expect(r.usd.valor).toBeNull()
+  })
+  it('una deuda estimada lleva "estimado" en las dos monedas (D-154)', () => {
+    const r = enDosMonedas('21400000', 'ARS', ccl, { nombre: 'la deuda estimada', fecha: '2026-09-30', etiquetas: ['estimado'] })
+    expect(r.ars.etiquetas).toEqual(['estimado'])
+    expect(r.usd.etiquetas).toEqual(['estimado'])
+    expect(enDosMonedas('21400000', 'ARS', null, { nombre: 'la deuda estimada', fecha: null, etiquetas: ['estimado'] }).usd.etiquetas).toEqual(['estimado'])
   })
 })
 
@@ -119,7 +125,11 @@ describe('esquemas de Datos', () => {
     })
     expect(leerFormulario(esquemaPasivoSaldo, { pasivo_id: '1', fecha: '2026-09-30', capital_pendiente: '21.400.000' })).toEqual({
       ok: true,
-      datos: { pasivo_id: 1, fecha: '2026-09-30', capital_pendiente: '21400000' },
+      datos: { pasivo_id: 1, fecha: '2026-09-30', capital_pendiente: '21400000', fuente: null },
+    })
+    expect(leerFormulario(esquemaPasivoSaldo, { pasivo_id: '1', fecha: '2026-09-30', capital_pendiente: '1', fuente: ' nota de la leasera ' })).toMatchObject({
+      ok: true,
+      datos: { fuente: 'nota de la leasera' },
     })
     expect(leerFormulario(esquemaBien, { nombre: 'Casa', tipo: 'inmueble', moneda_valuacion: 'USD', pasivo_id: '' })).toEqual({
       ok: true,
