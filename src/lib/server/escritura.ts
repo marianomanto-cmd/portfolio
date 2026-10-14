@@ -231,8 +231,11 @@ export async function guardarValuacionBien(v: { bien_id: number; fecha: Fecha; v
   return leerId(data, 'guardar la valuación')
 }
 
-/** Graba (o corrige) el capital pendiente informado de un pasivo. Devuelve el id de la carga. */
-export async function guardarPasivoSaldo(s: { pasivo_id: number; fecha: Fecha; capital_pendiente: string }, lote?: string | null): Promise<number> {
+/**
+ * Graba (o corrige) la deuda pendiente de un pasivo: la que informa el acreedor
+ * o un estimado con su fuente (D-154). Devuelve el id de la carga.
+ */
+export async function guardarPasivoSaldo(s: PasivoSaldoAlta, lote?: string | null): Promise<number> {
   const p = altaManual({ pasivo_saldos: [normalizarPasivoSaldo(s)] }, s.fecha, lote)
   const data = await llamar('guardar_manual', { p }, 'guardar el capital pendiente', { reintentable: true })
   return leerId(data, 'guardar el capital pendiente')
@@ -382,6 +385,9 @@ const RESTRICCIONES: Record<string, string> = {
   pasivos_valor_bien_check: 'El valor del bien tiene que ser mayor que cero',
   pasivos_alicuota_ganancias_check: 'La alícuota de Ganancias tiene que estar entre 0 y 1',
   pasivo_saldos_capital_pendiente_check: 'El capital pendiente no puede ser negativo',
+  pasivo_saldos_naturaleza_check: 'El capital pendiente tiene que ser informado por el acreedor o estimado',
+  pasivo_saldos_fuente_check: 'La fuente del capital pendiente tiene que tener entre 1 y 500 caracteres',
+  pasivo_saldos_estimado_con_fuente: 'Un capital pendiente estimado necesita su fuente: cómo se calculó',
   pasivo_saldos_pasivo_id_fkey: 'El pasivo no existe',
   // movimientos de capital
   movimientos_capital_check: 'La fecha de acreditación no puede ser anterior a la del movimiento',
@@ -1094,12 +1100,32 @@ export function normalizarValuacion(v: { bien_id: number; fecha: Fecha; valor: s
   }
 }
 
-export function normalizarPasivoSaldo(s: { pasivo_id: number; fecha: Fecha; capital_pendiente: string }) {
+export interface PasivoSaldoAlta {
+  pasivo_id: number
+  fecha: Fecha
+  capital_pendiente: string
+  /** informado = lo informó el acreedor; estimado = un cálculo aprobado por el dueño (D-154). */
+  naturaleza: 'informado' | 'estimado'
+  /** Quién lo informó o cómo se estimó. Obligatoria para un estimado. */
+  fuente?: string | null
+}
+
+export function normalizarPasivoSaldo(s: PasivoSaldoAlta) {
   if (!esObjeto(s)) throw new ErrorEscritura('El capital pendiente llegó vacío.')
+  if (s.naturaleza !== 'informado' && s.naturaleza !== 'estimado') {
+    throw new ErrorEscritura('Falta decir si el capital pendiente lo informó el acreedor o es un estimado.')
+  }
+  const fuente = typeof s.fuente === 'string' && s.fuente.trim() !== '' ? s.fuente.trim() : null
+  if (fuente !== null && fuente.length > 500) throw new ErrorEscritura('La fuente del capital pendiente tiene más de 500 caracteres.')
+  if (s.naturaleza === 'estimado' && fuente === null) {
+    throw new ErrorEscritura('Un capital pendiente estimado necesita su fuente: cómo se calculó.')
+  }
   return {
     pasivo_id: idPositivo(s.pasivo_id, 'el pasivo'),
     fecha: fechaRequerida(s.fecha, 'la fecha del capital pendiente'),
     capital_pendiente: montoRequerido(s.capital_pendiente, 'el capital pendiente', 'no_negativo'),
+    naturaleza: s.naturaleza,
+    fuente,
   }
 }
 

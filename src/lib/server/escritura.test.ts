@@ -691,17 +691,31 @@ describe('llamadas a la base (cliente falso)', () => {
   it('guardarValuacionBien y guardarPasivoSaldo usan guardar_manual con un lote nuevo', async () => {
     fake.estado.respuestasRpc.push({ data: 41, error: null }, { data: 42, error: null })
     expect(await guardarValuacionBien({ bien_id: 1, fecha: '2026-11-02', valor: '25000000', fuente: ' tasación ' })).toBe(41)
-    expect(await guardarPasivoSaldo({ pasivo_id: 2, fecha: '2026-11-02', capital_pendiente: '900000.50' })).toBe(42)
+    expect(await guardarPasivoSaldo({ pasivo_id: 2, fecha: '2026-11-02', capital_pendiente: '900000.50', naturaleza: 'informado', fuente: ' la leasera ' })).toBe(42)
     const [a, b] = fake.estado.rpc
     expect(a.fn).toBe('guardar_manual')
     expect(a.args.p).toMatchObject({
       fecha: '2026-11-02',
       bienes_valuaciones: [{ bien_id: 1, fecha: '2026-11-02', valor: '25000000', fuente: 'tasación' }],
     })
-    expect(b.args.p).toMatchObject({ pasivo_saldos: [{ pasivo_id: 2, fecha: '2026-11-02', capital_pendiente: '900000.50' }] })
+    expect(b.args.p).toMatchObject({
+      pasivo_saldos: [{ pasivo_id: 2, fecha: '2026-11-02', capital_pendiente: '900000.50', naturaleza: 'informado', fuente: 'la leasera' }],
+    })
     const lotes = [(a.args.p as { lote: string }).lote, (b.args.p as { lote: string }).lote]
     expect(lotes[0]).toMatch(/^[0-9a-f-]{36}$/)
     expect(lotes[0]).not.toBe(lotes[1])
+  })
+
+  it('guardarPasivoSaldo exige la naturaleza, y la fuente de un estimado (D-154)', async () => {
+    const base = { pasivo_id: 2, fecha: '2026-11-02', capital_pendiente: '900000' }
+    expect(await mensajeAsync(() => guardarPasivoSaldo({ ...base } as unknown as Parameters<typeof guardarPasivoSaldo>[0]))).toMatch(
+      /informó el acreedor o es un estimado/,
+    )
+    expect(await mensajeAsync(() => guardarPasivoSaldo({ ...base, naturaleza: 'estimado', fuente: '  ' }))).toMatch(/estimado necesita su fuente/)
+    expect(fake.estado.rpc).toHaveLength(0)
+    fake.estado.respuestasRpc.push({ data: 43, error: null })
+    expect(await guardarPasivoSaldo({ ...base, naturaleza: 'estimado', fuente: 'VP de las cuotas que faltan' })).toBe(43)
+    expect(fake.estado.rpc[0].args.p).toMatchObject({ pasivo_saldos: [{ naturaleza: 'estimado', fuente: 'VP de las cuotas que faltan' }] })
   })
 
   it('crearActivo usa alta_activo con el ratio desde hoy; actualizarActivo sin cambios no llama', async () => {

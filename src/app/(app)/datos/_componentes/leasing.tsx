@@ -1,8 +1,10 @@
 'use client'
 
-// Leasing (4.9 de la visión): el contrato, con montos netos de IVA, y el capital
-// pendiente que informa el acreedor (pasivo_saldos), que es lo que netea
-// Exposición desde la fase 1. La camioneta se vincula a su leasing desde Bienes.
+// Leasing (4.9 de la visión): el contrato, con montos netos de IVA, y la deuda
+// pendiente (pasivo_saldos), que es lo que netea Exposición desde la fase 1: la
+// que informa el acreedor (para un leasing, el valor de cancelación sin
+// penalidad, D-130) o, mientras no la haya, un estimado rotulado con su fuente
+// (D-131, D-154). La camioneta se vincula a su leasing desde Bienes.
 
 import Link from 'next/link'
 import { useEffect, useId, useState } from 'react'
@@ -20,24 +22,41 @@ import { ElegirMoneda, Mensaje, Panel, useFormulario } from './formulario'
 
 const NOMBRE_TIPO = { leasing: 'Leasing', tarjeta: 'Tarjeta', prestamo: 'Préstamo' } as const
 
+/** Cómo se llama lo que informa el acreedor: en un leasing, el valor de cancelación (D-130). */
+function nombreInformado(p: PasivoFila): string {
+  return p.tipo === 'leasing' ? 'Valor de cancelación' : 'Capital pendiente'
+}
+
+/** El valor que informó el acreedor. Un estimado no se carga desde acá (D-154). */
 function FormSaldo({ pasivo, hoy }: { pasivo: PasivoFila; hoy: Fecha }) {
   const id = useId()
   const [estado, enviar, enviando] = useFormulario(nuevoSaldoPasivo)
   const e = estado.errores
+  const leasing = pasivo.tipo === 'leasing'
   return (
-    <form key={estado.vez} onSubmit={enviar} noValidate className="mt-3 space-y-3 rounded-xl border border-border bg-surface-2 p-3" aria-label={`Capital pendiente de ${pasivo.nombre}`}>
+    <form key={estado.vez} onSubmit={enviar} noValidate className="mt-3 space-y-3 rounded-xl border border-border bg-surface-2 p-3" aria-label={`${nombreInformado(pasivo)} de ${pasivo.nombre}`}>
       <input type="hidden" name="pasivo_id" value={pasivo.id} />
+      <p className="text-sm text-muted">
+        {leasing
+          ? 'El valor de cancelación anticipada que te informe la leasera, sin la penalidad. Desde su fecha reemplaza al estimado.'
+          : 'El capital pendiente que te informe el acreedor.'}
+      </p>
       <div className="grid gap-3 sm:grid-cols-2">
         <Campo etiqueta="Informado al" htmlFor={`${id}-f`} error={e.fecha}>
           <Entrada id={`${id}-f`} type="date" name="fecha" defaultValue={hoy} max={hoy} invalido={Boolean(e.fecha)} />
         </Campo>
-        <Campo etiqueta={`Capital pendiente (${pasivo.moneda === 'USD' ? 'US$' : '$'})`} htmlFor={`${id}-m`} error={e.capital_pendiente}>
+        <Campo etiqueta={`${nombreInformado(pasivo)} (${pasivo.moneda === 'USD' ? 'US$' : '$'})`} htmlFor={`${id}-m`} error={e.capital_pendiente}>
           <Entrada id={`${id}-m`} name="capital_pendiente" inputMode="decimal" className="num" invalido={Boolean(e.capital_pendiente)} />
         </Campo>
+        <div className="sm:col-span-2">
+          <Campo etiqueta="Quién lo informó (opcional)" htmlFor={`${id}-q`} error={e.fuente} ayuda={leasing ? 'Ej.: nota de la leasera del 20/10.' : undefined}>
+            <Entrada id={`${id}-q`} name="fuente" invalido={Boolean(e.fuente)} />
+          </Campo>
+        </div>
       </div>
       <Mensaje estado={estado} />
       <Boton type="submit" variante="primario" disabled={enviando} className="max-sm:w-full">
-        {enviando ? 'Guardando…' : 'Guardar capital pendiente'}
+        {enviando ? 'Guardando…' : 'Guardar el valor informado'}
       </Boton>
     </form>
   )
@@ -141,7 +160,7 @@ export function Leasing({
         </Panel>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm text-muted">El capital pendiente que informa el acreedor es lo que se resta en Exposición.</p>
+          <p className="text-sm text-muted">La deuda que se resta en Exposición y en tu patrimonio es la última que cargaste: la que informa el acreedor o, mientras no la tengas, un estimado con su etiqueta.</p>
           <Boton variante="primario" onClick={() => setNuevo(true)} className="max-sm:w-full sm:ml-auto">
             <Plus aria-hidden className="size-4" /> Nuevo pasivo
           </Boton>
@@ -150,17 +169,20 @@ export function Leasing({
 
       {pasivos.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border-strong p-4 text-sm text-muted">
-          Todavía no cargaste el leasing. Con el contrato y el último capital pendiente informado, Exposición ya lo netea.
+          Todavía no cargaste el leasing. Con el contrato y el valor de cancelación que informe la leasera, Exposición ya lo netea.
         </p>
       ) : null}
 
       <ul className="grid gap-3 xl:grid-cols-2">
         {pasivos.map((p) => {
           const ultimo = ultimoSaldoPasivo(saldos, p.id)
+          const estimado = ultimo?.naturaleza === 'estimado'
+          const que = estimado ? 'Deuda estimada' : `${nombreInformado(p)} informado`
           const par = enDosMonedas(ultimo?.capital_pendiente ?? null, p.moneda, ccl, {
-            nombre: 'el capital pendiente informado',
+            nombre: estimado ? 'la deuda estimada' : `el ${nombreInformado(p).toLowerCase()} informado`,
             fecha: ultimo?.fecha ?? null,
             origen: ultimo?.carga_id ? { carga_id: ultimo.carga_id } : undefined,
+            etiquetas: estimado ? ['estimado'] : [],
           })
           const bien = bienes.find((b) => b.pasivo_id === p.id) ?? null
           const historia = saldos.filter((s) => s.pasivo_id === p.id).sort((a, b) => (a.fecha < b.fecha ? 1 : -1))
@@ -172,12 +194,29 @@ export function Leasing({
                 <Chip>{NOMBRE_TIPO[p.tipo]}</Chip>
                 <Chip>en {p.moneda === 'USD' ? 'dólares' : 'pesos'}</Chip>
               </div>
-              <p className="mt-3 text-sm text-muted">Capital pendiente informado</p>
+              <p className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted">
+                {ultimo ? que : `${nombreInformado(p)} informado`}
+                {estimado ? <Chip>estimado</Chip> : null}
+              </p>
               <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 text-lg">
-                <MontoTrazado calc={par.ars} moneda="ARS" titulo={`Capital pendiente de ${p.nombre} en pesos`} />
-                <MontoTrazado calc={par.usd} moneda="USD" titulo={`Capital pendiente de ${p.nombre} en dólares`} />
+                <MontoTrazado calc={par.ars} moneda="ARS" titulo={`${que} de ${p.nombre} en pesos`} />
+                <MontoTrazado calc={par.usd} moneda="USD" titulo={`${que} de ${p.nombre} en dólares`} />
               </div>
-              <p className="text-sm text-muted">{ultimo ? `Informado al ${fechaLarga(ultimo.fecha)}` : 'Sin capital pendiente informado: cargalo para que Exposición lo netee.'}</p>
+              <p className="text-sm text-muted">
+                {!ultimo
+                  ? `Sin ${nombreInformado(p).toLowerCase()} informado: cargalo para que Exposición lo netee.`
+                  : estimado
+                    ? `Estimado al ${fechaLarga(ultimo.fecha)}. No lo informó ${p.tipo === 'leasing' ? 'la leasera' : 'el acreedor'}: cuando te pase el valor, cargalo y reemplaza a este.`
+                    : `Informado al ${fechaLarga(ultimo.fecha)}.`}
+              </p>
+              {ultimo?.fuente ? (
+                <p className="mt-1 text-sm text-muted">
+                  {estimado ? 'Cómo se estimó: ' : 'Quién lo informó: '}
+                  <span className="text-text">
+                    <ConMontos texto={ultimo.fuente} />
+                  </span>
+                </p>
+              ) : null}
               <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
                 <Dato etiqueta="Inicio" valor={fechaLarga(p.fecha_inicio)} />
                 <Dato etiqueta="Cuotas" valor={String(p.cuotas_totales)} />
@@ -207,11 +246,14 @@ export function Leasing({
               {p.notas ? <p className="mt-1 text-sm text-muted">{p.notas}</p> : null}
               {historia.length > 1 ? (
                 <details className="mt-2 text-sm">
-                  <summary className="tocable flex min-h-11 cursor-pointer items-center text-muted lg:min-h-9">Capital informado antes ({historia.length})</summary>
+                  <summary className="tocable flex min-h-11 cursor-pointer items-center text-muted lg:min-h-9">Deuda cargada antes ({historia.length})</summary>
                   <ul className="num mt-1 space-y-0.5 text-muted">
                     {historia.map((s) => (
-                      <li key={s.fecha}>
-                        {fechaLarga(s.fecha)} · <M usd={p.moneda === 'USD'}>{m(s.capital_pendiente) ?? 'sin dato'}</M>
+                      <li key={s.fecha} className="flex flex-wrap items-center gap-x-2">
+                        <span>
+                          {fechaLarga(s.fecha)} · <M usd={p.moneda === 'USD'}>{m(s.capital_pendiente) ?? 'sin dato'}</M>
+                        </span>
+                        {s.naturaleza === 'estimado' ? <Chip>estimado</Chip> : null}
                       </li>
                     ))}
                   </ul>
@@ -231,7 +273,7 @@ export function Leasing({
               ) : (
                 <div className="mt-3 flex flex-wrap gap-2 [&>*]:max-sm:flex-1">
                   <Boton variante="secundario" onClick={() => setInformando(p.id)}>
-                    Registrar capital pendiente
+                    {p.tipo === 'leasing' ? 'Cargar el valor que informó la leasera' : 'Registrar capital pendiente'}
                   </Boton>
                   <Boton variante="fantasma" onClick={() => setCorrigiendo(p.id)}>
                     Corregir el contrato

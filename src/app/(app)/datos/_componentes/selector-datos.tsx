@@ -12,7 +12,7 @@ export const SUBPANTALLAS = [
   { href: '/datos/catalogo', nombre: 'Catálogo', descripcion: 'Activos: tipo, moneda de riesgo, geografía, ratio y color' },
   { href: '/datos/cuentas', nombre: 'Cuentas', descripcion: 'IEB, Galicia y Mercado Pago' },
   { href: '/datos/bienes', nombre: 'Bienes', descripcion: 'Casa y camioneta, con valuaciones fechadas' },
-  { href: '/datos/leasing', nombre: 'Leasing', descripcion: 'Contrato y capital pendiente informado' },
+  { href: '/datos/leasing', nombre: 'Leasing', descripcion: 'Contrato y deuda: informada o estimada' },
   { href: '/datos/movimientos', nombre: 'Movimientos', descripcion: 'Aportes, retiros y transferencias entre tus cuentas' },
 ] as const
 

@@ -59,6 +59,12 @@ select pg_temp.espera_ok($$insert into pasivo_cuotas (pasivo_id, nro, fecha_venc
 select pg_temp.espera_error($$insert into pasivo_cuotas (pasivo_id, nro, fecha_vencimiento, canon_neto, ccl_del_dia_pago, carga_id) values (1,2,'2025-08-01',1000,1200,2)$$, 'cuota impaga con CCL de pago');
 select total_pesos::text as total_cuota_esperado_1260 from pasivo_cuotas where nro = 1;
 select pg_temp.espera_ok($$insert into pasivo_saldos (pasivo_id, fecha, capital_pendiente, carga_id) values (1,'2026-10-07',5000000,2)$$, 'capital pendiente informado');
+select case when (select naturaleza = 'informado' and fuente is null from pasivo_saldos where pasivo_id = 1 and fecha = '2026-10-07')
+            then 'ok     pasivo_saldos: sin decir nada, es informado (D-154)'
+            else 'FALLA  pasivo_saldos: sin decir nada, es informado (D-154)' end;
+select pg_temp.espera_error($$insert into pasivo_saldos (pasivo_id, fecha, capital_pendiente, naturaleza, carga_id) values (1,'2026-10-08',5000000,'estimado',2)$$, 'capital estimado sin fuente');
+select pg_temp.espera_error($$insert into pasivo_saldos (pasivo_id, fecha, capital_pendiente, naturaleza, fuente, carga_id) values (1,'2026-10-08',5000000,'calculado','x',2)$$, 'naturaleza que no existe');
+select pg_temp.espera_error($$insert into pasivo_saldos (pasivo_id, fecha, capital_pendiente, naturaleza, fuente, carga_id) values (1,'2026-10-08',5000000,'estimado','   ',2)$$, 'capital estimado con fuente en blanco');
 
 -- Bienes
 insert into bienes (nombre, tipo, moneda_valuacion) values ('Casa','inmueble','USD');
@@ -396,7 +402,7 @@ select pg_temp.espera(not exists (select 1 from eventos where tipo = 'nota'), 'r
 -- ── guardar_manual ──
 select pg_temp.espera_ok($$select guardar_manual(pg_temp.j($j${"lote": "f0000000-0000-4000-8000-00000000000f", "fecha": "2026-11-02",
   "bienes_valuaciones": [{"bien_id": "@Auto de prueba", "fecha": "2026-11-02", "valor": "25000000", "fuente": "guía de precios"}],
-  "pasivo_saldos": [{"pasivo_id": "@Préstamo de prueba", "fecha": "2026-11-02", "capital_pendiente": "900000.50"}],
+  "pasivo_saldos": [{"pasivo_id": "@Préstamo de prueba", "fecha": "2026-11-02", "capital_pendiente": "900000.50", "naturaleza": "informado"}],
   "movimientos_capital": [{"tipo": "aporte", "cuenta_destino_id": "@Mercado Pago", "moneda_origen": "USD", "monto_origen": "1000",
                            "moneda_destino": "ARS", "monto_destino": "1480000", "tc_aplicado": "1480"}]}$j$))$$,
   'guardar_manual: valuación, capital pendiente y aporte');
@@ -425,8 +431,24 @@ select pg_temp.espera_error_por($$select guardar_manual(pg_temp.j($j${"lote": "f
   "bienes_valuaciones": [{"bien_id": "@Auto de prueba", "valor": "1", "fuente": "  "}]}$j$))$$, '23502', 'guardar_manual: valuación sin fuente');
 select pg_temp.espera_error_por($$select guardar_manual(pg_temp.j($j${"lote": "f0000000-0000-4000-8000-0000000000f3", "fecha": "2026-11-02"}$j$))$$,
   'nada para grabar', 'guardar_manual: sin hechos');
+select pg_temp.espera_error_por($$select guardar_manual(pg_temp.j($j${"lote": "f0000000-0000-4000-8000-0000000000f3", "fecha": "2026-11-02",
+  "pasivo_saldos": [{"pasivo_id": "@Préstamo de prueba", "capital_pendiente": "1"}]}$j$))$$,
+  'informó el acreedor o es un estimado', 'guardar_manual: un saldo de pasivo sin naturaleza (D-154)');
+select pg_temp.espera_error_por($$select guardar_manual(pg_temp.j($j${"lote": "f0000000-0000-4000-8000-0000000000f3", "fecha": "2026-11-02",
+  "pasivo_saldos": [{"pasivo_id": "@Préstamo de prueba", "capital_pendiente": "1", "naturaleza": "estimado", "fuente": "  "}]}$j$))$$,
+  'pasivo_saldos_estimado_con_fuente', 'guardar_manual: un estimado sin fuente');
+select pg_temp.espera_error_por($$select guardar_manual(pg_temp.j($j${"lote": "f0000000-0000-4000-8000-0000000000f3", "fecha": "2026-11-02",
+  "pasivo_saldos": [{"pasivo_id": "@Préstamo de prueba", "capital_pendiente": "1", "naturaleza": "calculado", "fuente": "x"}]}$j$))$$,
+  'pasivo_saldos_naturaleza_check', 'guardar_manual: una naturaleza que no existe');
 select pg_temp.espera(not exists (select 1 from cargas where lote = 'f0000000-0000-4000-8000-0000000000f3'),
                       'guardar_manual: los rechazos no dejan carga');
+select pg_temp.espera((select naturaleza from pasivo_saldos where carga_id = :m1) = 'informado', 'guardar_manual: el informado queda informado');
+select pg_temp.espera_ok($$select guardar_manual(pg_temp.j($j${"lote": "f0000000-0000-4000-8000-0000000000f4", "fecha": "2026-11-03",
+  "pasivo_saldos": [{"pasivo_id": "@Préstamo de prueba", "capital_pendiente": "850000", "naturaleza": "estimado", "fuente": " VP de las cuotas que faltan "}]}$j$))$$,
+  'guardar_manual: un saldo estimado con su fuente (D-154)');
+select pg_temp.espera((select naturaleza || ' | ' || fuente from pasivo_saldos where fecha = '2026-11-03') = 'estimado | VP de las cuotas que faltan',
+                      'guardar_manual: el estimado queda rotulado, con su fuente');
+select pg_temp.espera_ok($$select revertir_lote('f0000000-0000-4000-8000-0000000000f4', 'prueba del estimado')$$, 'revertir_lote: el saldo estimado');
 select pg_temp.espera_ok($$select revertir_lote('f0000000-0000-4000-8000-0000000000f2', 'tasación equivocada')$$, 'revertir_lote: alta manual');
 select pg_temp.espera(pg_temp.huella() = :'huella_m1', 'revertir_lote: restaura la valuación anterior');
 select pg_temp.espera_ok($$select revertir_lote('f0000000-0000-4000-8000-00000000000f', 'prueba')$$, 'revertir_lote: primera alta manual');

@@ -2,7 +2,7 @@
 // bien y el último capital pendiente de un pasivo, en las dos monedas con su
 // traza. Sin CCL, la otra moneda es "sin dato" (nunca cero ni estimado).
 
-import { calc, sinDato, vista, type Calc, type CalcVista } from '@/lib/domain/calc'
+import { calc, sinDato, vista, type Calc, type CalcVista, type Etiqueta } from '@/lib/domain/calc'
 import { Decimal, monto, numero } from '@/lib/domain/dinero'
 import { fechaCorta, fechaLarga } from '@/lib/domain/fechas'
 import type { Fecha, Moneda } from '@/lib/domain/tipos'
@@ -53,7 +53,7 @@ export function enDosMonedas(
   valor: string | null,
   moneda: Moneda,
   ccl: CCL | null,
-  que: { nombre: string; fecha: Fecha | null; origen?: { carga_id: number; lugar?: string } },
+  que: { nombre: string; fecha: Fecha | null; origen?: { carga_id: number; lugar?: string }; etiquetas?: Etiqueta[] },
 ): ParVista {
   if (valor === null) {
     const nada = sinDato(`Todavía no cargaste ${que.nombre}.`)
@@ -66,23 +66,27 @@ export function enDosMonedas(
     unidad: moneda,
     origen: que.origen,
   } as const
+  const etiquetas = que.etiquetas ?? []
   const original: Calc = calc(v, `${monto(v, moneda, { decimales: 2 })} = ${que.nombre} cargado${que.fecha ? ` el ${fechaCorta(que.fecha)}` : ''}`, [insumoValor], {
+    etiquetas,
     explicacion: `Lo que cargaste como ${que.nombre}, en ${moneda === 'ARS' ? 'pesos' : 'dólares'}.`,
   })
   let otra: Calc
   if (ccl === null) {
-    otra = sinDato(`Falta un CCL cargado para pasar ${moneda === 'ARS' ? 'a dólares' : 'a pesos'}.`, [insumoValor])
+    otra = sinDato(`Falta un CCL cargado para pasar ${moneda === 'ARS' ? 'a dólares' : 'a pesos'}.`, [insumoValor], { etiquetas })
   } else {
     const c = new Decimal(ccl.valor)
     const insumoCcl = { nombre: `CCL del ${fechaLarga(ccl.fecha)}`, valor: c.toFixed(), unidad: 'ratio' as const }
     if (moneda === 'ARS') {
       const usd = v.div(c)
       otra = calc(usd, `${monto(v, 'ARS', { decimales: 2 })} ÷ CCL ${numero(c, 2)} = ${monto(usd, 'USD', { decimales: 2 })}`, [insumoValor, insumoCcl], {
+        etiquetas,
         explicacion: 'Lo mismo en dólares, al último CCL que cargaste.',
       })
     } else {
       const ars = v.times(c)
       otra = calc(ars, `${monto(v, 'USD', { decimales: 2 })} × CCL ${numero(c, 2)} = ${monto(ars, 'ARS', { decimales: 2 })}`, [insumoValor, insumoCcl], {
+        etiquetas,
         explicacion: 'Lo mismo en pesos, al último CCL que cargaste.',
       })
     }
@@ -94,6 +98,9 @@ export interface SaldoPasivo {
   pasivo_id: number
   fecha: Fecha
   capital_pendiente: string
+  /** informado = lo informó el acreedor; estimado = un cálculo aprobado por el dueño (D-154). */
+  naturaleza: 'informado' | 'estimado'
+  fuente: string | null
   carga_id: number | null
 }
 

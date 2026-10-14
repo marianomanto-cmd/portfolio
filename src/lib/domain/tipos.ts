@@ -125,6 +125,10 @@ export interface PasivoSaldo {
   pasivo_id: number
   fecha: Fecha
   capital_pendiente: Decimal
+  /** informado = lo informó el acreedor; estimado = un cálculo aprobado por el dueño, con su fuente (D-154). */
+  naturaleza: 'informado' | 'estimado'
+  /** Quién lo informó o cómo se calculó. Obligatoria para un estimado. */
+  fuente: string | null
   carga_id: number
 }
 

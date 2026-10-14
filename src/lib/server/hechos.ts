@@ -92,7 +92,7 @@ async function leerHechosDeLaBase(): Promise<Hechos> {
     ),
     leerTodo<Fila>(
       'pasivo_saldos',
-      'pasivo_id,fecha,capital_pendiente::text,carga_id',
+      'pasivo_id,fecha,capital_pendiente::text,naturaleza,fuente,carga_id',
       ['fecha', 'pasivo_id'],
     ),
     leerTodo<Fila>(
@@ -220,6 +220,9 @@ async function leerHechosDeLaBase(): Promise<Hechos> {
         pasivo_id: n(r.pasivo_id),
         fecha: String(r.fecha),
         capital_pendiente: decReq(s(r.capital_pendiente), 'capital_pendiente'),
+        // Lo que no dice "informado" se trata como estimado: rotular de más es el error conservador.
+        naturaleza: r.naturaleza === 'informado' ? 'informado' : 'estimado',
+        fuente: s(r.fuente),
         carga_id: n(r.carga_id),
       }),
     ),

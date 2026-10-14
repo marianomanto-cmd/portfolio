@@ -103,7 +103,7 @@ export async function leerDatos(): Promise<DatosPantalla> {
         'id,nombre,tipo,moneda,fecha_inicio,cuotas_totales,monto_financiado_neto::text,anticipo_neto::text,opcion_compra_neto::text,opcion_compra_fecha,valor_bien::text,notas',
         ['id'],
       ),
-      leerTodo<Fila>('pasivo_saldos', 'pasivo_id,fecha,capital_pendiente::text,carga_id', ['pasivo_id', 'fecha']),
+      leerTodo<Fila>('pasivo_saldos', 'pasivo_id,fecha,capital_pendiente::text,naturaleza,fuente,carga_id', ['pasivo_id', 'fecha']),
       ultimoCcl(),
       leerTodo<Fila>(
         'movimientos_capital',
@@ -160,7 +160,15 @@ export async function leerDatos(): Promise<DatosPantalla> {
         valor_bien: s(r.valor_bien),
         notas: s(r.notas),
       })),
-      saldosPasivo: saldos.map((r) => ({ pasivo_id: n(r.pasivo_id), fecha: String(r.fecha), capital_pendiente: String(r.capital_pendiente), carga_id: n(r.carga_id) })),
+      saldosPasivo: saldos.map((r) => ({
+        pasivo_id: n(r.pasivo_id),
+        fecha: String(r.fecha),
+        capital_pendiente: String(r.capital_pendiente),
+        // Lo que no dice "informado" se muestra como estimado (D-154): rotular de más es el error conservador.
+        naturaleza: r.naturaleza === 'informado' ? ('informado' as const) : ('estimado' as const),
+        fuente: s(r.fuente),
+        carga_id: n(r.carga_id),
+      })),
       ccl,
       movimientos: movimientos
         .map((r) => ({

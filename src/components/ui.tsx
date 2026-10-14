@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { etiquetaPrincipal, type CalcVista, type Etiqueta } from '@/lib/domain/calc'
+import { etiquetaPrincipal, NOMBRE_ETIQUETA, type CalcVista, type Etiqueta } from '@/lib/domain/calc'
 import type { Par } from '@/lib/vistas/contratos'
 import { MontoTrazado } from './monto'
 
@@ -26,14 +26,6 @@ export function Tarjeta({
 /** Rótulo chico de una tarjeta: "PATRIMONIO FINANCIERO". */
 export function Rotulo({ children, className = '', as: Tag = 'h2' }: { children: ReactNode; className?: string; as?: 'h2' | 'h3' | 'p' | 'span' }) {
   return <Tag className={`text-[11px] font-semibold uppercase tracking-[0.08em] text-muted ${className}`}>{children}</Tag>
-}
-
-const NOMBRE_ETIQUETA: Record<Etiqueta, string> = {
-  viejo: 'viejo',
-  declarado: 'declarado',
-  inferido: 'inferido',
-  pendiente: 'pendiente',
-  parcial: 'suma parcial',
 }
 
 /** Un solo chip gris por número, con la etiqueta más grave (D-67). Lo verificado no lleva nada. */

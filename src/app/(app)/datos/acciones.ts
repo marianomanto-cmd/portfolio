@@ -195,8 +195,9 @@ export async function nuevoSaldoPasivo(previo: EstadoFormulario, form: FormData)
     () => r,
     async () => {
       if (!r.ok) throw new Error('inválido')
-      await guardarPasivoSaldo(r.datos, loteDe(form))
-      return 'Capital pendiente guardado.'
+      // Este formulario es el del valor que informa el acreedor; un estimado no se carga desde acá (D-154).
+      await guardarPasivoSaldo({ ...r.datos, naturaleza: 'informado' }, loteDe(form))
+      return 'Valor informado guardado. Desde esa fecha es la deuda que resta en tu patrimonio.'
     },
   )
 }

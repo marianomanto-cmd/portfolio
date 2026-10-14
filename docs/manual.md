@@ -87,6 +87,7 @@ Una cifra que no es un dato verificado lleva un chip gris chico, con una palabra
 | **viejo** | El dato tiene más de 2 días hábiles. Los feriados y los días sin rueda en BYMA no cuentan; un día con rueda aunque los bancos cierren (el Día del Bancario, un no laborable con fines turísticos) sí cuenta (D-129) | Un precio que no se actualiza porque no cargaste esa cuenta; el CCL de hace tres días hábiles (D-16, D-109) |
 | **inferido** | Se calculó a partir de otro dato; no se leyó tal cual | El precio de una compra deducido del cambio de PPP; una compra pendiente valuada al precio del día (D-110) |
 | **declarado** | Lo cargaste vos, sin respaldo de una fuente | El CCL de compra de una posición que ya tenías antes de la primera carga |
+| **estimado** | No lo informó la fuente: es un cálculo que aprobaste, con su fórmula en la traza | La deuda del leasing mientras la leasera no te pase el valor de cancelación (D-131, D-154). Se ve en la deuda y en todo total que la incluye: el patrimonio total y el neto de Exposición |
 
 ### "Sin atribuir"
 
@@ -139,7 +140,7 @@ El resultado de cada control (el Excel contra B2 y sus Subtotales, la captura de
 
 **Las dos tarjetas** (D-03):
 - **Patrimonio financiero**: lo invertible. Tus posiciones de IEB y Galicia y la liquidez de las tres cuentas. Sobre esto se miden Cartera, la concentración y los resultados. Debajo, su variación y su desglose: activos, CCL y, si hay, sin atribuir. Las tres partes suman la variación.
-- **Patrimonio total**: el financiero, más la casa, más tu parte de la camioneta (su valuación menos el capital pendiente del leasing), "sujeta a opción de compra". Dice la fecha de cada valuación. Mientras no cargues tus bienes o el leasing (Datos), el patrimonio total y su variación son "sin dato", con la suma de lo que sí cargaste a la vista (D-65, D-126).
+- **Patrimonio total**: el financiero, más la casa, más tu parte de la camioneta (su valuación menos la deuda del leasing), "sujeta a opción de compra". Dice la fecha de cada valuación. Mientras no cargues tus bienes o el leasing (Datos), el patrimonio total y su variación son "sin dato", con la suma de lo que sí cargaste a la vista (D-65, D-126). Si la deuda del leasing es un estimado, el total lleva el chip "estimado", y su traza dice cómo se estimó (D-154).
 
 **Pesos financieros − deuda del leasing** (D-101). Tus activos financieros que arriesgan pesos, menos lo que debés del leasing: "largo $32.783.100 ($54,18 M − $21,40 M) · US$ 21.175 · si el CCL sube 1%, pierde US$ 210". **Largo** quiere decir que tenés más pesos que deuda en pesos: si el dólar sube, perdés en dólares. El "+1%" es una sensibilidad, no un pronóstico. La casa y la camioneta no entran: les falta la moneda de riesgo, que se elige desde la 1b (D-73). Sin el leasing cargado, o sin su capital pendiente, la deuda es "sin dato", nunca $0, y el neto queda "sin dato", con lo que da sin la deuda (D-126).
 
@@ -253,7 +254,7 @@ Lo que podés encontrar en la bandeja:
 
 > Estás **largo en pesos por $32.783.100** (US$ 21.175): tus pesos financieros ($54,18 M) superan lo que debés del leasing ($21,40 M). Por cada +1% de CCL: en dólares, ese neto pierde US$ 210; en pesos, tus activos en dólares suman $500.884.
 
-**Largo, corto y neto:** tus pesos financieros, el capital pendiente del leasing (lo que informa la leasera), el neto en pesos y en dólares, y tus activos que arriesgan dólares ("CEDEARs y dólares, aunque coticen en pesos").
+**Largo, corto y neto:** tus pesos financieros, la deuda del leasing (lo que informa la leasera o, mientras no lo tengas, el estimado, con su chip), el neto en pesos y en dólares, y tus activos que arriesgan dólares ("CEDEARs y dólares, aunque coticen en pesos").
 
 **Composición**, en barras horizontales: por clase, por moneda de riesgo y por geografía. La liquidez cuenta en la geografía de su custodio: los dólares que están en IEB son AR en geografía y USD en moneda de riesgo.
 
@@ -289,7 +290,7 @@ El título es el selector: tocá **"Datos · Catálogo ▾"** para cambiar de su
 | **Catálogo** | Tus activos: ticker, nombre, tipo (CEDEAR, acción local, bono, LECAP, FCI), moneda de riesgo, geografía, indexación (bonos), subyacente y **ratio con su historia** (CEDEAR: un ratio nuevo se carga con su fecha "vigente desde"), color fijo para los gráficos, y si se sigue ofreciendo en las cargas |
 | **Cuentas** | IEB, Galicia y Mercado Pago, y cómo llega cada una a Cargar (Excel o captura) |
 | **Bienes** | La casa y la camioneta: tipo, moneda en que lo valuás, la deuda que lo financia (la camioneta, con su leasing), y sus **valuaciones fechadas con su fuente** (tasación, guía de precios). Cada valuación se muestra también en la otra moneda, al último CCL, con su traza. Sin valuación, el valor es "sin dato" (D-04) |
-| **Leasing** | El contrato (montos **netos de IVA**; lo que no tengas a mano queda vacío): moneda, cantidad de cuotas, monto financiado, anticipo, valor del bien, opción de compra y su fecha. Y el **capital pendiente informado** por la leasera, con su fecha: es lo que se resta en Exposición |
+| **Leasing** | El contrato (montos **netos de IVA**; lo que no tengas a mano queda vacío): moneda, cantidad de cuotas, monto financiado, anticipo, valor del bien, opción de compra y su fecha. Y la **deuda**: el **valor de cancelación** que informe la leasera ("Cargar el valor que informó la leasera", con su fecha y, si querés, quién lo informó) o, mientras no lo tengas, el **estimado** que aprobaste, con el chip "estimado" y cómo se calculó. La última es lo que se resta en Exposición y en el patrimonio; el valor informado reemplaza al estimado desde su fecha (D-154) |
 | **Movimientos** | Aportes, retiros y transferencias entre tus cuentas (sección 9) |
 
 ### 4.7 Ajustes

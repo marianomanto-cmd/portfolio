@@ -2,7 +2,7 @@
 // devuelve el valor con su fórmula y sus insumos, como el motor. Ninguno inventa
 // un dato: si falta una parte, el resultado es "sin dato" con la suma parcial.
 
-import type { CalcVista, InsumoVista } from '@/lib/domain/calc'
+import { unicas, type CalcVista, type InsumoVista } from '@/lib/domain/calc'
 import { Decimal, monto, numero, porcentaje } from '@/lib/domain/dinero'
 import { fechaCorta, fechaEnCordoba, sumarDias, ZONA } from '@/lib/domain/fechas'
 import type { Fecha } from '@/lib/domain/tipos'
@@ -103,9 +103,7 @@ export function parcialDeTotal(total: CalcVista, moneda: 'ARS' | 'USD'): ReturnT
 }
 
 function etiquetas(partes: { calc: CalcVista }[]): CalcVista['etiquetas'] {
-  const orden = ['parcial', 'pendiente', 'viejo', 'inferido', 'declarado'] as const
-  const todas = new Set(partes.flatMap((p) => p.calc.etiquetas))
-  return orden.filter((e) => todas.has(e))
+  return unicas(partes.flatMap((p) => p.calc.etiquetas))
 }
 
 /** Un monto en pesos pasado a dólares al CCL, con su traza. */
