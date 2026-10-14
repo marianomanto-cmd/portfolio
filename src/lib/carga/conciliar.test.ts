@@ -256,6 +256,13 @@ describe('una tenencia que la fuente ya no lista: se propone registrar la venta 
     // Otra moneda u otra sección: tampoco.
     expect(proponerCarga([captura([total(true, 'bonos', 'USD')])], h, '2026-10-08', { ccl: D(1530) }).ausentes).toEqual([])
     expect(proponerCarga([captura([total(true, 'cedears')])], h, '2026-10-08', { ccl: D(1530) }).ausentes.map((a) => a.ticker)).toEqual(['SPY'])
+    // Una ausente que quedó pendiente antes sigue ausente aunque esta captura no cubra su sección.
+    const conPendiente = { ...h, ausentes: [{ cuenta_id: 2, activo_id: 1, fecha: '2026-10-06', carga_id: 1 }] }
+    expect(proponerCarga([captura([total(true, 'bonos')])], conPendiente, '2026-10-08', { ccl: D(1530) }).ausentes.map((a) => a.ticker)).toEqual([
+      'SPY',
+      'S09O6',
+      'T15E7',
+    ])
   })
 })
 

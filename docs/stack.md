@@ -19,7 +19,7 @@ Partió de la propuesta del dueño ("Stack de UI — librerías gratuitas", 2026
 | Estado en URL | nuqs + zod 4 | Supuestos de escenarios versionados con `discriminatedUnion('v', …)` y migración de versiones viejas |
 | Validación | zod 4 | Entradas de server actions, filas del Excel, lectura de capturas |
 | Fechas | date-fns 4 + `TZDate` en America/Argentina/Cordoba | "Hoy" nunca depende de la zona horaria del servidor |
-| Feriados | date-holidays (solo para sembrar) + tabla `feriados` | Se siembra cada año y se corrige a mano con el calendario de BYMA. Nunca se calcula en vivo |
+| Feriados | Tabla `feriados`, sembrada por migración con fuente oficial | La primera migración trae 2026 y 2027; después, una por año, cada diciembre: la ley y los decretos del año, el calendario de BYMA y el de la NYSE (D-16, D-129). Nunca se calcula en vivo |
 | Excel | exceljs | Lee el Excel de IEB en un Route Handler (multipart) y exporta. Detrás de una interfaz propia, por si hay que cambiarlo |
 | IA | @anthropic-ai/sdk | Solo en el servidor, para las capturas |
 | Base | supabase-js con `service_role`, solo en el servidor | Ver "Números exactos desde la base" |
@@ -38,7 +38,7 @@ Partió de la propuesta del dueño ("Stack de UI — librerías gratuitas", 2026
 | d3-random `randomLcg` como generador | Tiene período y calidad insuficientes para 10⁶–10⁷ sorteos | Se reemplaza por sfc32. Cada escenario guarda `{algoritmo, semilla}` y un test fija los primeros N valores |
 | simple-statistics para cuantiles | Cambió la definición de percentil en una versión patch | Cuantil propio tipo 7, testeado contra numpy |
 | TanStack Query para cachear Supabase | El navegador nunca habla con Supabase (D-20) | **No se usa.** Server Components, Server Actions y `useOptimistic` |
-| "No existe librería de feriados argentinos" | **Falso:** date-holidays cubre Argentina | Se usa para sembrar la tabla, con correcciones manuales de BYMA |
+| "No existe librería de feriados argentinos" | **Falso:** date-holidays cubre Argentina | No se usa: no sabe qué hace BYMA cada día ni trae los días que se decretan en el año (D-129) |
 | SheetJS fuera de npm | Correcto: `npm i xlsx` instala 0.18.5, con vulnerabilidades | exceljs, como proponía el documento |
 
 ## Números exactos desde la base

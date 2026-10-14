@@ -149,6 +149,17 @@ export async function revisarLayout(page: Page, grueso: boolean): Promise<string
       }
     }
 
+    // Texto que se sale de un control con borde y sin recorte: se ve pisando o
+    // pasando el borde ("Transferencia" en un botón de 77 px). Los campos
+    // (input, select, textarea) desplazan su texto adentro y no cuentan.
+    for (const el of controles) {
+      if (el.matches('input, select, textarea')) continue
+      const cs = getComputedStyle(el)
+      if (cs.display === 'inline' || cs.overflowX !== 'visible') continue
+      if (!(parseFloat(cs.borderLeftWidth) > 0 && parseFloat(cs.borderRightWidth) > 0)) continue
+      if (el.scrollWidth > el.clientWidth + 1) out.push(`texto que se sale de su control (${el.scrollWidth} > ${el.clientWidth}): ${desc(el)}`)
+    }
+
     // Controles superpuestos (uno fijo y otro que scrollea no cuenta: el contenido pasa por debajo de las barras).
     const cajas = controles.map((el) => ({ el, r: el.getBoundingClientRect(), fijo: enFijo(el) }))
     for (let i = 0; i < cajas.length; i++) {

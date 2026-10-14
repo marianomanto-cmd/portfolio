@@ -418,12 +418,16 @@ export function proponerCarga(
               .filter((c) => c.tipo === 'galicia_total' && c.ok === true && c.cobertura)
               .map((c) => `${c.cobertura!.seccion}:${c.cobertura!.moneda}`),
           )
+    // Una ausente que quedó pendiente en una carga anterior sigue ausente aunque
+    // esta captura no cubra su sección: si no, la carga nueva la "olvidaría" y
+    // volvería a valer su último precio (Hechos.ausentes lee la última carga).
+    const yaAusente = (activo_id: number) => (hechos.ausentes ?? []).some((x) => x.cuenta_id === cuenta.id && x.activo_id === activo_id)
     for (const t of tens.values()) {
       if (t.cuenta_id !== cuenta.id || vistos.has(t.activo_id)) continue
       const a = hechos.activos.find((x) => x.id === t.activo_id)
       if (!a) continue
       const moneda = t.operaciones[0]?.moneda ?? 'ARS'
-      if (cubiertas !== null && !cubiertas.has(`${SECCION_DE_TIPO[a.tipo]}:${moneda}`)) continue
+      if (cubiertas !== null && !cubiertas.has(`${SECCION_DE_TIPO[a.tipo]}:${moneda}`) && !yaAusente(a.id)) continue
       propuesta.ausentes.push(ausente(l.cuenta, cuenta.id, a, t, hechos, fecha, ccl))
     }
 

@@ -181,7 +181,7 @@ function Celda({ f, k }: { f: FilaCartera; k: Clave }) {
       )
     case 'dias': {
       // De dónde se cuentan, a la vista: "desde apertura" no es cuánto hace que la tenés.
-      const c = diasEnPosicion(f.dias_en_posicion, f.dias_desde)
+      const c = diasEnPosicion(f.dias_en_posicion, f.dias_desde, f.fecha_inicio ?? null)
       return (
         <Doble
           arriba={

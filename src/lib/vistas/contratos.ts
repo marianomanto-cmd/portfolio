@@ -157,6 +157,8 @@ export interface FilaCartera {
    * (la apertura en la app, sin fecha de compra real).
    */
   dias_desde: 'compra' | 'declarada' | 'apertura' | null
+  /** Desde cuándo se cuentan los días (la traza muestra la resta). Opcional. */
+  fecha_inicio?: Fecha | null
   /** Badge único cuando los signos de ARS y USD difieren. */
   ganas_pesos_perdes_dolares: boolean
   pendiente: string | null

@@ -764,7 +764,7 @@ export function desgloseDesdeCompra(h: Hechos, clave: string, hasta: Fecha, opci
     if (base === null)
       return { tipo: 'sin_dato', motivo: o.tipo === 'apertura' ? 'La apertura no tiene PPP del bróker.' : 'Compra con precio pendiente: el bróker todavía no informó el PPP.' }
     if (o.ccl_del_dia === null)
-      return { tipo: 'sin_dato', motivo: o.tipo === 'apertura' ? 'Falta el CCL de compra de la apertura: declaralo para ver el desglose en dólares.' : 'Falta el CCL del día de la compra.' }
+      return { tipo: 'sin_dato', motivo: o.tipo === 'apertura' ? 'Falta el CCL de compra de la apertura: se declara desde la 1b (Pendientes).' : 'Falta el CCL del día de la compra.' }
     const v0: Doble = o.moneda === 'USD' ? { ars: base.times(o.ccl_del_dia), usd: base } : { ars: base, usd: base.div(o.ccl_del_dia) }
     const valor = o.cantidad.times(p1)
     const v1: Doble = { ars: valor, usd: valor.div(ccl1) }
@@ -984,9 +984,9 @@ export function cuadre(v: Variacion, h: Hechos, opciones: { hoy?: Fecha } = {}):
       detalle: `Patrimonio de hoy − patrimonio de la carga anterior − aportes y retiros = activos + TC + sin atribuir, en las dos monedas.${notaFuera}`,
       diferencia: { ars: difA, usd: difU },
     }
-  const da = difA.valor as Decimal
-  const du = difU.valor as Decimal
-  const detalle = `El desglose no cierra por ${monto(da, 'ARS', { decimales: 2, signo: true })} · ${monto(du, 'USD', { decimales: 2, signo: true })}: si no tiene explicación, es un bug (revisalo).${notaFuera}`
+  // Cuánto no cierra lo dice `diferencia`, con su traza (Hoy: "no cierra por
+  // +$ X · US$ Y."): el detalle no lo repite y arranca por la explicación.
+  const detalle = `Si no tiene explicación, es un bug: revisalo.${notaFuera}`
   return { ars_ok: okA, usd_ok: okU, detalle, diferencia: { ars: difA, usd: difU } }
 }
 

@@ -24,31 +24,50 @@ const entero = (v: unknown): number | null => {
 
 /**
  * Por cuenta, la carga vigente más reciente (por fecha y, en el mismo día, la
- * última confirmada) y, de sus ausentes, las que no se registraron. El JSON se
- * valida campo por campo: lo que no tiene forma se ignora. Las ausentes
- * grabadas antes de que llevaran activo_id se resuelven por el ticker.
+ * última confirmada) y, de sus ausentes, las que no se registraron: toda
+ * resolución distinta de 'registrada' ('pendiente' y 'sin revisar al guardar').
+ * La fecha y la carga de cada una son las de la primera carga de su racha: si
+ * la dejaste pendiente varios días seguidos, la del primero, así las fotos de
+ * los días del medio tampoco la valúan al último precio (contarla dos veces).
+ * El JSON se valida campo por campo: lo que no tiene forma se ignora. Las
+ * ausentes grabadas antes de que llevaran activo_id se resuelven por el ticker.
  */
 export function ausentesVigentes(cargas: readonly CargaConAusentes[], activos: readonly Pick<Activo, 'id' | 'ticker'>[]): Ausente[] {
-  const ultima = new Map<number, CargaConAusentes>()
+  const porCuenta = new Map<number, CargaConAusentes[]>()
   for (const c of cargas) {
     if (c.cuenta_id === null || c.estado !== 'vigente') continue
-    const u = ultima.get(c.cuenta_id)
-    if (!u || c.fecha > u.fecha || (c.fecha === u.fecha && c.id > u.id)) ultima.set(c.cuenta_id, c)
+    porCuenta.set(c.cuenta_id, [...(porCuenta.get(c.cuenta_id) ?? []), c])
   }
   const porTicker = new Map(activos.map((a) => [a.ticker.toUpperCase(), a.id]))
   const ids = new Set(activos.map((a) => a.id))
+  const memo = new Map<number, number[]>()
+  /** Los activos que una carga declara ausentes y sin registrar, en el orden en que los grabó. */
+  const pendientesDe = (c: CargaConAusentes): number[] => {
+    const hecho = memo.get(c.id)
+    if (hecho) return hecho
+    const out: number[] = []
+    if (Array.isArray(c.ausentes)) {
+      for (const x of c.ausentes) {
+        if (x === null || typeof x !== 'object' || Array.isArray(x)) continue
+        const r = x as Record<string, unknown>
+        if (r.resolucion === 'registrada') continue
+        const activo_id = entero(r.activo_id) ?? (typeof r.ticker === 'string' ? (porTicker.get(r.ticker.toUpperCase()) ?? null) : null)
+        if (activo_id === null || !ids.has(activo_id) || out.includes(activo_id)) continue
+        out.push(activo_id)
+      }
+    }
+    memo.set(c.id, out)
+    return out
+  }
   const out: Ausente[] = []
-  for (const c of ultima.values()) {
-    if (!Array.isArray(c.ausentes)) continue
-    const vistos = new Set<number>()
-    for (const x of c.ausentes) {
-      if (x === null || typeof x !== 'object' || Array.isArray(x)) continue
-      const r = x as Record<string, unknown>
-      if (r.resolucion === 'registrada') continue
-      const activo_id = entero(r.activo_id) ?? (typeof r.ticker === 'string' ? (porTicker.get(r.ticker.toUpperCase()) ?? null) : null)
-      if (activo_id === null || !ids.has(activo_id) || vistos.has(activo_id)) continue
-      vistos.add(activo_id)
-      out.push({ cuenta_id: c.cuenta_id as number, activo_id, fecha: c.fecha, carga_id: c.id })
+  for (const [cuenta_id, lista] of porCuenta) {
+    lista.sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.id - b.id))
+    const ultima = lista[lista.length - 1]
+    for (const activo_id of pendientesDe(ultima)) {
+      // Hacia atrás, mientras la carga anterior de la cuenta también la declare ausente y sin registrar.
+      let desde = ultima
+      for (let k = lista.length - 2; k >= 0 && pendientesDe(lista[k]).includes(activo_id); k--) desde = lista[k]
+      out.push({ cuenta_id, activo_id, fecha: desde.fecha, carga_id: desde.id })
     }
   }
   return out.sort((a, b) => a.cuenta_id - b.cuenta_id || a.activo_id - b.activo_id)

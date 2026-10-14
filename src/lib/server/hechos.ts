@@ -109,7 +109,7 @@ async function leerHechosDeLaBase(): Promise<Hechos> {
     // De lo grabado, solo las tenencias ausentes (un camino JSON, sin traer el resto).
     leerTodo<Fila & { ausentes?: unknown }>(
       'cargas',
-      'id,lote,fecha,cuenta_id,origen,archivo_path,estado,creado_en,reemplaza_a,lector,tiempo_activo_ms,ausentes:grabado->ausentes',
+      'id,lote,fecha,cuenta_id,origen,archivo_path,estado,creado_en,reemplaza_a,lector,tiempo_activo_ms,listado_completo,ausentes:grabado->ausentes',
       ['id'],
     ),
   ])
@@ -264,6 +264,7 @@ async function leerHechosDeLaBase(): Promise<Hechos> {
           reemplaza_a: r.reemplaza_a === null ? null : n(r.reemplaza_a),
           lector: s(r.lector),
           tiempo_activo_ms: r.tiempo_activo_ms === null ? null : n(r.tiempo_activo_ms),
+          listado_completo: r.listado_completo !== false,
         }),
       )
       .filter((c) => c.estado !== 'revertida'),

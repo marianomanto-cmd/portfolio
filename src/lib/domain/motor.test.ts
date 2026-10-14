@@ -147,8 +147,8 @@ describe('tenencias y PPC', () => {
     expect(u.motivo).toMatch(/CCL de compra/)
   })
   it('compra del día sin precio: pendiente, nunca cero (D-19)', () => {
-    const t = tenencias([op({ fecha: '2026-10-07', activo_id: 1, tipo: 'compra', cantidad: D(191), ccl_del_dia: D(1500) })]).get('1:1')!
-    expect(t.cantidad.toFixed()).toBe('191')
+    const t = tenencias([op({ fecha: '2026-10-07', activo_id: 1, tipo: 'compra', cantidad: D(37), ccl_del_dia: D(1500) })]).get('1:1')!
+    expect(t.cantidad.toFixed()).toBe('37')
     expect(t.costo_ars).toBeNull()
     expect(t.etiquetas).toContain('pendiente')
   })
@@ -281,7 +281,7 @@ describe('armado de pantallas', () => {
       op({ fecha: '2026-10-01', activo_id: 2, tipo: 'apertura', cantidad: D(1000000), precio: D('1.05') }),
     ]
     h.tipos_cambio = [tc('2026-10-01', 1500), tc('2026-10-02', 1530)]
-    h.cotizaciones = [cot('2026-10-01', 1, 20870), cot('2026-10-01', 2, '1.07'), cot('2026-10-02', 1, 21300), cot('2026-10-02', 2, '1.071')]
+    h.cotizaciones = [cot('2026-10-01', 1, 20915), cot('2026-10-01', 2, '1.07'), cot('2026-10-02', 1, 21300), cot('2026-10-02', 2, '1.071')]
     h.saldos = [
       { fecha: '2026-10-01', cuenta_id: 3, moneda: 'ARS', monto: D(1000000), carga_id: 1 },
       { fecha: '2026-10-02', cuenta_id: 3, moneda: 'ARS', monto: D(1001000), carga_id: 1 },

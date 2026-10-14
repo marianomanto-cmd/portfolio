@@ -193,7 +193,10 @@ describe('ausentes: la fuente ya no lista una tenencia y la venta no está regis
   it('Exposición: lo que arriesga dólares queda "sin dato" (no suma una SPY que ya no tenés)', () => {
     const e = armarExposicion(ventaTotalSpy(), '2026-10-06', 'financiero')
     expect(e.activos_en_dolares.ars.valor).toBeNull()
-    expect(e.activos_en_dolares.ars.etiquetas).toContain('parcial')
+    // SPY es lo único que arriesga dólares: sin ninguna parte conocida no hay
+    // suma parcial (no "(0 de 1): $ 0,00"); el motivo es el de SPY.
+    expect(e.activos_en_dolares.ars.etiquetas).not.toContain('parcial')
+    expect(e.activos_en_dolares.ars.motivo).toContain('ya no la lista')
     // La concentración dice por qué no se puede calcular.
     expect(e.concentracion.top1.valor).toBeNull()
     expect(e.concentracion.top1.motivo).toContain('SPY')
@@ -303,7 +306,9 @@ describe('cuadre: la diferencia en pesos y en dólares, con traza', () => {
       'Aportes, retiros y otros flujos externos',
       'Activos + TC + sin atribuir',
     ])
-    expect(c.detalle).toMatch(/^El desglose no cierra por −\$ 1,00 · US\$ 0,00: si no tiene explicación, es un bug/)
+    // Cuánto no cierra lo dice la diferencia (Hoy: "no cierra por …", con su traza); el detalle no lo repite.
+    expect(c.detalle).toMatch(/^Si no tiene explicación, es un bug: revisalo\./)
+    expect(c.detalle).not.toContain('no cierra por')
   })
 
   it('Galicia no tiene saldo cargado: la plata de una compra entra de fuera de la app, el cuadre cierra y lo dice (antes: ≠ sin arreglo posible)', () => {

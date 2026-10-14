@@ -1983,7 +1983,7 @@ Valen las reglas de 7.0. En la 1b ya hay datos, así que todo lo que se agrega e
 | `cargas.origen` suma `serie`, y `cargas` suma la columna `fuente`, obligatoria cuando el origen es `serie`. `cargas_check` pasa a `(origen in ('manual','serie')) = (archivo_path is null)` | Pegar serie: el origen de cada fecha pegada | CA-13, D-48 |
 | `bienes`: `moneda_riesgo` (check `ARS`/`USD`, como `activos.moneda_riesgo`: es riesgo, no unidad de cuenta, D-59) y `cadencia_revaluacion_meses` | Moneda de riesgo elegida por vos; un bien sin ella no entra en Exposición y la vista Total dice "sin dato". Valuación que se vuelve vieja | D-73, D-65, CO-11 |
 
-`feriados` es la única tabla con datos que cambia de forma. Es chica, así que los tres pasos van en la misma migración: se saca el check, se renombran los mercados, se pone el check nuevo, y las filas sembradas en la 1a reciben como fuente "date-holidays, sembrado en la 1a".
+`feriados` es la única tabla con datos que cambia de forma. Es chica, así que los tres pasos van en la misma migración: se saca el check, se renombran los mercados, se pone el check nuevo, y las filas sembradas en la 1a reciben como fuente "migración 20261014203031_feriados_2026_2027 (fuentes oficiales en su encabezado)" (D-129).
 
 **`1b_tesis_como_datos`** (D-51, DD-5, DS-11, DS-13, DB-6, DB-11)
 

@@ -33,9 +33,43 @@ describe('ausentesVigentes', () => {
     )
     expect(r).toEqual([
       { cuenta_id: 1, activo_id: 1, fecha: '2026-10-08', carga_id: 4 },
-      { cuenta_id: 1, activo_id: 3, fecha: '2026-10-08', carga_id: 4 },
+      // T15E7 ya estaba pendiente en la carga anterior de la cuenta: su racha empieza ahí.
+      { cuenta_id: 1, activo_id: 3, fecha: '2026-10-06', carga_id: 1 },
       { cuenta_id: 2, activo_id: 2, fecha: '2026-10-08', carga_id: 5 },
     ])
+  })
+
+  it('pendiente varios días seguidos: la fecha es la de la primera carga de la racha, no la de la última', () => {
+    const r = ausentesVigentes(
+      [
+        carga({ id: 1, fecha: '2026-10-05', ausentes: [] }),
+        carga({ id: 2, fecha: '2026-10-06', ausentes: [pendiente(1, 'SPY')] }),
+        carga({ id: 3, fecha: '2026-10-07', ausentes: [{ ...pendiente(1, 'SPY'), resolucion: 'sin revisar al guardar' }] }),
+        carga({ id: 5, fecha: '2026-10-07', cuenta_id: 2, ausentes: [{ ...pendiente(1, 'SPY'), cuenta_id: 2 }] }),
+        carga({ id: 4, fecha: '2026-10-08', ausentes: [pendiente(1, 'SPY'), pendiente(2, 'S09O6')] }),
+      ],
+      ACTIVOS,
+    )
+    expect(r).toEqual([
+      { cuenta_id: 1, activo_id: 1, fecha: '2026-10-06', carga_id: 2 },
+      { cuenta_id: 1, activo_id: 2, fecha: '2026-10-08', carga_id: 4 },
+      // La racha es por cuenta: la de otra cuenta no la estira.
+      { cuenta_id: 2, activo_id: 1, fecha: '2026-10-07', carga_id: 5 },
+    ])
+  })
+
+  it('la racha se corta en una carga que volvió a listarla (o que la registró)', () => {
+    const r = ausentesVigentes(
+      [
+        carga({ id: 1, fecha: '2026-10-05', ausentes: [pendiente(1, 'SPY')] }),
+        carga({ id: 2, fecha: '2026-10-06', ausentes: [{ ...pendiente(1, 'SPY'), resolucion: 'registrada' }] }),
+        carga({ id: 3, fecha: '2026-10-07', ausentes: [pendiente(1, 'SPY')] }),
+        carga({ id: 4, fecha: '2026-10-08', estado: 'reemplazada', ausentes: [pendiente(1, 'SPY')] }),
+        carga({ id: 6, fecha: '2026-10-08', ausentes: [pendiente(1, 'SPY')] }),
+      ],
+      ACTIVOS,
+    )
+    expect(r).toEqual([{ cuenta_id: 1, activo_id: 1, fecha: '2026-10-07', carga_id: 3 }])
   })
 
   it('una carga posterior que ya trae la tenencia (o que no declara ausentes) la saca', () => {

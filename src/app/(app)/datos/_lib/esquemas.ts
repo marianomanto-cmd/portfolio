@@ -108,6 +108,9 @@ export const esquemaBien = z.object({
   pasivo_id: z.preprocess(vacio, id.optional()).transform((v) => v ?? null),
 })
 
+/** Corregir un bien cargado con un dato equivocado (la moneda, por ejemplo). */
+export const esquemaEdicionBien = esquemaBien.extend({ id })
+
 export const esquemaValuacion = z.object({
   bien_id: id,
   fecha,
@@ -128,6 +131,9 @@ export const esquemaPasivo = z.object({
   valor_bien: z.preprocess(vacio, numeroAR({ min: 'positivo' }).optional()).transform((v) => v ?? null),
   notas: z.preprocess(vacio, z.string().trim().max(500).optional()).transform((v) => v ?? null),
 })
+
+/** Corregir el contrato de un pasivo. */
+export const esquemaEdicionPasivo = esquemaPasivo.extend({ id })
 
 export const esquemaPasivoSaldo = z.object({
   pasivo_id: id,

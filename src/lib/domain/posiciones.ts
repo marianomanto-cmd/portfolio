@@ -95,7 +95,7 @@ function costosAlta(o: Operacion): { ars: Decimal | null; usd: Decimal | null; m
       motivoArs: null,
       motivoUsd:
         o.tipo === 'apertura'
-          ? 'Falta el CCL de compra de la apertura: declaralo para ver el PPC y el resultado en dólares.'
+          ? 'Falta el CCL de compra de la apertura: se declara desde la 1b (Pendientes).'
           : 'Falta el CCL del día de la operación.',
       etArs: [],
       etUsd: [],

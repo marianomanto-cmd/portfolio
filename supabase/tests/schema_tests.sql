@@ -508,7 +508,7 @@ select pg_temp.espera((select precio is null and precio_carga_id is null from op
 select pg_temp.espera_ok($$select revertir_lote('a1900000-0000-4000-8000-000000000001', 'prueba')$$, 'revertir_lote: la compra pendiente');
 select pg_temp.espera(pg_temp.huella() = :'huella_inicial', 'D-19: después de revertir todo, la huella inicial');
 
--- ═════════════ Revisión de la fase 1a: 20261008190000_confirmar_carga_recarga (números inventados) ═════════════
+-- ═════════════ Revisión de la fase 1a: 20261014193803_confirmar_carga_recarga (números inventados) ═════════════
 
 -- ── Recargar el mismo día con un solo tipo de cambio no borra el otro ──
 -- R1, a la mañana: CCL con su referencia y cripto.
@@ -632,7 +632,7 @@ select pg_temp.espera((select nombre = 'CEDEAR renombrado' and color is null and
                       and (select count(*) from ratios_cedear r join activos a on a.id = r.activo_id where a.ticker = 'XNEW') = 2,
                       'editar_activo: cambia solo lo pedido y suma el ratio con su vigencia');
 select pg_temp.espera_error_por($$select editar_activo(32000, '{"nombre": "x"}')$$, 'No existe el activo', 'editar_activo: activo inexistente');
--- D-104 (20261008190100_catalogo_cedear_ratio): nunca queda un CEDEAR sin ratio.
+-- D-104 (20261014193834_catalogo_cedear_ratio): nunca queda un CEDEAR sin ratio.
 select pg_temp.espera_error_por($$select alta_activo('{"ticker": "XSIN", "nombre": "CEDEAR sin ratio", "tipo": "cedear", "moneda_riesgo": "USD",
   "geografia": "US", "ticker_subyacente": "XSIN"}')$$, 'necesita su ratio', 'alta_activo: CEDEAR sin ratio');
 select pg_temp.espera_ok($$select alta_activo('{"ticker": "XLOC", "nombre": "Acción local", "tipo": "accion_local", "moneda_riesgo": "ARS", "geografia": "AR"}')$$,
@@ -662,7 +662,7 @@ select pg_temp.espera_error_por($$insert into auditoria (tabla, operacion) value
                                 'service_role escribe la auditoría a mano (después de la migración)');
 reset role;
 
--- ═════════════════════════ Seguridad (migraciones 202610081910* y siguientes) ═════════════════════════
+-- ═════════════════════════ Seguridad (migraciones 20261014193836 y siguientes) ═════════════════════════
 
 -- ── Toda función de public fija el search_path, con pg_temp explícito y al final ──
 -- Sin pg_temp en la lista, Postgres busca las tablas primero en la temporal de la sesión.
@@ -671,7 +671,7 @@ select pg_temp.espera(bool_and(coalesce((select bool_or(c ~ '^search_path=(.+, )
 from pg_proc p
 where p.pronamespace = 'public'::regnamespace;
 
--- ── Auditoría: una tabla temporal "auditoria" no se lleva las filas (20261008191000_auditoria_search_path) ──
+-- ── Auditoría: una tabla temporal "auditoria" no se lleva las filas (20261014193836_auditoria_search_path) ──
 set role service_role;
 create temp table auditoria (id bigserial, en timestamptz default now(), tabla text, operacion text,
                              antes jsonb, despues jsonb, carga_id bigint);
@@ -683,3 +683,40 @@ select pg_temp.espera((select count(*) from public.auditoria where tabla = 'feri
                       and (select count(*) from pg_temp.auditoria) = 0,
                       'auditoría: con una tabla temporal "auditoria", el alta y la baja van igual a public.auditoria');
 drop table pg_temp.auditoria;
+
+-- ── Feriados 2026 y 2027 (20261014203031_feriados_2026_2027) ──
+-- 'AR': días de semana sin rueda en BYMA; 'US': cierres de la NYSE.
+select pg_temp.espera((select count(*) from feriados where mercado = 'AR' and extract(year from fecha) = 2026) = 17
+                      and (select count(*) from feriados where mercado = 'AR' and extract(year from fecha) = 2027) = 12
+                      and (select count(*) from feriados where mercado = 'US' and extract(year from fecha) = 2026) = 10
+                      and (select count(*) from feriados where mercado = 'US' and extract(year from fecha) = 2027) = 10,
+                      'feriados: 17 + 12 días sin rueda en BYMA y 10 + 10 cierres de la NYSE (2026 y 2027)');
+select pg_temp.espera(bool_and(extract(isodow from fecha) between 1 and 5 and btrim(descripcion) <> ''),
+                      'feriados sembrados: todos de lunes a viernes y con descripción')
+from feriados where fecha between '2026-01-01' and '2027-12-31';
+-- El caso de la revisión: un precio del vie 9/10/2026, el mié 14/10, tiene 2 días hábiles y no 3.
+select pg_temp.espera(count(*) = 2, 'feriados: del vie 9/10/2026 al mié 14/10 hay 2 días hábiles (el lun 12/10 fue feriado)')
+from generate_series(date '2026-10-10', date '2026-10-14', interval '1 day') d
+where extract(isodow from d) < 6 and not exists (select 1 from feriados f where f.mercado = 'AR' and f.fecha = d::date);
+select pg_temp.espera((select count(*) from feriados where mercado = 'AR'
+                         and fecha in ('2026-06-15', '2026-11-23', '2027-06-21', '2027-08-16', '2027-10-11')) = 5
+                      and not exists (select 1 from feriados where mercado = 'AR'
+                         and fecha in ('2026-06-17', '2026-11-20', '2027-06-17', '2027-08-17', '2027-10-12')),
+                      'feriados: cada trasladable está en su lunes, no en la fecha original (Ley 27.399, art. 6)');
+select pg_temp.espera(not exists (select 1 from feriados where mercado = 'AR'
+                         and fecha in ('2026-03-23', '2026-11-06', '2026-12-07', '2026-12-24')),
+                      'feriados: no están los días en que BYMA negocia sin liquidar (23/3, 6/11, 7/12 y 24/12/2026)');
+select pg_temp.espera((select count(*) from feriados where (mercado, fecha) in
+                         (('AR', date '2026-11-09'), ('AR', date '2026-12-31'), ('US', date '2026-07-03'),
+                          ('US', date '2027-06-18'), ('US', date '2027-07-05'), ('US', date '2027-12-24'))) = 6
+                      and not exists (select 1 from feriados where mercado = 'US'
+                         and fecha in ('2026-07-04', '2026-11-27', '2026-12-24', '2027-11-26')),
+                      'feriados: el 9/11 y el 31/12/2026 en BYMA; en la NYSE, el día observado y no los cierres temprano');
+select pg_temp.espera(bool_and(exists (select 1 from auditoria a where a.tabla = 'feriados' and a.operacion = 'INSERT'
+                                         and a.despues ->> 'mercado' = f.mercado and a.despues ->> 'fecha' = f.fecha::text)),
+                      'feriados: cada fila sembrada quedó en la auditoría')
+from feriados f where f.fecha between '2026-01-01' and '2027-12-31';
+select pg_temp.espera(has_table_privilege('service_role', 'feriados', 'select')
+                      and not has_table_privilege('anon', 'feriados', 'select')
+                      and not has_table_privilege('authenticated', 'feriados', 'select'),
+                      'feriados: los lee solo service_role');

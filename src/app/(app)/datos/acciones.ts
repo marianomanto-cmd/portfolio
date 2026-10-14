@@ -7,6 +7,8 @@
 import { revalidatePath } from 'next/cache'
 import {
   actualizarActivo,
+  actualizarBien,
+  actualizarPasivo,
   crearActivo,
   crearBien,
   crearPasivo,
@@ -19,6 +21,8 @@ import { configurado } from '@/lib/server/supabase'
 import {
   esquemaActivo,
   esquemaBien,
+  esquemaEdicionBien,
+  esquemaEdicionPasivo,
   esquemaEdicionActivo,
   esquemaMovimiento,
   esquemaPasivo,
@@ -126,6 +130,34 @@ export async function nuevoBien(previo: EstadoFormulario, form: FormData): Promi
       if (!r.ok) throw new Error('inválido')
       await crearBien(r.datos)
       return `${r.datos.nombre} quedó cargado. Sumale una valuación con su fuente.`
+    },
+  )
+}
+
+export async function editarBien(previo: EstadoFormulario, form: FormData): Promise<EstadoFormulario> {
+  const r = leerFormulario(esquemaEdicionBien, form)
+  return escribir(
+    previo,
+    () => r,
+    async () => {
+      if (!r.ok) throw new Error('inválido')
+      const { id, ...bien } = r.datos
+      await actualizarBien(id, bien)
+      return `${bien.nombre} quedó corregido (el cambio queda en la auditoría).`
+    },
+  )
+}
+
+export async function editarPasivo(previo: EstadoFormulario, form: FormData): Promise<EstadoFormulario> {
+  const r = leerFormulario(esquemaEdicionPasivo, form)
+  return escribir(
+    previo,
+    () => r,
+    async () => {
+      if (!r.ok) throw new Error('inválido')
+      const { id, ...pasivo } = r.datos
+      await actualizarPasivo(id, pasivo)
+      return `${pasivo.nombre} quedó corregido (el cambio queda en la auditoría).`
     },
   )
 }

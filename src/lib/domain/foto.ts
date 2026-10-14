@@ -452,8 +452,15 @@ export function sumaCalc(
   const faltan = partes.filter((p) => p.calc.valor === null)
   const parcial = partes.reduce((a, p) => (p.calc.valor === null ? a : a.plus(p.calc.valor)), CERO)
   if (faltan.length) {
+    const falta = faltan.length === 1 ? `Falta ${faltan[0].nombre}.` : `Faltan ${faltan.length} partes.`
+    // Sin ninguna parte conocida no hay suma parcial: es "sin dato", nunca
+    // "suma parcial (0 de 1): $ 0,00". Va el motivo de lo que falta.
+    if (faltan.length === partes.length) {
+      const motivos = [...new Set(faltan.map((p) => p.calc.motivo).filter((m): m is string => Boolean(m)))]
+      return sinDato(motivos.length === 1 ? motivos[0] : falta, insumos, { explicacion })
+    }
     return sinDato(
-      `Falta ${faltan.length === 1 ? faltan[0].nombre : `${faltan.length} partes`}. Suma parcial (${partes.length - faltan.length} de ${partes.length}): ${monto(parcial, moneda, { decimales: 2 })}.`,
+      `${falta} Suma parcial (${partes.length - faltan.length} de ${partes.length}): ${monto(parcial, moneda, { decimales: 2 })}.`,
       insumos,
       { etiquetas: ['parcial'], explicacion },
     )

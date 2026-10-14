@@ -163,15 +163,33 @@ function FraseExposicion({ v, pesosUsd, sensPesos }: { v: VistaExposicion; pesos
     <p className="text-[15px] leading-8 md:text-base">
       Estás <span className="font-semibold">{largo ? 'largo' : 'corto'} en pesos</span> por{' '}
       <MontoTrazado calc={r.neto_ars} moneda="ARS" titulo="Pesos financieros − deuda del leasing" className="font-semibold" />{' '}
-      <MontoTrazado calc={r.neto_usd} moneda="USD" titulo="El neto en dólares" decimales={0} />: tus pesos financieros (
-      <MontoTrazado calc={r.pesos_financieros.ars} moneda="ARS" titulo="Pesos financieros" compacta />, <MontoTrazado calc={pesosUsd} moneda="USD" titulo="Pesos financieros en dólares" decimales={0} />){' '}
-      {largo ? 'superan' : 'no llegan a'} lo que debés del leasing (<MontoTrazado calc={r.deuda_pesos.ars} moneda="ARS" titulo="Deuda del leasing" compacta />).{' '}
+      {/* La puntuación va pegada a su cifra (whitespace-nowrap): cada cifra es un
+          botón y un "(" o un ";" quedaban solos en un renglón del teléfono. */}
+      <span className="whitespace-nowrap">
+        <MontoTrazado calc={r.neto_usd} moneda="USD" titulo="El neto en dólares" decimales={0} />:
+      </span>{' '}
+      tus pesos financieros{' '}
+      <span className="whitespace-nowrap">
+        (<MontoTrazado calc={r.pesos_financieros.ars} moneda="ARS" titulo="Pesos financieros" compacta />,
+      </span>{' '}
+      <span className="whitespace-nowrap">
+        <MontoTrazado calc={pesosUsd} moneda="USD" titulo="Pesos financieros en dólares" decimales={0} />)
+      </span>{' '}
+      {largo ? 'superan' : 'no llegan a'} lo que debés del leasing{' '}
+      <span className="whitespace-nowrap">
+        (<MontoTrazado calc={r.deuda_pesos.ars} moneda="ARS" titulo="Deuda del leasing" compacta />).
+      </span>{' '}
       <span className="font-semibold">Por cada +1% de CCL:</span> en dólares, ese neto {sens !== null && sens.startsWith('-') ? 'pierde' : 'gana'}{' '}
-      <Traza calc={r.sensibilidad_usd_1pct} titulo="Si el CCL sube 1%: el neto en dólares" moneda="USD">
-        <Monto valor={sens === null ? null : sens.replace(/^-/, '')} moneda="USD" decimales={0} />
-      </Traza>
-      ; en pesos, tus activos en dólares suman{' '}
-      <MontoTrazado calc={sensPesos} moneda="ARS" titulo="Si el CCL sube 1%: tus activos en dólares, en pesos" />.
+      <span className="whitespace-nowrap">
+        <Traza calc={r.sensibilidad_usd_1pct} titulo="Si el CCL sube 1%: el neto en dólares" moneda="USD">
+          <Monto valor={sens === null ? null : sens.replace(/^-/, '')} moneda="USD" decimales={0} />
+        </Traza>
+        ;
+      </span>{' '}
+      en pesos, tus activos en dólares suman{' '}
+      <span className="whitespace-nowrap">
+        <MontoTrazado calc={sensPesos} moneda="ARS" titulo="Si el CCL sube 1%: tus activos en dólares, en pesos" />.
+      </span>
     </p>
   )
 }

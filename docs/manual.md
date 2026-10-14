@@ -68,13 +68,13 @@ Toda cifra existe en ARS y en USD. Toda cifra se toca y muestra de dónde sale: 
 
 En el desglose, la traza dice además "de lo cual: interacción": la parte que se debe a que se movieron a la vez el activo y el CCL. Ya está incluida; se muestra para que sepas cuánto es.
 
-Escape, o tocar afuera, la cierra. En Hoy, debajo de la frase, "Tocá una cifra para ver de dónde sale" te lo recuerda.
+Escape, o tocar afuera, la cierra. En la compu, cada cifra de la frase de Hoy se toca en el lugar. En el teléfono, "Ver la frase completa y cada cifra" abre una hoja con cada número en su renglón, y ahí "Tocá una cifra para ver de dónde sale" te lo recuerda.
 
 ### "Sin dato"
 
 Cuando falta un insumo, la cifra dice **sin dato**, en gris. Al tocarla, dice qué falta: "Falta el CCL de compra de la apertura", "No hay un precio cargado". Nunca hay un 0 ni un guion en lugar de un dato que falta.
 
-**Un total al que le falta una parte también es "sin dato"** (D-65). Debajo, en gris, va la suma de lo que sí se conoce, rotulada como parcial: "suma parcial (3 de 6 posiciones): +US$ 1.630,45".
+**Un total al que le falta una parte también es "sin dato"** (D-65). Debajo, en gris, va la suma de lo que sí se conoce, rotulada como parcial: "suma parcial (3 de 6): +US$ 1.630,45". En Hoy, la tarjeta del patrimonio muestra la suma parcial en pesos y en dólares, cada una con su traza. Si no se conoce ninguna parte, no hay suma parcial: la cifra dice qué falta (nunca "suma parcial (0 de 1): $ 0,00", D-126).
 
 ### Las etiquetas
 
@@ -84,7 +84,7 @@ Una cifra que no es un dato verificado lleva un chip gris chico, con una palabra
 |---|---|---|
 | **parcial** | Es un total y le faltan partes. El valor es "sin dato" y la suma parcial va abajo | El total de "Res. USD" de Cartera cuando una posición no tiene CCL de compra |
 | **pendiente** | Falta un dato que llega después | El costo de una compra del día, que IEB muestra con PPP `-` hasta el día siguiente |
-| **viejo** | El dato tiene más de 2 días hábiles (los feriados no cuentan) | Un precio que no se actualiza porque no cargaste esa cuenta; el CCL de hace tres días hábiles (D-16, D-109) |
+| **viejo** | El dato tiene más de 2 días hábiles. Los feriados y los días sin rueda en BYMA no cuentan; un día con rueda aunque los bancos cierren (el Día del Bancario, un no laborable con fines turísticos) sí cuenta (D-129) | Un precio que no se actualiza porque no cargaste esa cuenta; el CCL de hace tres días hábiles (D-16, D-109) |
 | **inferido** | Se calculó a partir de otro dato; no se leyó tal cual | El precio de una compra deducido del cambio de PPP; una compra pendiente valuada al precio del día (D-110) |
 | **declarado** | Lo cargaste vos, sin respaldo de una fuente | El CCL de compra de una posición que ya tenías antes de la primera carga |
 
@@ -112,11 +112,11 @@ Arriba, en todas las pantallas, el **chip de estado de los datos**: "Datos al ci
 | Signo | Quiere decir |
 |---|---|
 | ✓ | La cuenta está cargada y al día |
-| ≠ | Quedó una diferencia sin resolver |
+| ≠ | Quedó una diferencia sin resolver: un control que no cerró, o la última carga de esa cuenta dejó algo pendiente (dice "parcial: quedaron filas pendientes", D-118) |
 | ○ | Tipeado, sin control posible: el CCL y el cripto |
 | ◷ | Más de 2 días hábiles sin carga |
 
-El resultado de cada control (el Excel contra B2 y sus Subtotales, la captura de Galicia contra su total) se ve en la bandeja de esa carga. En la barra, el botón de Cargar lleva un punto gris cuando es día hábil y todavía no cargaste.
+El resultado de cada control (el Excel contra B2 y sus Subtotales, la captura de Galicia contra su total) se ve en la bandeja de esa carga. En la barra, el botón de Cargar lleva un punto gris cuando es día hábil, ya cerró BYMA (17 h) y todavía no cargaste (D-127).
 
 ### 4.1 Hoy
 
@@ -124,33 +124,40 @@ El resultado de cada control (el Excel contra B2 y sus Subtotales, la captura de
 
 **La frase del día.** Siempre dice desde cuándo mide. Ejemplo:
 
-> Desde la carga del mar 13/10: +$590.125 en pesos (+0,57%), pero −US$ 340 en dólares (−0,50%). En pesos, el CCL sumó $532.812 y tus activos $57.313. En dólares, tus activos sumaron US$ 37 y la suba del CCL le restó US$ 377 a tus pesos.
+> Desde la carga del mar 13/10: +$590.125 en pesos (+0,57%), pero −US$ 340 en dólares (−0,50%). En pesos, el CCL sumó $532.812 y tus activos sumaron $57.313. En dólares, tus activos sumaron US$ 37 y la suba del CCL le restó US$ 377 a tus pesos.
 
 - "**El CCL sumó $532.812**" es lo que ganaste en pesos solo porque subió el dólar, sobre lo que tenías en activos que arriesgan dólares. Su traza: `US$ 32.291,66 que tenías en activos en dólares × (1.548,20 − 1.531,70) = $532.812,44`.
-- "**Tus activos $57.313**" es lo que se movieron los precios y saldos.
+- "**Tus activos sumaron $57.313**" es lo que se movieron los precios y saldos. Si bajaron, dice "restaron"; la suba o la baja del CCL sale de comparar los dos CCL.
 - "**La suba del CCL le restó US$ 377 a tus pesos**": tus activos en pesos valen lo mismo en pesos, pero menos en dólares.
 - Las partes se redondean de modo que **lo que ves suma exacto lo que ves**. El valor exacto está en la traza.
 - Si hay partidas sin dato nuevo, la frase agrega cuánto quedó **sin atribuir**. Si hoy se atribuye lo que había quedado pendiente de cargas anteriores, también lo dice: "Incluye lo que había quedado sin atribuir en cargas anteriores y hoy se atribuye".
 - Después de una **carga express**: "Cargaste solo tipos de cambio: ningún precio ni saldo es nuevo, así que todo el cambio queda sin atribuir hasta tu próxima carga completa."
+- En una carga express, la segunda oración cuenta cuánto movió cada partida al CCL nuevo, y "de tus US$ …" también se toca: es la suma de tus dólares en efectivo de la carga anterior.
 - Si la carga **no tiene CCL**: "Esta carga no tiene CCL: los dólares usan el del mar 13/10 y no hay con qué separar activo de tipo de cambio…" (D-109).
-- En el teléfono, la frase es texto corrido. **"Ver la frase completa y cada cifra"** abre una hoja con cada número en su renglón, para tocarlo.
+- Si a una partida le falta un dato (por ejemplo, una tenencia que la fuente ya no lista), la variación es "sin dato" y la frase dice cuál falta y por qué, en vez de repartir cifras que no existen: "Desde la carga del lun 05/10: sin dato en pesos y sin dato en dólares. Falta SPY: IEB ya no la lista desde el mar 06/10…" (D-117). Cada "sin dato" se toca y muestra la suma parcial.
+- En el teléfono, la frase es texto corrido. **"Ver la frase completa y cada cifra"** abre una hoja con cada número en su renglón, para tocarlo; en una carga express, también cada cifra de la segunda oración (por ejemplo, "De SPY"). La frase se recorta solo con el dedo: con mouse, aunque la ventana sea angosta, se lee entera.
 
 **Las dos tarjetas** (D-03):
 - **Patrimonio financiero**: lo invertible. Tus posiciones de IEB y Galicia y la liquidez de las tres cuentas. Sobre esto se miden Cartera, la concentración y los resultados. Debajo, su variación y su desglose: activos, CCL y, si hay, sin atribuir. Las tres partes suman la variación.
-- **Patrimonio total**: el financiero, más la casa, más tu parte de la camioneta (su valuación menos el capital pendiente del leasing), "sujeta a opción de compra". Dice la fecha de cada valuación.
+- **Patrimonio total**: el financiero, más la casa, más tu parte de la camioneta (su valuación menos el capital pendiente del leasing), "sujeta a opción de compra". Dice la fecha de cada valuación. Mientras no cargues tus bienes o el leasing (Datos), el patrimonio total y su variación son "sin dato", con la suma de lo que sí cargaste a la vista (D-65, D-126).
 
-**Pesos financieros − deuda del leasing** (D-101). Tus activos financieros que arriesgan pesos, menos lo que debés del leasing: "largo $32.783.100 ($54,18 M − $21,40 M) · US$ 21.175 · si el CCL sube 1%, pierde US$ 210". **Largo** quiere decir que tenés más pesos que deuda en pesos: si el dólar sube, perdés en dólares. El "+1%" es una sensibilidad, no un pronóstico. La casa y la camioneta no entran: les falta la moneda de riesgo, que se elige desde la 1b (D-73).
+**Pesos financieros − deuda del leasing** (D-101). Tus activos financieros que arriesgan pesos, menos lo que debés del leasing: "largo $32.783.100 ($54,18 M − $21,40 M) · US$ 21.175 · si el CCL sube 1%, pierde US$ 210". **Largo** quiere decir que tenés más pesos que deuda en pesos: si el dólar sube, perdés en dólares. El "+1%" es una sensibilidad, no un pronóstico. La casa y la camioneta no entran: les falta la moneda de riesgo, que se elige desde la 1b (D-73). Sin el leasing cargado, o sin su capital pendiente, la deuda es "sin dato", nunca $0, y el neto queda "sin dato", con lo que da sin la deuda (D-126).
 
-**Atención.** Lo que le falta a tus datos, con un botón: "Falta el CCL", el CCL que se está arrastrando de otro día, "SPY: dato viejo", "Casa: sin valuación", "Leasing: sin capital pendiente", "T30J7: compra con precio pendiente", "YPFD: declarar CCL de compra". En la compu va en una columna a la derecha desde 1280 px; en el teléfono, en un renglón que se despliega. Si no hay nada: "Tus datos están completos. Nada que revisar."
+**Atención.** Lo que le falta a tus datos, con un botón: "Falta el CCL", el CCL que se está arrastrando de otro día, "SPY: dato viejo", "Pesos en Mercado Pago: dato viejo", "SPY: IEB ya no la lista" (gravedad alta: registrá la venta o el vencimiento en Cargar, D-117), "IEB: la carga del mar 06/10 quedó parcial" (algo quedó pendiente; se resuelve en tu próxima carga de esa cuenta, D-118), "Casa: sin valuación", "Leasing: sin capital pendiente", "T30J7: compra con precio pendiente", "YPFD: declarar CCL de compra". En la compu va en una columna a la derecha desde 1280 px; en el teléfono, en un renglón que se despliega. Si no hay nada: "Tus datos están completos. Nada que revisar."
 
 **Lo demás:**
-- **"Todavía no cargaste hoy · Cargar"**, un día hábil sin carga.
+- **"Todavía no cargaste hoy · Cargar"**, un día hábil sin carga, después del cierre de BYMA (17 h). A la mañana, antes del cierre, no aparece: los datos de hoy todavía no existen (D-127).
 - **Un día de datos sin CCL** lo avisa arriba: "El mié 14/10 no tiene CCL: los dólares usan el CCL del mar 13/10 y el cambio del día queda sin atribuir" (D-109).
-- **"Quién movió tu financiero"**: cada posición con su aporte a la variación. Una sin precio nuevo dice "sin precio nuevo", nunca 0.
-- **El cuadre:** el patrimonio de hoy recalculado desde los hechos, contra el de la carga anterior más cada parte de la frase (D-66). ✓ quiere decir que cierra en pesos y en dólares; ≠, que no cierra (el detalle dice por cuánto: si no tiene explicación, es un bug); ○, que no se puede verificar porque falta un dato del financiero. Un caso conocido de ≠: un cobro (por ejemplo, un dividendo en dólares) que entró a un saldo que nunca cargaste; cargá ese saldo.
+- **"Quién movió tu financiero"**: cada posición con su aporte a la variación. Una sin precio nuevo dice "sin precio nuevo", nunca 0. Cada aporte se toca y muestra su cuenta: valores, CCL y flujos del día.
+- **El cuadre:** el patrimonio de hoy recalculado desde los hechos, contra el de la carga anterior más cada parte de la frase (D-66). La línea dice por cuánto, en pesos y en dólares, y cada cifra se toca para ver su cálculo:
+  - **✓** "cierra (diferencia $ 0,00 · US$ 0,00)";
+  - **≠** "no cierra por +$ X · +US$ Y", y abajo "Si no tiene explicación, es un bug: revisalo";
+  - **○** no se puede verificar porque falta un dato del financiero, y dice cuál.
+
+  La plata de una operación en una cuenta sin saldo cargado en esa moneda (Galicia no carga saldos; o un dividendo en dólares de IEB, si nunca cargaste su saldo en dólares) cuenta como plata que entró o salió de la app: el cuadre cierra y la nombra ("Cuenta como plata que entró o salió de la app: compra de … en Galicia, $ … (Galicia no tiene saldo en pesos cargado)", D-125).
 - **"Excedente de octubre: sin dato · llega con Flujo (fase 2)"**: la cifra existe en el spec, pero su sección todavía no.
 - **En diciembre**, un aviso: "La carga del último día hábil del año es tu foto al 31/12: la vas a necesitar para Bienes Personales" (D-76). Ese día hacé la carga completa.
-- **Sin datos todavía**, Hoy muestra el **Día cero** con los accesos a Datos y a Cargar (ver la sección 5). Después de la primera carga dice "Primera carga guardada. Mañana vas a ver qué cambió y por qué."
+- **Sin datos todavía**, Hoy muestra el **Día cero**, en el orden de la sección 5: primero Datos › Leasing y Bienes (el catálogo es opcional) y después la primera carga. El botón principal lleva a Datos › Leasing; el segundo, a Cargar (D-128). Después de la primera carga dice "Primera carga guardada. Mañana vas a ver qué cambió y por qué."
 
 ### 4.2 Cargar
 
@@ -177,13 +184,16 @@ El resultado de cada control (el Excel contra B2 y sus Subtotales, la captura de
 | **Advertencia** | Algo para mirar: dos lecturas distintas, un saldo que saltó, una fecha que no coincide, una conciliación | Elegís una de sus opciones (la opción es el motivo, que queda grabado) o "Dejar pendiente". Si no la tocás, el Enter la deja pendiente |
 | **Error** | La aritmética no cierra, o un número no se pudo leer | Lo corregís ("Corregir lectura") o lo dejás pendiente. **Frena el Enter** |
 | **Sin alta** | El ticker no está en tu catálogo | Lo das de alta ahí mismo (ver abajo) |
-| **Pendiente** | Lo dejaste para otro día | No se graba: esa posición conserva su cantidad y su último precio (que se pondrá viejo si no lo cargás), y la cuenta queda con "listado incompleto" |
+| **Pendiente** | Lo dejaste para otro día | No se graba: esa posición conserva su cantidad y su último precio (que se pondrá viejo si no lo cargás), y la cuenta queda en ≠ "parcial" hasta tu próxima carga de esa cuenta (D-118). Si todo lo de una fuente queda pendiente, esa fuente no crea su carga y lo que ya tenía del día sigue como estaba (D-122) |
 
 Con el teclado, en la bandeja: ↑ y ↓ pasan de fila; **A** acepta (o completa, o da de alta), **E** edita y **P** deja pendiente. Los mismos botones están siempre a la vista.
 
 Lo que podés encontrar en la bandeja:
 - **Dos lecturas que no coinciden** (en una captura): "Lectura A: $4.912.300 · Lectura B: $4.912.800", con un botón por cada una. Si una de las dos cierra la cuenta, la app la propone.
 - **Conciliación** (D-15): "el bróker tiene 9.000.000 y la app 8.000.000: falta una compra de 1.000.000 a $1,0986 (inferido del PPP, sin comisiones)". Nunca se aplica sola: la aceptás, la editás o la dejás pendiente. Si el bróker tiene menos, propone una venta con el precio de hoy como referencia (corregilo si vendiste a otro). Si tiene más cantidad con el mismo costo total, pregunta "¿Cambio de ratio?" y propone un ajuste de ratio. La primera vez que aparece cada posición, la propuesta es una **apertura** con el PPP del bróker como costo (D-14).
+- **Ya la tenía.** En una cuenta ya cargada, una posición nueva se propone como compra. Si en realidad ya la tenías (por ejemplo, quedó pendiente el Día cero), tocá **"Ya la tenía (apertura)"** y entra como apertura con el PPP, sin CCL ni pago de hoy (D-121).
+- **La fuente no lo trae.** Si la app tiene algo que la fuente ya no lista, la fila te pregunta si lo vendiste o venció. **"Registrar venta"** o, en un bono o una LECAP, **"Registrar vencimiento"** piden lo que cobraste (el precio o el importe en una venta, el importe en un vencimiento; el último precio aparece solo como referencia) y el CCL del día. **"Dejar pendiente"** lo deja en "sin dato" hasta que lo registres (D-117). El Excel de IEB lista todo; una captura de Galicia solo cuenta para la sección y la moneda de un total que cierra.
+- **Galicia en dólares.** Lo que la captura muestra en dólares ("Bonos en dólares", U$D) todavía no se graba: la fila queda en error y la dejás pendiente (D-123).
 - Una compra o una venta propuesta necesita el **CCL del día**: si no lo tipeaste, la fila queda en error hasta que lo tipees.
 - **Compra del día:** IEB muestra el PPP como `-`. Se graba como compra con precio pendiente (D-19).
 - **Completar precio:** al día siguiente, con el PPP nuevo, la bandeja propone el precio de esa compra: "(10.200 × 110 − $1.000.000) ÷ 10 = $12.200". Lo aceptás con un toque ("Completar"), tipeás otro precio ("Editar precio") o grabás la fila sin completarlo, y la compra sigue pendiente (D-110). Mientras tanto, la compra se valuó al precio del día, con la etiqueta "inferido"; al completarse, los días que usaron ese precio se recalculan con el real y su frase puede cambiar un poco.
@@ -194,13 +204,13 @@ Lo que podés encontrar en la bandeja:
 
 **El botón Guardar** dice qué va a hacer el Enter, con números: "Guardar 11 · dejar 1 pendiente". Mientras algo se lee: "Esperando Mercado Pago (leyendo…)", y al lado "Guardar sin Mercado Pago". Con un error: "Resolvé 1 error para guardar". Abajo, el tiempo activo que va llevando la carga.
 
-**Después del Enter:** "Guardado · 41 s activos", con lo que se grabó por cuenta (precios, saldos, operaciones y, si hubo, precios completados), y tres botones: **Ver Hoy**, **Deshacer** y **Nueva carga**.
+**Después del Enter:** "Guardado · 41 s activos", con lo que se grabó por cuenta (precios, saldos, operaciones y, si hubo, precios completados), y tres botones: **Ver Hoy**, **Deshacer** y **Nueva carga**. Si el guardado falla, la pantalla ofrece **Ver Registro** y **Nueva carga**. Si se cortó la conexión y volvés a tocar Enter, la app reconoce el mismo envío y muestra lo que de verdad quedó grabado ("Ya estaba guardado"); si cambiaste algo en el medio, no lo graba y te pide una carga nueva (D-120).
 
 ### 4.3 Cartera
 
 **Para qué:** cada posición en pesos y en dólares, con su desglose.
 
-**En la compu**, una tabla. Las columnas, en el orden en que entran según el ancho: Activo, Res. USD, Res. ARS, % fin., Precio, Activo / TC en US$, Activo / TC en $, PPC USD, PPC ARS, Cant., Días. Las que no entran van al **detalle de la fila** (el chevron ›). Si colapsás la barra lateral entran más; desde unos 1600 px, todas.
+**En la compu**, una tabla de 13 columnas. En el orden en que entran según el ancho: Activo, Res. USD, Res. ARS, % fin., Precio, Activo / TC en US$, Activo / TC en $, PPC USD, PPC ARS, Cant., Días, Valor $ y Valor US$. Las que no entran van al **detalle de la fila** (el chevron ›). A 1280 px con la barra lateral abierta entran 7; a 1600 px, 10 (hasta Cant.), y 11 con la barra colapsada. Todas entran desde unos 1910 px (1730 px con la barra colapsada).
 
 | Columna | Qué es |
 |---|---|
@@ -211,12 +221,15 @@ Lo que podés encontrar en la bandeja:
 | **Res. ARS / Res. USD** | Resultado desde la compra, en $ y en %: lo que vale hoy menos lo que costó, en cada moneda |
 | **Activo / TC en $** y **en US$** | El resultado partido en lo que hizo el activo y lo que hizo el tipo de cambio |
 | **% fin.** | Su peso en tu patrimonio financiero |
-| **Días** | Días en posición: desde la primera compra registrada o desde la fecha de compra declarada. En una posición que ya tenías antes de la primera carga y sin fecha declarada, se cuentan desde la apertura en la app, y lo dice |
+| **Días** | Días en posición: desde la primera compra registrada o desde la fecha de compra declarada. En una posición que ya tenías antes de la primera carga y sin fecha declarada, se cuentan desde la apertura en la app, y lo dice. La cifra se toca y muestra la cuenta ("jue 15/10 − jue 01/10 = 14 días desde la apertura en la app"), y lleva el chip "desde apertura" o "declarado" |
+| **Valor $** y **Valor US$** | Lo que vale la posición hoy, en cada moneda |
 
 **Cómo leer el desglose.** La moneda de riesgo decide dónde aparece el efecto del CCL:
-- **Un CEDEAR** arriesga dólares. En pesos, su resultado tiene una parte de activo y otra de CCL: "De tus +$6,21 M en pesos, $3,44 M fueron el CCL". En dólares, todo es activo.
+- **Un CEDEAR** arriesga dólares. En pesos, su resultado tiene una parte de activo y otra de CCL: "De tus +$ 6,2 M en pesos, +$ 3,4 M fueron el CCL" (los montos compactos llevan su signo). En dólares, todo es activo.
 - **Una LECAP o un bono en pesos** arriesgan pesos. En dólares, su resultado tiene una parte de activo y otra de CCL; por ejemplo, S13N6: +US$ 326,16 de activo y −US$ 247,94 de CCL = +US$ 78,22. En pesos, todo es activo.
 - El desglose desde la compra es la **suma de los mismos intervalos** que usa Hoy, así que Cartera y Hoy dan el mismo reparto (D-35). Lo anterior a tu primera carga es un solo tramo por compra, con el CCL de compra. Si la última carga no trajo precio o CCL nuevo para esa posición, el desglose muestra también lo que queda **sin atribuir**. La traza lista cada tramo.
+- El desglose es el de **lo que tenés hoy**: después de una venta parcial, lo acumulado se reparte en la proporción que queda (como el costo), y los cupones y dividendos no entran (D-114). Lo que ves suma el resultado de la fila (D-35).
+- Si el resultado es "sin dato" (una compra con precio pendiente, o una tenencia que la fuente ya no lista), el desglose también, con el mismo motivo (D-126). Una tenencia que la fuente ya no lista dice "IEB ya no la lista desde el …: registrá la venta o el vencimiento en Cargar" (D-117). En una apertura sin CCL de compra, ese CCL se declara desde la 1b (Pendientes).
 
 **Cupones, dividendos y amortizaciones** (D-114). Una amortización te devuelve capital: baja el costo de la posición en lo que cobraste, así que no aparece como pérdida. Un cupón o un dividendo no toca el costo: se ve en la frase del día en que lo cobrás (pasa del título a tu saldo). El resultado de cada fila es el del título, sin los cupones cobrados.
 
@@ -244,24 +257,32 @@ Lo que podés encontrar en la bandeja:
 
 **Composición**, en barras horizontales: por clase, por moneda de riesgo y por geografía. La liquidez cuenta en la geografía de su custodio: los dólares que están en IEB son AR en geografía y USD en moneda de riesgo.
 
-**Concentración:** tu posición más grande y tus tres más grandes, como porcentaje del **patrimonio financiero** (también en la vista Total, D-03). Dice "sin umbral": la app no juzga la concentración hasta que cargues el tuyo (1b, D-42).
+**Concentración:** tu posición más grande y tus tres más grandes, como porcentaje del **patrimonio financiero** (también en la vista Total, D-03). Dice "sin umbral": la app no juzga la concentración hasta que cargues el tuyo (1b, D-42). Sin el total del financiero (por ejemplo, con una tenencia que la fuente ya no lista), la concentración es "sin dato".
+
+**Cuando falta algo:**
+- Sin ninguna carga, la composición dice "sin dato · aparece con tu primera carga" y el botón lleva a Cargar.
+- Sin el leasing cargado, o sin su capital pendiente, la deuda en pesos es "sin dato", y también el neto, la sensibilidad y el % neto, con lo que da sin la deuda (D-126). El botón lleva a Datos › Leasing.
 
 ### 4.5 Registro
 
 **Para qué:** el log de cargas que pediste (D-17): qué entró, de qué archivo, cuánto tardó, y dónde se revierte.
 
-- **Una tarjeta por lote** (un Enter, o un guardado de Datos): la fecha de los datos, la hora en que guardaste, el tiempo activo y las fuentes.
-- **Cada carga del lote** (una por cuenta, más la del tipo de cambio): origen (Excel, captura, manual), cuántos precios, saldos y operaciones grabó, el archivo, el número de carga y su estado:
+- **Una tarjeta por lote** (un Enter, o un guardado de Datos): la fecha de los datos, la hora en que guardaste, el tiempo activo y las fuentes. Si guardaste otro día que el de los datos, la tarjeta lo dice: "mié 14/10 · guardado el jue 15/10 a las 08:00".
+- **Cada carga del lote** (una por cuenta, más la del tipo de cambio): origen (Excel, captura, manual para Datos, tipeado para el CCL y el cripto), cuántos precios, saldos y operaciones grabó, el archivo, el número de carga y su estado:
   - **vigente:** sus datos son los que valen;
   - **reemplazada:** ese día y esa cuenta se volvieron a cargar después; la carga sigue a la vista;
   - **revertida:** se deshizo (el motivo queda guardado con la carga); la carga sigue a la vista, tachada.
+- **Un guardado de Datos** se llama "Datos" y dice qué grabó ("valuación de Casa", "capital pendiente de Leasing", "aporte a Mercado Pago"), también en el resumen del lote y al revertir.
 - **Revertir el lote:** ver la sección 8.
 
 En el teléfono, las cargas de cada lote se abren al tocar la tarjeta.
 
 ### 4.6 Datos
 
-El título es el selector: tocá **"Datos · Catálogo ▾"** para cambiar de subpantalla. Cada guardado de Datos es una carga **manual** y queda en el Registro.
+El título es el selector: tocá **"Datos · Catálogo ▾"** para cambiar de subpantalla.
+
+- **Los aportes, retiros, transferencias, valuaciones y capital pendiente** son cargas **manuales** y quedan en el Registro. Si guardás dos veces el mismo envío (por ejemplo, porque se cortó la conexión), no se duplica. Si se corta la conexión, el formulario se queda y te dice que mires el Registro antes de volver a guardar (D-124).
+- **Dar de alta o corregir un activo, un bien o un pasivo** no es una carga: no aparece en el Registro, y el cambio queda en la auditoría con el antes y el después. Para corregir un bien, **"Corregir datos"**; un pasivo, **"Corregir el contrato"**. Abren el formulario del alta ya completo (D-124).
 
 | Subpantalla | Qué tiene |
 |---|---|
@@ -286,6 +307,8 @@ Todo esto se recuerda **por dispositivo**: el teléfono y la compu tienen cada u
 
 Una sola vez, unos 40 minutos (D-70). El orden importa: el día 2 tiene que mostrar números, no "sin dato" por todos lados.
 
+> **Tu Día cero ya está cargado.** Lo cargó Claude el 14/10, desde la sesión de desarrollo, directo en la base, con las mismas funciones que usa la app, a partir de los archivos y datos que pasaste en el chat (D-130). Falta el valor del leasing (ver el paso 1): hasta que lo cargues, la deuda, el neto de Exposición y el patrimonio total dicen "sin dato". Esta sección queda para entender qué se hizo, o para empezar de nuevo.
+
 **Antes de empezar, tené a mano:**
 - el contrato del leasing y el último capital pendiente que te informó la leasera, con su fecha;
 - una valuación de la casa y otra de la camioneta, con su fuente (tasación, guía de precios) y su fecha;
@@ -293,11 +316,11 @@ Una sola vez, unos 40 minutos (D-70). El orden importa: el día 2 tiene que most
 - el CCL y el dólar cripto del día, y de dónde los sacás;
 - el Excel "Portafolio" de IEB del día, y las capturas de Galicia (la pantalla de tenencia, con la tabla de instrumentos y su total) y de Mercado Pago (el saldo de la cuenta remunerada, con su TNA).
 
-**Paso 1 · Datos › Leasing.** Cargá el contrato (lo que tengas; el resto queda vacío) y el último **capital pendiente** informado, con su fecha. Sin él, Exposición no puede restar la deuda.
+**Paso 1 · Datos › Leasing.** Cargá el contrato (lo que tengas; el resto queda vacío) y el último **capital pendiente** informado, con su fecha. Sin él, Exposición no puede restar la deuda. Un leasing no informa un "capital pendiente" como un préstamo: pedile a la leasera el **valor de cancelación anticipada sin la penalidad** y cargá ese, con su fecha. Hasta tenerlo, dejalo vacío: la deuda queda "sin dato" (D-126). Si mientras tanto querés ver el neto, podés cargar un estimado tuyo, sabiendo que es provisorio: así se hizo con el Día cero (D-131).
 
 **Paso 2 · Datos › Bienes.**
 - **La casa:** tipo inmueble, la moneda en que la valuás, y su valuación con fecha y fuente.
-- **La camioneta:** tipo vehículo, y en "Deuda que lo financia" elegí el leasing del paso 1. Después, su valuación con fecha y fuente. Tu parte es el valor menos el capital pendiente, "sujeta a opción de compra" (D-03).
+- **La camioneta:** tipo vehículo, y en "Deuda que lo financia" elegí el leasing del paso 1. Después, su valuación con fecha y fuente. Si la guía de precios no la lista, podés usar la suma asegurada de una cotización del seguro, con esa fuente (D-130). Tu parte es el valor menos el capital pendiente, "sujeta a opción de compra" (D-03).
 
 **Paso 3 · Datos › Catálogo** (opcional). Si preferís, das de alta tus activos ahora. Si no, la bandeja te los pide en el paso 4. Para cada uno, la moneda de riesgo la elegís vos: la app no la supone (D-73). A cada CEDEAR, su ratio con su vigencia.
 
@@ -321,14 +344,14 @@ Una sola vez, unos 40 minutos (D-70). El orden importa: el día 2 tiene que most
 
 Después del cierre (o a la mañana siguiente, con los datos del día anterior):
 
-1. **Juntá las fuentes:** el Excel "Portafolio" de IEB y las capturas de Galicia y de Mercado Pago. Recortá la captura a la tabla (ver "Una captura demasiado grande" en la sección 12).
+1. **Juntá las fuentes:** el Excel "Portafolio" de IEB y las capturas de Galicia y de Mercado Pago. Recortá la captura a la tabla (ver "La imagen es más grande de lo que acepta el modelo" en la sección 12).
 2. **Abrí Cargar:** `c` en la compu, o el botón del medio en el teléfono. El foco arranca en el CCL.
 3. **Tipeá** `1548,2` → Tab → `1541`. Mirá el eco.
 4. **Soltá el Excel y pegá las dos capturas.** Se leen mientras tanto.
 5. **Mirá la bandeja.** Lo normal es que todo esté verificado y plegado. Resolvé solo lo que está arriba.
 6. **Enter.** "Guardado · 41 s activos". Tocá **Ver Hoy** y leé la frase.
 
-**El tiempo que cuenta es el activo** (D-62): la suma de los tramos en que hacés algo (tipear, pegar, tocar). Un tramo se corta después de 60 s sin gestos, así que esperar a que lea una captura no cuenta. El Registro guarda el tiempo activo de cada carga.
+**El tiempo que cuenta es el activo** (D-62): la suma de los tramos en que hacés algo (tipear, pegar, tocar). Un tramo se corta después de 60 s sin gestos: una pausa de más de un minuto no cuenta, pero los segundos que esperás a que lea una captura sí se suman (la lectura tarda como mucho 50 s). El Registro guarda el tiempo activo de cada carga.
 
 **Un día sin cargar no es una falta.** Lo viejo se ve viejo, nada se rellena con estimaciones y ningún contador vuelve a cero.
 
@@ -346,7 +369,7 @@ Las tres son válidas (D-64):
 
 **Un día sin CCL** (por ejemplo, una carga media sin tipear el CCL) usa el último CCL tipeado para pasar a dólares, con su fecha a la vista y la etiqueta "viejo" pasados 2 días hábiles. Pero en ese intervalo no atribuye nada a activo ni a CCL hasta que haya uno tipeado (D-109).
 
-**Recargar el mismo día** una cuenta reemplaza su carga anterior: pisa precios y saldos de ese día y **suma** las operaciones que falten. La anterior queda en el Registro como "reemplazada". Si la primera carga estaba mal, no recargues: revertila (sección 8).
+**Recargar el mismo día** una cuenta reemplaza su carga anterior: pisa los precios y saldos de ese día que trae, conserva los que no trae y **suma** las operaciones que falten. La anterior queda en el Registro como "reemplazada". Con el tipo de cambio pasa lo mismo: un campo que dejás vacío no borra el valor que el día ya tenía (D-119). Si el Excel de IEB ya grabó el precio de un activo ese día, una captura posterior no lo pisa. Si la primera carga estaba mal, no recargues: revertila (sección 8).
 
 **Un saldo que aparece por primera vez** (una cuenta nueva, o la primera captura de Mercado Pago un día después del primer Excel) entra como apertura, nunca como ganancia.
 
@@ -388,7 +411,7 @@ Debajo, "Últimos movimientos": cada uno con lo que salió y lo que entró, en l
 
 ## 10. Modo privado, tema y paleta
 
-- **Modo privado:** el ojo de la barra de arriba, o `h`. Desenfoca los montos y deja los porcentajes, para mirar la app con gente al lado.
+- **Modo privado:** el ojo de la barra de arriba, o `h`. Desenfoca los montos y deja los porcentajes, para mirar la app con gente al lado. Vale en todas las pantallas, Cargar y Datos incluidas, y también para los montos dentro de un texto (por ejemplo, el motivo de un "sin dato"). Las trazas que abrís a propósito muestran la cuenta entera.
 - **Tema:** en Ajustes, el del sistema, claro u oscuro.
 - **Paleta para daltonismo:** en Ajustes. Positivo en azul, negativo en naranja.
 
@@ -402,7 +425,10 @@ Los tres se recuerdan por dispositivo.
 - **Borrador de la carga:** si cerrás la pestaña antes del Enter, se pierde la bandeja y hay que volver a soltar los archivos. Los archivos ya leídos quedan guardados en el servidor, pero la bandeja no se recupera.
 - **Empezar la carga en el teléfono y terminarla en la compu:** en la 1a, una carga se hace entera en un dispositivo (1b).
 - **Declarar el CCL de compra** de una posición de apertura, para que su PPC en dólares deje de ser "sin dato": llega con Pendientes (1b). Hasta entonces, Atención lo lista.
-- **Corregir un hecho suelto** con motivo e historial en la traza: por ahora, se revierte la carga y se carga de nuevo.
+- **Corregir un hecho suelto** con motivo e historial en la traza: por ahora, se revierte la carga y se carga de nuevo. Un bien o un pasivo sí se corrigen en Datos (sección 4.6).
+- **Galicia en dólares:** lo que la captura muestra en U$D ("Bonos en dólares") todavía no se graba; la fila se deja pendiente (D-123).
+- **Cargar un feriado desde la app.** Ya están los de 2026 y 2027: los días sin rueda en BYMA y los cierres de la NYSE (D-129). Los que se decreten después se agregan con una migración. El botón "Hoy no operó el mercado" llega en la 1b.
+- **El aviso de la mañana:** "Todavía no cargaste hoy" aparece recién después del cierre de BYMA; a la mañana no avisa si falta la carga del día hábil anterior (D-127).
 - **En el Registro, el detalle de cada carga:** la lectura cruda (las dos lecturas de una captura lado a lado), el modelo que leyó y el archivo original para abrirlo. Hoy se guardan, pero la pantalla muestra solo el nombre del archivo, los conteos y el estado.
 - **Revertir una sola carga de un lote** (por ejemplo, solo la de Mercado Pago): en la 1a se revierte el lote entero. Tampoco hay "deshacer la reversión": para volver atrás, se carga de nuevo el archivo, que sigue guardado.
 - **La moneda de riesgo de los bienes** (1b): hasta entonces, la vista Total de Exposición dice "sin dato".
@@ -425,7 +451,7 @@ Muchas decisiones de `docs/vision.md` §6 siguen esperando tu aprobación. Las q
 
 ## 12. Problemas comunes
 
-**"La imagen es demasiado grande" (una captura).** La app nunca achica ni recomprime una captura, para no perder dígitos. Si el lado mayor pasa los 2.576 px (una captura de pantalla completa en una Mac Retina, o una de un iPhone Pro Max), la rechaza. **Recortá solo la tabla** (en la Mac, Cmd+Shift+4 y arrastrás) o mandala en dos partes. También rechaza archivos de más de 4 MB, y formatos que no sean PNG, JPEG, WebP o GIF. Las fotos HEIC del iPhone no se leen: compartilas como PNG o JPEG (en el iPhone, Ajustes › Cámara › Formatos › Más compatible).
+**"La imagen es más grande de lo que acepta el modelo" (una captura).** La app nunca achica ni recomprime una captura, para no perder dígitos. El modelo la rechaza si su lado mayor pasa los 2.576 px **o** si pasa los 4.784 parches de 28 × 28 px (⌈ancho ÷ 28⌉ × ⌈alto ÷ 28⌉, unos 3,7 megapíxeles). Por eso una captura de pantalla completa de 2560 × 1600 se rechaza aunque su lado mayor entre: da 92 × 58 = 5.336. El mensaje dice "…la imagen es más grande de lo que acepta el modelo (…). No la achico sin avisar: capturá solo la tabla o el saldo (en la compu, recortando la zona) o mandala en dos partes." **Recortá solo la tabla** (en la Mac, Cmd+Shift+4 y arrastrás) o mandala en dos partes. También rechaza archivos de más de 4 MB, y formatos que no sean PNG, JPEG, WebP o GIF. Las fotos HEIC del iPhone no se leen: compartilas como PNG o JPEG (en el iPhone, Ajustes › Cámara › Formatos › Más compatible).
 
 **"Las dos lecturas no coinciden."** Cada captura se lee dos veces, de dos maneras distintas. Si difieren en un número, la app prueba qué combinación cierra la cuenta `cantidad × precio ≈ valorizado` y la propone. Mirá la captura y elegí la lectura correcta con un toque. Si ninguna cierra, la fila queda en **error**: corregí el número a mano ("Corregir lectura") o dejala pendiente. En Mercado Pago no hay cuenta que controle el saldo, así que siempre elegís vos cuando las lecturas difieren.
 
@@ -441,7 +467,7 @@ Muchas decisiones de `docs/vision.md` §6 siguen esperando tu aprobación. Las q
 | "… se cortó antes de terminar. Si la captura tiene muchas filas, partila en dos" | Mandá la tabla en dos capturas |
 | "no parece una pantalla de inversiones de Galicia ni el saldo de Mercado Pago" | Capturá la pantalla correcta |
 | "no encontré ninguna posición ni total en la pantalla" | Capturá la tabla de Bonos (o de Fondos) de Galicia |
-| "las dos lecturas no se ponen de acuerdo en de qué banco es" | Pegala de nuevo, en el lugar de su banco |
+| "las dos lecturas no se ponen de acuerdo en de qué banco es (…). Decime de cuál es y la vuelvo a leer." | Tocá **"Es de Galicia"** o **"Es de Mercado Pago"**: la vuelve a leer con esa pista (D-123) |
 | "el saldo es ilegible en las dos lecturas" | Otra captura, sin nada que tape el número |
 | "Anthropic limitó los pedidos" o "está sobrecargado" | Esperá un minuto y **Reintentar** |
 | "la clave ANTHROPIC_API_KEY no es válida" o "problema de facturación en la cuenta de Anthropic" | Revisá la clave o el saldo de la cuenta de Anthropic; el Excel se sigue leyendo |
@@ -466,7 +492,15 @@ Muchas decisiones de `docs/vision.md` §6 siguen esperando tu aprobación. Las q
 
 **"Esa carga se confirmó y después se revirtió."** Un lote revertido no se reusa. Tocá **Nueva carga** y empezá de nuevo con los mismos archivos.
 
-**"Algo falló al mostrar esta pantalla."** Nada se guardó ni se cambió. Tocá **Reintentar**; si sigue, el detalle quedó en los registros del servidor (Vercel → Logs), con la referencia que muestra la pantalla.
+**"Ese lote ya se guardó con otro contenido…"** Tocaste Enter, se cortó la respuesta, cambiaste algo y volviste a guardar. Lo primero quedó grabado; lo que cambiaste después, no. Tocá **Nueva carga** y volvé a armarla (D-120).
+
+**"… muestra este título en dólares y la 1a guarda los precios en pesos: no se graba."** Una fila de Galicia en U$D. Dejala pendiente (D-123).
+
+**"No sé si se guardó: se cortó la conexión."** (en Datos) Mirá el Registro. Si no está, volvé a guardar: el mismo envío no se duplica (D-124).
+
+**"Algo falló al mostrar esta pantalla."** Si estabas guardando algo, no se sabe si se guardó: mirá el Registro antes de volver a intentar (el botón **Ver el Registro** lleva ahí). Tocá **Reintentar**; si sigue, el detalle quedó en los registros del servidor (Vercel → Logs), con la referencia que muestra la pantalla.
+
+**"No encontré esa página."** La dirección no existe. La pantalla queda dentro de las barras de la app, con **Ir a Hoy** y **Ver la cartera**.
 
 **Un número que no te cierra con lo que muestra el bróker.** Tocalo y seguí la traza hasta el archivo. Las diferencias de criterio tienen nombre (por ejemplo, IEB valúa tus dólares a su propio dólar y la app a tu CCL). Si no tiene explicación, es un bug: anotalo con la fecha y la cifra.
 
@@ -475,6 +509,7 @@ Muchas decisiones de `docs/vision.md` §6 siguen esperando tu aprobación. Las q
 | Palabra | Qué quiere decir acá |
 |---|---|
 | **Apertura** | La operación con la que entra a la app una posición que ya tenías antes de la primera carga. Su costo es el PPP del bróker (D-14) |
+| **Ausente** | Una tenencia que la app tiene y la fuente ya no lista: una venta total o un vencimiento sin registrar. Mientras no la registres, vale "sin dato" (D-117) |
 | **Bandeja** | La lista de lo que la app entendió de tus archivos, antes de guardar |
 | **Carga** | Lo que se grabó de una cuenta (o del tipo de cambio) en un Enter. Tiene su archivo, su lectura cruda y su estado |
 | **Conciliación** | Comparar lo que dice el bróker con lo que la app deriva de tus operaciones, y proponer la operación que falta |

@@ -4,7 +4,7 @@
 
 import type { CalcVista, InsumoVista } from '@/lib/domain/calc'
 import { Decimal, monto, numero, porcentaje } from '@/lib/domain/dinero'
-import { fechaEnCordoba, ZONA } from '@/lib/domain/fechas'
+import { fechaCorta, fechaEnCordoba, sumarDias, ZONA } from '@/lib/domain/fechas'
 import type { Fecha } from '@/lib/domain/tipos'
 
 type Unidad = 'ARS' | 'USD' | 'fraccion'
@@ -191,18 +191,27 @@ const DESDE: Record<'compra' | 'declarada' | 'apertura', { formula: string; expl
 
 /**
  * Los días en posición (Cartera), con su traza: de dónde se cuentan. La
- * fecha de compra que declaraste lleva la etiqueta "declarado".
+ * fecha de compra que declaraste lleva la etiqueta "declarado". Con la fecha
+ * de inicio, la fórmula muestra la resta: "jue 15/10 − mié 01/10 = 14 días".
  */
-export function diasEnPosicion(dias: number | null, desde: 'compra' | 'declarada' | 'apertura' | null): CalcVista {
+export function diasEnPosicion(dias: number | null, desde: 'compra' | 'declarada' | 'apertura' | null, inicio: Fecha | null = null): CalcVista {
   if (dias === null || desde === null) {
     return { valor: null, motivo: 'La posición no tiene fecha de inicio.', formula: 'sin dato', insumos: [], etiquetas: [] }
   }
   const d = DESDE[desde]
+  const cuantos = `${numero(String(dias), 0)} ${dias === 1 ? 'día' : 'días'}`
+  const hasta = inicio ? sumarDias(inicio, dias) : null
   return {
     valor: String(dias),
-    formula: `${numero(String(dias), 0)} ${dias === 1 ? 'día' : 'días'} ${d.formula}`,
+    formula: inicio && hasta ? `${fechaCorta(hasta)} − ${fechaCorta(inicio)} = ${cuantos} ${d.formula}` : `${cuantos} ${d.formula}`,
     explicacion: d.explicacion,
-    insumos: [],
+    insumos:
+      inicio && hasta
+        ? [
+            { nombre: desde === 'compra' ? 'Primera compra registrada' : desde === 'declarada' ? 'Fecha de compra que declaraste' : 'Apertura en la app', valor: inicio, unidad: 'fecha' },
+            { nombre: 'Hoy', valor: hasta, unidad: 'fecha' },
+          ]
+        : [],
     etiquetas: desde === 'declarada' ? ['declarado'] : [],
   }
 }

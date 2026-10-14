@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { tickerDeNombre } from '@/lib/carga/captura-verificacion'
-import { esquemaActivo, esquemaEdicionActivo, leerFormulario } from './esquemas'
+import { esquemaActivo, esquemaEdicionActivo, esquemaEdicionBien, esquemaEdicionPasivo, leerFormulario } from './esquemas'
 
 describe('esquemaActivo: un fondo sin código se puede dar de alta con el ticker que arma el lector', () => {
   const alta = (ticker: string) =>
@@ -34,5 +34,21 @@ describe('esquemaEdicionActivo: nunca queda un CEDEAR sin ratio (D-104)', () => 
 
   it('lo que no es CEDEAR no necesita ratio', () => {
     expect(leerFormulario(esquemaEdicionActivo, { ...base, tipo: 'accion_local', moneda_riesgo: 'ARS', geografia: 'AR', ticker_subyacente: '' }).ok).toBe(true)
+  })
+})
+
+describe('corregir un bien o un pasivo cargado con un dato equivocado', () => {
+  it('el bien: los mismos campos que el alta, más su id', () => {
+    expect(leerFormulario(esquemaEdicionBien, { id: '3', nombre: 'Casa', tipo: 'inmueble', moneda_valuacion: 'USD', geografia: 'AR', pasivo_id: '' })).toEqual({
+      ok: true,
+      datos: { id: 3, nombre: 'Casa', tipo: 'inmueble', moneda_valuacion: 'USD', geografia: 'AR', pasivo_id: null },
+    })
+    expect(leerFormulario(esquemaEdicionBien, { nombre: 'Casa', tipo: 'inmueble', moneda_valuacion: 'USD' }).ok).toBe(false)
+  })
+  it('el pasivo: el contrato, en formato argentino', () => {
+    const r = leerFormulario(esquemaEdicionPasivo, {
+      id: '2', nombre: 'Leasing', tipo: 'leasing', moneda: 'ARS', fecha_inicio: '2025-06-01', cuotas_totales: '36', monto_financiado_neto: '42.000.000',
+    })
+    expect(r).toMatchObject({ ok: true, datos: { id: 2, cuotas_totales: 36, monto_financiado_neto: '42000000' } })
   })
 })

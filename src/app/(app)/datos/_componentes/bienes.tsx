@@ -11,7 +11,7 @@ import type { Fecha } from '@/lib/domain/tipos'
 import { fechaLarga } from '@/lib/domain/fechas'
 import { monto } from '@/lib/domain/dinero'
 import { Boton, Campo, Chip, Entrada, Selector } from '../../carga/_componentes/ui'
-import { nuevaValuacion, nuevoBien } from '../acciones'
+import { editarBien, nuevaValuacion, nuevoBien } from '../acciones'
 import { enDosMonedas, ultimaValuacion, type CCL, type Valuacion } from '../_lib/calculos'
 import { GEOGRAFIAS, NOMBRE_GEOGRAFIA } from '../_lib/catalogo'
 import type { BienFila, PasivoFila } from '../_lib/servidor'
@@ -46,29 +46,31 @@ function FormValuacion({ bien, hoy }: { bien: BienFila; hoy: Fecha }) {
   )
 }
 
-function FormBien({ pasivosLibres, onCerrar }: { pasivosLibres: PasivoFila[]; onCerrar: () => void }) {
+/** Alta de un bien o, con `bien`, la corrección de uno cargado con un dato equivocado. */
+function FormBien({ pasivosLibres, onCerrar, bien = null }: { pasivosLibres: PasivoFila[]; onCerrar: () => void; bien?: BienFila | null }) {
   const id = useId()
-  const [estado, enviar, enviando] = useFormulario(nuevoBien)
-  const [moneda, setMoneda] = useState<'ARS' | 'USD' | ''>('')
+  const [estado, enviar, enviando] = useFormulario(bien ? editarBien : nuevoBien)
+  const [moneda, setMoneda] = useState<'ARS' | 'USD' | ''>(bien?.moneda_valuacion ?? '')
   const e = estado.errores
   useEffect(() => {
-    if (estado.ok && estado.vez > 0) setMoneda('')
-  }, [estado.ok, estado.vez])
+    if (estado.ok && estado.vez > 0 && !bien) setMoneda('')
+  }, [estado.ok, estado.vez, bien])
   return (
-    <form key={estado.vez} onSubmit={enviar} noValidate className="space-y-3" aria-label="Nuevo bien">
+    <form key={bien ? 'corregir' : estado.vez} onSubmit={enviar} noValidate className="space-y-3" aria-label={bien ? `Corregir ${bien.nombre}` : 'Nuevo bien'}>
+      {bien ? <input type="hidden" name="id" value={bien.id} /> : null}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Campo etiqueta="Nombre" htmlFor={`${id}-n`} error={e.nombre}>
-          <Entrada id={`${id}-n`} name="nombre" placeholder="Casa, Camioneta…" invalido={Boolean(e.nombre)} autoFocus />
+          <Entrada id={`${id}-n`} name="nombre" defaultValue={bien?.nombre} placeholder="Casa, Camioneta…" invalido={Boolean(e.nombre)} autoFocus />
         </Campo>
         <Campo etiqueta="Tipo" htmlFor={`${id}-t`} error={e.tipo}>
-          <Selector id={`${id}-t`} name="tipo" defaultValue="inmueble">
+          <Selector id={`${id}-t`} name="tipo" defaultValue={bien?.tipo ?? 'inmueble'}>
             <option value="inmueble">Inmueble</option>
             <option value="vehiculo">Vehículo</option>
             <option value="otro">Otro</option>
           </Selector>
         </Campo>
         <Campo etiqueta="Geografía" htmlFor={`${id}-g`} error={e.geografia}>
-          <Selector id={`${id}-g`} name="geografia" defaultValue="AR">
+          <Selector id={`${id}-g`} name="geografia" defaultValue={bien?.geografia ?? 'AR'}>
             {GEOGRAFIAS.map((g) => (
               <option key={g} value={g}>
                 {NOMBRE_GEOGRAFIA[g]}
@@ -82,7 +84,7 @@ function FormBien({ pasivosLibres, onCerrar }: { pasivosLibres: PasivoFila[]; on
           error={e.pasivo_id}
           ayuda={pasivosLibres.length ? 'La camioneta va con su leasing: queda "sujeta a opción de compra".' : 'Sin pasivos libres: cargá el leasing primero si lo financia.'}
         >
-          <Selector id={`${id}-p`} name="pasivo_id" defaultValue="">
+          <Selector id={`${id}-p`} name="pasivo_id" defaultValue={bien?.pasivo_id ?? ''}>
             <option value="">Ninguna</option>
             {pasivosLibres.map((p) => (
               <option key={p.id} value={p.id}>
@@ -93,12 +95,19 @@ function FormBien({ pasivosLibres, onCerrar }: { pasivosLibres: PasivoFila[]; on
         </Campo>
       </div>
       <div className="max-w-md">
-        <ElegirMoneda nombre="moneda_valuacion" valor={moneda} onCambio={setMoneda} leyenda="¿En qué moneda lo valuás?" error={e.moneda_valuacion} />
+        <ElegirMoneda
+          nombre="moneda_valuacion"
+          valor={moneda}
+          onCambio={setMoneda}
+          leyenda="¿En qué moneda lo valuás?"
+          ayuda={bien ? 'Cambiarla reinterpreta las valuaciones ya cargadas en la moneda nueva.' : undefined}
+          error={e.moneda_valuacion}
+        />
       </div>
       <Mensaje estado={estado} />
       <div className="flex flex-wrap gap-2 [&>*]:max-sm:flex-1">
         <Boton type="submit" variante="primario" disabled={enviando}>
-          {enviando ? 'Guardando…' : 'Cargar bien'}
+          {enviando ? 'Guardando…' : bien ? 'Guardar la corrección' : 'Cargar bien'}
         </Boton>
         <Boton variante="fantasma" onClick={onCerrar}>
           {estado.ok ? 'Cerrar' : 'Cancelar'}
@@ -123,6 +132,7 @@ export function Bienes({
 }) {
   const [nuevo, setNuevo] = useState(false)
   const [valuando, setValuando] = useState<number | null>(null)
+  const [corrigiendo, setCorrigiendo] = useState<number | null>(null)
   const libres = pasivos.filter((p) => !bienes.some((b) => b.pasivo_id === p.id))
 
   return (
@@ -161,7 +171,7 @@ export function Bienes({
           return (
             <li key={b.id} className="min-w-0 rounded-2xl border border-border bg-surface p-4">
               <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <h3 className="font-semibold text-text">{b.nombre}</h3>
+                <h2 className="font-semibold text-text">{b.nombre}</h2>
                 <Chip>{NOMBRE_TIPO_BIEN[b.tipo]}</Chip>
                 <Chip>valuado en {b.moneda_valuacion === 'USD' ? 'dólares' : 'pesos'}</Chip>
                 {pasivo ? <Chip tono="azul">sujeto a opción de compra · {pasivo.nombre}</Chip> : null}
@@ -199,10 +209,20 @@ export function Bienes({
                     Cerrar
                   </Boton>
                 </>
+              ) : corrigiendo === b.id ? (
+                <div className="mt-3 rounded-xl border border-border bg-surface-2 p-3">
+                  {/* Su propia deuda sigue disponible al corregirlo. */}
+                  <FormBien bien={b} pasivosLibres={pasivos.filter((p) => p.id === b.pasivo_id || libres.includes(p))} onCerrar={() => setCorrigiendo(null)} />
+                </div>
               ) : (
-                <Boton variante="secundario" className="mt-3 max-sm:w-full" onClick={() => setValuando(b.id)}>
-                  Agregar valuación
-                </Boton>
+                <div className="mt-3 flex flex-wrap gap-2 [&>*]:max-sm:flex-1">
+                  <Boton variante="secundario" onClick={() => setValuando(b.id)}>
+                    Agregar valuación
+                  </Boton>
+                  <Boton variante="fantasma" onClick={() => setCorrigiendo(b.id)}>
+                    Corregir datos
+                  </Boton>
+                </div>
               )}
             </li>
           )

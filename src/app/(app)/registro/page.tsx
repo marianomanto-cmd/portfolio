@@ -1,6 +1,6 @@
 import { FileSpreadsheet, Image as ImagenIcono, Keyboard } from 'lucide-react'
 import type { Metadata } from 'next'
-import { fechaCorta, ZONA } from '@/lib/domain/fechas'
+import { fechaCorta, fechaEnCordoba, ZONA } from '@/lib/domain/fechas'
 import { vistaRegistro } from '@/lib/vistas'
 import type { FilaRegistro, VistaRegistro } from '@/lib/vistas/contratos'
 import { ErrorVista } from '@/components/error-vista'
@@ -30,6 +30,19 @@ const ORIGEN: Record<FilaRegistro['origen'], { nombre: string; Icono: typeof Key
   manual: { nombre: 'tipeado', Icono: Keyboard },
 }
 
+/** El origen a la vista (manual §4.5: Excel, captura, manual): un guardado de Datos es "manual"; el CCL y el cripto, "tipeado". */
+const nombreOrigen = (f: FilaRegistro) => (f.origen === 'manual' && f.cuenta === 'Datos' ? 'manual' : ORIGEN[f.origen].nombre)
+
+/** Cómo se nombra una carga en el resumen del lote y en el diálogo de Revertir. */
+const nombreFuente = (f: FilaRegistro) => (f.cuenta === 'Tipo de cambio' ? 'CCL y cripto' : f.cuenta === 'Datos' && f.detalle ? `Datos: ${f.detalle}` : f.cuenta)
+
+/** "guardado a las 08:00", o "guardado el jue 15/10 a las 08:00" si se guardó otro día que el de los datos. */
+function guardado(fecha: string, creado: string): string {
+  const instante = new Date(creado)
+  const dia = fechaEnCordoba(instante)
+  return `guardado ${dia !== fecha ? `el ${fechaCorta(dia)} ` : ''}a las ${hora.format(instante)}`
+}
+
 interface Lote {
   clave: string
   lote: string | null
@@ -52,10 +65,16 @@ function agrupar(filas: FilaRegistro[]): Lote[] {
 }
 
 function conteo(f: FilaRegistro): string {
+  // Un guardado de Datos dice qué grabó ("valuación de Casa · aporte a Mercado Pago").
+  if (f.detalle) return f.detalle
+  const plural = (n: number | undefined, uno: string, varios: string) => (n ? `${n} ${n > 1 ? varios : uno}` : null)
   const p = [
-    f.cotizaciones ? `${f.cotizaciones} precio${f.cotizaciones > 1 ? 's' : ''}` : null,
-    f.saldos ? `${f.saldos} saldo${f.saldos > 1 ? 's' : ''}` : null,
-    f.operaciones ? `${f.operaciones} operaci${f.operaciones > 1 ? 'ones' : 'ón'}` : null,
+    plural(f.cotizaciones, 'precio', 'precios'),
+    plural(f.saldos, 'saldo', 'saldos'),
+    plural(f.operaciones, 'operación', 'operaciones'),
+    plural(f.valuaciones, 'valuación', 'valuaciones'),
+    plural(f.capitales, 'capital pendiente', 'capitales pendientes'),
+    plural(f.movimientos, 'movimiento', 'movimientos'),
   ].filter(Boolean)
   if (f.cuenta === 'Tipo de cambio' && !p.length) return 'CCL y cripto'
   return p.length ? p.join(' · ') : 'sin filas'
@@ -107,7 +126,7 @@ function ListaCargas({ filas }: { filas: FilaRegistro[] }) {
             <o.Icono aria-hidden className="mt-0.5 size-4 shrink-0 text-muted md:mt-0" />
             <span className="text-sm">
               <span className={`font-medium ${f.estado === 'revertida' ? 'line-through decoration-1' : ''}`}>{f.cuenta}</span>
-              <span className="text-muted"> · {o.nombre}</span>
+              <span className="text-muted"> · {nombreOrigen(f)}</span>
             </span>
             <span className="col-start-2 text-[13px] text-muted md:col-start-auto">
               {conteo(f)}
@@ -130,12 +149,12 @@ function LoteTarjeta({ l }: { l: Lote }) {
   const hayVigentes = l.filas.some((f) => f.estado === 'vigente')
   const todasRevertidas = l.filas.every((f) => f.estado === 'revertida')
   const filas = [...l.filas].sort((a, b) => a.carga_id - b.carga_id)
-  const fuentes = [...new Set(filas.filter((f) => f.estado === 'vigente').map((f) => (f.cuenta === 'Tipo de cambio' ? 'CCL y cripto' : f.cuenta)))]
+  const fuentes = [...new Set(filas.filter((f) => f.estado === 'vigente').map(nombreFuente))]
   return (
     <Tarjeta as="li" className="p-4 md:p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2 className="text-[15px] font-semibold">
-          {fechaCorta(l.fecha)} <span className="font-normal text-muted">· guardado a las {hora.format(new Date(l.creado))}</span>
+          {fechaCorta(l.fecha)} <span className="font-normal text-muted">· {guardado(l.fecha, l.creado)}</span>
         </h2>
         <span className="text-sm text-muted">
           {activo !== null ? (

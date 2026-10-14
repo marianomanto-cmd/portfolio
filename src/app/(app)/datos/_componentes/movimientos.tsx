@@ -32,7 +32,9 @@ function ElegirTipo({ valor, onCambio }: { valor: TipoMovimiento; onCambio: (t: 
     <fieldset className="min-w-0 space-y-1.5">
       <legend className="text-sm font-medium text-text">¿Qué fue?</legend>
       <input type="hidden" name="tipo" value={valor} />
-      <div className="grid grid-cols-3 gap-2">
+      {/* Tres columnas parejas, pero ninguna más angosta que su texto: a 360 px,
+          "Transferencia" se salía de su botón (D-30). */}
+      <div className="grid grid-cols-[repeat(3,minmax(max-content,1fr))] gap-2">
         {TIPOS.map((t) => (
           <button
             key={t.valor}
@@ -224,7 +226,7 @@ export function Movimientos({
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted">
-        Plata que entra, sale o se mueve entre tus cuentas (D-06). Sin registrarla, un depósito se lee como ganancia y un retiro como pérdida.
+        Plata que entra, sale o se mueve entre tus cuentas <span className="whitespace-nowrap">(D-06)</span>. Sin registrarla, un depósito se lee como ganancia y un retiro como pérdida.
       </p>
       {precarga?.monto ? (
         <p className="rounded-lg bg-accent-soft px-3 py-2 text-sm text-text" role="status">

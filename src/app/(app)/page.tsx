@@ -136,7 +136,16 @@ function nombreDeParte(f: FraseDelDia, i: number): string | null {
   const sig = f.partes[i + 1]
   if (!sig || sig.calc) return null
   const t = sig.texto.trim().replace(/[.,;:]+$/, '')
+  // "+$ 49.560 de tus US$ 4.200": al grupo lo nombra una cifra con su traza (tus
+  // dólares de la carga anterior), que no va en el rótulo (se ve en modo privado).
+  if (t === 'de tus' && esBaseDeGrupo(f, i + 2)) return 'de tus dólares en efectivo'
   return /^de /.test(t) ? t : null
+}
+
+/** La cifra que nombra un grupo en la frase express: "de tus US$ 4.200" (tus dólares en efectivo de la carga anterior). */
+function esBaseDeGrupo(f: FraseDelDia, i: number): boolean {
+  const ant = f.partes[i - 1]
+  return Boolean(f.partes[i]?.calc) && Boolean(ant) && !ant.calc && ant.texto.trim() === 'de tus'
 }
 
 function tituloParte(f: FraseDelDia, i: number): string {
@@ -150,6 +159,7 @@ function tituloParte(f: FraseDelDia, i: number): string {
   if (mismo(c, f.activos.usd)) return 'Lo que pusieron tus activos, en dólares'
   if (f.sin_atribuir && (mismo(c, f.sin_atribuir.ars) || mismo(c, f.sin_atribuir.usd))) return 'Sin atribuir (sin precio o saldo nuevo)'
   if (p.texto.trim().endsWith('%')) return 'Variación porcentual'
+  if (esBaseDeGrupo(f, i)) return 'Tus dólares en efectivo, en la carga anterior'
   const en = p.texto.includes('US$') ? 'en dólares' : 'en pesos'
   const nombre = nombreDeParte(f, i)
   return nombre ? `${mayuscula(nombre)}, ${en}` : `Cifra de la frase, ${en}`
@@ -157,10 +167,10 @@ function tituloParte(f: FraseDelDia, i: number): string {
 const mismo = (a: CalcVista, b: CalcVista) => a.valor === b.valor && a.formula === b.formula
 
 function detalleFrase(f: FraseDelDia, m: Mostrar): FilaDetalle[] {
-  const parte = (c: CalcVista, moneda: 'ARS' | 'USD', titulo: string): ParteMostrada => ({
-    texto: m.texto(c, moneda, { signo: true }),
+  const parte = (c: CalcVista, moneda: 'ARS' | 'USD', titulo: string, signo = true): ParteMostrada => ({
+    texto: m.texto(c, moneda, signo ? { signo: true } : { signo: false, abs: true }),
     calc: c,
-    tono: tono(c, m.valor(c)),
+    tono: signo ? tono(c, m.valor(c)) : null,
     esMonto: true,
     titulo,
   })
@@ -181,11 +191,12 @@ function detalleFrase(f: FraseDelDia, m: Mostrar): FilaDetalle[] {
     const c = p.calc
     if (!c || p.texto.trim().endsWith('%') || vistas.some((x) => mismo(x, c))) return
     const lado = p.texto.includes('US$') ? 'usd' : 'ars'
-    const base = mayuscula(nombreDeParte(f, i) ?? 'En la frase')
+    const base = esBaseDeGrupo(f, i) ? 'Tus dólares en efectivo (carga anterior)' : mayuscula(nombreDeParte(f, i) ?? 'En la frase')
     let etiqueta = base
     for (let n = 2; extra.get(etiqueta)?.[lado]; n++) etiqueta = `${base} (${n})`
     const fila = extra.get(etiqueta) ?? { etiqueta, ars: null, usd: null }
-    fila[lado] = parte(c, lado === 'usd' ? 'USD' : 'ARS', tituloParte(f, i))
+    // Con signo solo lo que la frase muestra con signo (un saldo, como "US$ 4.200", no lo lleva).
+    fila[lado] = parte(c, lado === 'usd' ? 'USD' : 'ARS', tituloParte(f, i), /^[+−-]/.test(p.texto.trim()))
     extra.set(etiqueta, fila)
     vistas.push(c)
   })

@@ -9,6 +9,8 @@ const fake = vi.hoisted(() => {
     respuestasRpc: [] as { data: unknown; error: unknown }[],
     inserts: [] as { tabla: string; fila: unknown }[],
     respuestaInsert: { data: { id: 7 } as unknown, error: null as unknown },
+    updates: [] as { tabla: string; fila: unknown; eq?: [string, unknown] }[],
+    respuestaUpdate: { data: [{ id: 3 }] as unknown, error: null as unknown },
     uploads: [] as { bucket: string; path: string; opciones: unknown }[],
     respuestaUpload: { data: null as unknown, error: null as unknown },
   }
@@ -21,6 +23,16 @@ const fake = vi.hoisted(() => {
       insert: (fila: unknown) => {
         estado.inserts.push({ tabla, fila })
         return { select: () => ({ single: () => Promise.resolve(estado.respuestaInsert) }) }
+      },
+      update: (fila: unknown) => {
+        const u: { tabla: string; fila: unknown; eq?: [string, unknown] } = { tabla, fila }
+        estado.updates.push(u)
+        return {
+          eq: (col: string, val: unknown) => {
+            u.eq = [col, val]
+            return { select: () => Promise.resolve(estado.respuestaUpdate) }
+          },
+        }
       },
     }),
     storage: {
@@ -39,6 +51,8 @@ vi.mock('./supabase', () => ({ supabase: () => fake.cliente }))
 
 import {
   actualizarActivo,
+  actualizarBien,
+  actualizarPasivo,
   confirmarCarga,
   crearActivo,
   crearBien,
@@ -657,6 +671,21 @@ describe('llamadas a la base (cliente falso)', () => {
     expect(await guardarMovimientoCapital(mov, LOTE)).toBe(61)
     expect(fake.estado.rpc.map((r) => (r.args.p as { lote: string }).lote)).toEqual([LOTE, LOTE])
     expect(await mensajeAsync(() => guardarValuacionBien({ bien_id: 1, fecha: '2026-11-02', valor: '1', fuente: 'x' }, 'no-es-un-lote'))).toMatch(/lote/)
+  })
+
+  it('un bien o un pasivo cargado con un dato equivocado se corrige (fila por fila, con la auditoría)', async () => {
+    await actualizarBien(3, { nombre: ' Casa ', tipo: 'inmueble', moneda_valuacion: 'USD', geografia: 'AR', pasivo_id: null })
+    expect(fake.estado.updates.at(-1)).toEqual({
+      tabla: 'bienes',
+      fila: { nombre: 'Casa', tipo: 'inmueble', moneda_valuacion: 'USD', geografia: 'AR', pasivo_id: null },
+      eq: ['id', 3],
+    })
+    await actualizarPasivo(2, { nombre: 'Leasing', tipo: 'leasing', moneda: 'ARS', fecha_inicio: '2025-06-01', cuotas_totales: 36, monto_financiado_neto: '42000000' })
+    expect(fake.estado.updates.at(-1)).toMatchObject({ tabla: 'pasivos', fila: { cuotas_totales: 36, monto_financiado_neto: '42000000', anticipo_neto: null }, eq: ['id', 2] })
+    fake.estado.respuestaUpdate = { data: [], error: null }
+    expect(await mensajeAsync(() => actualizarBien(99, { nombre: 'X', tipo: 'otro', moneda_valuacion: 'ARS' }))).toMatch(/No existe el bien #99/)
+    expect(await mensajeAsync(() => actualizarBien(3, { nombre: 'Casa', tipo: 'otro', moneda_valuacion: 'EUR' as 'ARS' }))).toMatch(/moneda de valuación/)
+    fake.estado.respuestaUpdate = { data: [{ id: 3 }], error: null }
   })
 
   it('guardarValuacionBien y guardarPasivoSaldo usan guardar_manual con un lote nuevo', async () => {

@@ -319,7 +319,9 @@ const DIA_LARGO = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'vierne
  */
 function detalleExpress(fin: Contribucion[], f1: Foto | null, d0: Fecha, p: (texto: string, c?: Calc | null) => ParteFrase): ParteFrase[] {
   const ticker = new Map((f1?.items ?? []).map((i) => [i.clave, i.ticker]))
-  const grupos: { nombre: string; cs: Contribucion[] }[] = []
+  // `base`: el grupo de tus dólares se nombra con un monto ("de tus US$ 4.200"),
+  // que es una cifra más de la frase: va como parte tocable, con su traza.
+  const grupos: { nombre: string; cs: Contribucion[]; base?: Calc }[] = []
   for (const c of fin.filter((x) => x.clase === 'posicion' && x.moneda_riesgo === 'USD')) grupos.push({ nombre: `de ${ticker.get(c.clave) ?? c.nombre}`, cs: [c] })
   const resto = (nombre: string, f: (c: Contribucion) => boolean) => {
     const cs = fin.filter(f)
@@ -328,7 +330,18 @@ function detalleExpress(fin: Contribucion[], f1: Foto | null, d0: Fecha, p: (tex
   resto('de tus posiciones en pesos', (c) => c.clase === 'posicion' && c.moneda_riesgo === 'ARS')
   resto('de tus pesos en efectivo', (c) => c.clase === 'saldo' && c.moneda_riesgo === 'ARS')
   const dolares = fin.filter((c) => c.clase === 'saldo' && c.moneda_riesgo === 'USD')
-  if (dolares.length) grupos.push({ nombre: `de tus ${monto(dolares.reduce((a, c) => a.plus(c.v0?.usd ?? CERO), CERO), 'USD', { decimales: 0 })}`, cs: dolares })
+  if (dolares.length) {
+    // Un saldo sin v0 no existía en la carga anterior: no suma (no es un dato que falte).
+    const conBase = dolares.filter((c) => c.v0 !== null)
+    const suma = conBase.reduce((a, c) => a.plus(c.v0!.usd), CERO)
+    const base = calc(
+      suma,
+      `${conBase.length ? conBase.map((c) => `${c.nombre} ${monto(c.v0!.usd, 'USD', { decimales: 2 })}`).join(' + ') : 'ningún saldo'} = ${monto(suma, 'USD', { decimales: 2 })}`,
+      conBase.map((c) => ({ nombre: c.nombre, valor: c.v0!.usd.toFixed(), unidad: 'USD' as const })),
+      { explicacion: `Tus dólares en efectivo en la carga anterior (${fechaCorta(d0)}).` },
+    )
+    grupos.push({ nombre: `de tus ${monto(suma, 'USD', { decimales: 0 })}`, cs: dolares, base })
+  }
   const lista = (k: 'ars' | 'usd'): ParteFrase[] => {
     const m: Moneda = k === 'ars' ? 'ARS' : 'USD'
     const items = grupos
@@ -343,7 +356,9 @@ function detalleExpress(fin: Contribucion[], f1: Foto | null, d0: Fecha, p: (tex
         x.g.cs.map((y) => ({ nombre: y.nombre, valor: y.sin_atribuir[k].toFixed(), unidad: m })),
         { explicacion: 'Lo que cambia esta parte de tu cartera solo por valuarla al CCL nuevo con los precios y saldos de la carga anterior. Queda sin atribuir hasta su próxima observación fresca.' },
       )
-      out.push(p(monto(x.total, m, { signo: true }), c), p(` ${x.g.nombre}`))
+      out.push(p(monto(x.total, m, { signo: true }), c))
+      if (x.g.base) out.push(p(' de tus '), p(monto(x.g.base.valor as Decimal, 'USD', { decimales: 0 }), x.g.base))
+      else out.push(p(` ${x.g.nombre}`))
     })
     return out
   }
@@ -852,6 +867,7 @@ function filaCartera(i: ItemFoto, f: Foto, totalArs: Decimal | null, hoy: Fecha,
       peso: vista(peso),
       dias_en_posicion: t.fecha_inicio ? diasEntre(t.fecha_inicio, hoy) : null,
       dias_desde: t.fecha_inicio === null ? null : t.fecha_declarada ? 'declarada' : t.desde_apertura ? 'apertura' : 'compra',
+      fecha_inicio: t.fecha_inicio,
       // B18: el cero no gana ni pierde.
       ganas_pesos_perdes_dolares: resA.valor !== null && resU.valor !== null && resA.valor.gt(0) && resU.valor.lt(0),
       pendiente,
@@ -904,9 +920,34 @@ function pendientes(h: Hechos, f: Foto | null, hoy: Fecha): Pendiente[] {
     out.push({ id: `capital:${p.clave}`, gravedad: 'alta', titulo: `${p.nombre}: sin capital pendiente`, detalle: 'Sin el capital informado, la exposición no puede netear la deuda.', accion: { etiqueta: 'Cargar capital', href: '/datos/leasing' } })
   if (h.pasivos.length === 0)
     out.push({ id: 'sin-leasing', gravedad: 'media', titulo: 'Cargá el leasing', detalle: 'La deuda en pesos netea contra tus pesos (spec §3).', accion: { etiqueta: 'Cargar leasing', href: '/datos/leasing' } })
+  // D-47: lo que dejaste pendiente en la bandeja (una fila, un saldo, un ticker
+  // sin alta) no se grabó y la carga quedó con listado_completo = false. Vive en
+  // Atención hasta la próxima carga de esa cuenta.
+  for (const c of ultimasPorCuenta(h)) {
+    if (c.listado_completo !== false) continue
+    const cuenta = h.cuentas.find((x) => x.id === c.cuenta_id)?.nombre ?? `La cuenta ${c.cuenta_id}`
+    out.push({
+      id: `parcial:${c.cuenta_id}:${c.id}`,
+      gravedad: 'media',
+      titulo: `${cuenta}: la carga del ${fechaCorta(c.fecha)} quedó parcial`,
+      detalle: `Lo que dejaste pendiente no se grabó: sigue con su dato anterior, y una tenencia que todavía no diste de alta no entra en los totales. Se resuelve en tu próxima carga de ${cuenta}.`,
+      accion: { etiqueta: 'Cargar', href: '/carga' },
+    })
+  }
   void hoy
   const orden = { alta: 0, media: 1, baja: 2 }
   return out.sort((a, b) => orden[a.gravedad] - orden[b.gravedad])
+}
+
+/** La carga vigente más reciente de cada cuenta (por fecha y, el mismo día, la última). */
+function ultimasPorCuenta(h: Hechos): Hechos['cargas'] {
+  const ult = new Map<number, Hechos['cargas'][number]>()
+  for (const c of h.cargas) {
+    if (c.cuenta_id === null || c.estado !== 'vigente') continue
+    const u = ult.get(c.cuenta_id)
+    if (!u || c.fecha > u.fecha || (c.fecha === u.fecha && c.id > u.id)) ult.set(c.cuenta_id, c)
+  }
+  return [...ult.values()].sort((a, b) => (a.cuenta_id as number) - (b.cuenta_id as number))
 }
 
 function fuentes(h: Hechos, d1: Fecha | null, hoy: Fecha, feriados: Set<Fecha>): Fuente[] {
@@ -915,12 +956,15 @@ function fuentes(h: Hechos, d1: Fecha | null, hoy: Fecha, feriados: Set<Fecha>):
     const cuenta = h.cuentas.find((c) => c.nombre === nombre)
     const cargas = h.cargas.filter((c) => c.cuenta_id === cuenta?.id && c.estado === 'vigente').sort((a, b) => (a.fecha < b.fecha ? -1 : 1))
     const ult = cargas.at(-1)
+    // Una carga que dejó algo sin grabar (D-47, D-106: listado_completo = false)
+    // es ≠ "diferencia sin resolver" (visión §4.0) hasta la próxima de la cuenta.
+    const parcial = ult?.listado_completo === false
     out.push({
       nombre,
-      estado: !ult ? 'sin_carga' : esViejo(ult.fecha, hoy, feriados) ? 'viejo' : 'ok',
+      estado: !ult ? 'sin_carga' : esViejo(ult.fecha, hoy, feriados) ? 'viejo' : parcial ? 'diferencia' : 'ok',
       fecha: ult?.fecha ?? null,
       carga_id: ult?.id ?? null,
-      detalle: ult ? `Última carga: ${fechaCorta(ult.fecha)}` : 'Todavía no cargaste esta cuenta.',
+      detalle: ult ? `Última carga: ${fechaCorta(ult.fecha)}${parcial ? ' · parcial: quedaron filas pendientes' : ''}` : 'Todavía no cargaste esta cuenta.',
     })
   }
   const tc = [...h.tipos_cambio].sort((a, b) => (a.fecha < b.fecha ? -1 : 1))

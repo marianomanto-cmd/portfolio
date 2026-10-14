@@ -197,6 +197,33 @@ export async function crearPasivo(p: PasivoAlta): Promise<number> {
   return leerId(data?.id, 'dar de alta el pasivo')
 }
 
+/**
+ * Corrige un bien cargado con un dato equivocado (nombre, tipo, moneda de
+ * valuación, geografía, deuda que lo financia). Fila por fila: la auditoría
+ * guarda el antes y el después.
+ */
+export async function actualizarBien(id: number, b: BienAlta): Promise<void> {
+  const bienId = idPositivo(id, 'el bien')
+  const fila = normalizarBien(b)
+  const { data, error } = await supabase().from('bienes').update(fila).eq('id', bienId).select('id')
+  if (error) throw traducirErrorBase(error, 'corregir el bien')
+  if (!Array.isArray(data) || data.length !== 1) throw new ErrorEscritura(`No existe el bien #${bienId}.`)
+}
+
+/** Corrige un pasivo (el contrato): como actualizarBien, con la auditoría. */
+export async function actualizarPasivo(id: number, p: PasivoAlta): Promise<void> {
+  const pasivoId = idPositivo(id, 'el pasivo')
+  const fila = normalizarPasivo(p)
+  const { data, error } = await supabase()
+    .from('pasivos')
+    // Los montos van como texto (D-32); los tipos generados los declaran number.
+    .update(fila as unknown as Database['public']['Tables']['pasivos']['Update'])
+    .eq('id', pasivoId)
+    .select('id')
+  if (error) throw traducirErrorBase(error, 'corregir el pasivo')
+  if (!Array.isArray(data) || data.length !== 1) throw new ErrorEscritura(`No existe el pasivo #${pasivoId}.`)
+}
+
 /** Graba (o corrige, si ya hay una ese día) la valuación de un bien. Devuelve el id de la carga. */
 export async function guardarValuacionBien(v: { bien_id: number; fecha: Fecha; valor: string; fuente: string }, lote?: string | null): Promise<number> {
   const p = altaManual({ bienes_valuaciones: [normalizarValuacion(v)] }, v.fecha, lote)
