@@ -7,7 +7,8 @@ import { TablaCartera } from '@/components/cartera/tabla'
 import { ErrorVista } from '@/components/error-vista'
 
 export const dynamic = 'force-dynamic'
-export const metadata: Metadata = { title: 'Cartera' }
+// En la pantalla se llama Posiciones (D-156); la ruta sigue siendo /cartera.
+export const metadata: Metadata = { title: 'Posiciones' }
 
 export default async function PaginaCartera({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const sp = await searchParams
@@ -18,16 +19,16 @@ export default async function PaginaCartera({ searchParams }: { searchParams: Pr
   } catch (e) {
     return (
       <>
-        <h1 className="sr-only">Cartera</h1>
-        <ErrorVista error={e} que="tu cartera" />
+        <h1 className="sr-only">Posiciones</h1>
+        <ErrorVista error={e} que="tus posiciones" />
       </>
     )
   }
   return (
     <div className="flex flex-col gap-3">
-      <h1 className="sr-only">Cartera</h1>
+      <h1 className="sr-only">Posiciones</h1>
       {v.filas.length === 0 ? (
-        <p className="rounded-xl border border-border bg-surface p-5 text-sm text-muted">
+        <p className="rounded-tarjeta border border-border bg-surface p-5 text-sm text-muted">
           Todavía no hay posiciones: aparecen con tu primera carga.
         </p>
       ) : (

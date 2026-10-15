@@ -20,6 +20,8 @@ export interface Fuente {
   fecha: Fecha | null
   carga_id: number | null
   detalle: string | null
+  /** El CCL o el cripto tipeado (texto decimal), para el chip de la barra superior. Solo en esas dos. */
+  valor?: string | null
 }
 
 export interface Pendiente {
@@ -93,6 +95,11 @@ export interface VistaHoy {
   exposicion: ExposicionResumen
   atencion: Pendiente[]
   fuentes: Fuente[]
+  /**
+   * La hora en que se guardó la última carga del día de los datos (ISO), para
+   * el chip de la barra superior ("CARGA DE HOY · 09:41"). null sin cargas.
+   */
+  guardado_en?: string | null
   cargo_hoy: boolean
   es_habil_hoy: boolean
   /** En diciembre: recordatorio de la foto al 31/12 (D-76 de la visión). */

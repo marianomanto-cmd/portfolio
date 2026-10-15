@@ -15,7 +15,7 @@ function Segmentado<T extends string>({
   onCambio: (v: T) => void
 }) {
   return (
-    <div role="radiogroup" aria-label={nombre} className="grid w-full auto-cols-fr grid-flow-col gap-1 rounded-xl border border-border bg-surface-2 p-1 sm:w-auto sm:min-w-80">
+    <div role="radiogroup" aria-label={nombre} className="grid w-full auto-cols-fr grid-flow-col gap-1 rounded-full border border-border p-1 sm:w-auto sm:min-w-80">
       {opciones.map((o) => {
         const actual = o.valor === valor
         return (
@@ -25,7 +25,7 @@ function Segmentado<T extends string>({
             role="radio"
             aria-checked={actual}
             onClick={() => onCambio(o.valor)}
-            className={`tocable h-9 rounded-lg px-3 text-sm ${actual ? 'bg-surface font-semibold shadow-[var(--shadow)]' : 'text-muted hover:text-text'}`}
+            className={`tocable h-9 rounded-full px-3 font-mono text-[11px] uppercase tracking-[0.08em] transition-colors ${actual ? 'bg-surface-3 text-text' : 'text-muted hover:text-text'}`}
           >
             {o.etiqueta}
           </button>
@@ -51,19 +51,19 @@ export function FormularioPreferencias() {
   const p = usePreferencias()
   return (
     <Tarjeta className="p-4 md:p-6" aria-labelledby="pref-titulo">
-      <h2 id="pref-titulo" className="mb-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+      <h2 id="pref-titulo" className="rotulo mb-4 text-[11px]">
         En este dispositivo
       </h2>
       <div className="divide-y divide-border">
-        <Fila titulo="Tema" detalle="Claro u oscuro, o el que use tu sistema.">
+        <Fila titulo="Tema" detalle="Oscuro (el de la app), claro, o el que use tu sistema.">
           <Segmentado<Tema>
             nombre="Tema"
             valor={p.tema}
             onCambio={(v) => cambiarPreferencia('tema', v)}
             opciones={[
-              { valor: 'sistema', etiqueta: 'Sistema' },
-              { valor: 'claro', etiqueta: 'Claro' },
               { valor: 'oscuro', etiqueta: 'Oscuro' },
+              { valor: 'claro', etiqueta: 'Claro' },
+              { valor: 'sistema', etiqueta: 'Sistema' },
             ]}
           />
         </Fila>

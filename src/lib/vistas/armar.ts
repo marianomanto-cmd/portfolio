@@ -8,7 +8,7 @@ import { conjuntoFeriados, diaSemana, diasEntre, diasHabilesEntre, esHabil, esVi
 import { financieros, foto, indexar, sumaCalc, type Foto, type ItemFoto } from '@/lib/domain/foto'
 import { cantidadCalc, costoCalc, ppcCalc } from '@/lib/domain/posiciones'
 import type { Fecha, Hechos, Moneda } from '@/lib/domain/tipos'
-import { COLOR_CLASE, COLOR_GEO, NOMBRE_CLASE, NOMBRE_GEO } from './colores'
+import { COLOR_CLASE, COLOR_GEO, COLOR_MONEDA, COLOR_SIN_ELEGIR, NOMBRE_CLASE, NOMBRE_GEO } from './colores'
 import {
   EXPLICACION_INFERIDO,
   cuadre,
@@ -129,6 +129,7 @@ export function armarHoy(h: Hechos, hoy: Fecha): VistaHoy {
     exposicion: resumenExposicion(f1, 'financiero'),
     atencion: pendientes(h, f1, hoy),
     fuentes: fuentes(h, d1, hoy, feriados),
+    guardado_en: guardadoEn(h, d1),
     cargo_hoy: fechas.includes(hoy),
     es_habil_hoy: esHabil(hoy, feriados),
     aviso_fin_de_anio:
@@ -574,7 +575,7 @@ export function armarExposicion(h: Hechos, hoy: Fecha, modo: Vista): VistaExposi
   }
   const pesosEnActivos = resumen.pesos_financieros
   // Composición por moneda de riesgo: los bienes van a "Sin elegir" (D-73).
-  const porMoneda = segmentos(conRiesgo, (i) => i.moneda_riesgo, (k) => (k === 'ARS' ? 'Pesos' : 'Dólares'), (k) => (k === 'ARS' ? '#6b7a90' : '#2f5bd3'), total)
+  const porMoneda = segmentos(conRiesgo, (i) => i.moneda_riesgo, (k) => (k === 'ARS' ? 'Pesos' : 'Dólares'), (k) => (k === 'ARS' ? COLOR_MONEDA.ARS : COLOR_MONEDA.USD), total)
   if (bienes.length) {
     const ars = sumaItems(bienes, 'ARS', 'Bienes sin moneda de riesgo elegida, en pesos.')
     const usd = sumaItems(bienes, 'USD', 'Bienes sin moneda de riesgo elegida, en dólares.')
@@ -582,7 +583,7 @@ export function armarExposicion(h: Hechos, hoy: Fecha, modo: Vista): VistaExposi
       ars.valor === null || total === null || total.isZero()
         ? sinDato('Falta un valor para calcular el peso.')
         : calc(ars.valor.div(total), `${monto(ars.valor, 'ARS')} ÷ ${monto(total, 'ARS')} = ${porcentaje(ars.valor.div(total))}`, [deCalc('Bienes sin moneda de riesgo', ars, 'ARS')], { explicacion: 'Qué parte de la vista representa este grupo.' })
-    porMoneda.push({ clave: 'sin_elegir', nombre: 'Sin elegir', color: '#9aa1ac', valor: par(ars, usd), peso: vista(peso) })
+    porMoneda.push({ clave: 'sin_elegir', nombre: 'Sin elegir', color: COLOR_SIN_ELEGIR, valor: par(ars, usd), peso: vista(peso) })
   }
   return {
     fecha_datos: d1,
@@ -965,10 +966,23 @@ function fuentes(h: Hechos, d1: Fecha | null, hoy: Fecha, feriados: Set<Fecha>):
   const tc = [...h.tipos_cambio].sort((a, b) => (a.fecha < b.fecha ? -1 : 1))
   const ultCcl = [...tc].reverse().find((t) => t.ccl !== null)
   const ultCri = [...tc].reverse().find((t) => t.cripto_venta !== null)
-  out.push({ nombre: 'CCL', estado: !ultCcl ? 'sin_carga' : esViejo(ultCcl.fecha, hoy, feriados) ? 'viejo' : 'tipeado', fecha: ultCcl?.fecha ?? null, carga_id: ultCcl?.carga_id ?? null, detalle: ultCcl ? `Tipeado el ${fechaCorta(ultCcl.fecha)}` : null })
-  out.push({ nombre: 'Cripto', estado: !ultCri ? 'sin_carga' : esViejo(ultCri.fecha, hoy, feriados) ? 'viejo' : 'tipeado', fecha: ultCri?.fecha ?? null, carga_id: ultCri?.carga_id ?? null, detalle: ultCri ? `Tipeado el ${fechaCorta(ultCri.fecha)}` : null })
+  out.push({ nombre: 'CCL', estado: !ultCcl ? 'sin_carga' : esViejo(ultCcl.fecha, hoy, feriados) ? 'viejo' : 'tipeado', fecha: ultCcl?.fecha ?? null, carga_id: ultCcl?.carga_id ?? null, detalle: ultCcl ? `Tipeado el ${fechaCorta(ultCcl.fecha)}` : null, valor: ultCcl?.ccl?.toFixed() ?? null })
+  out.push({ nombre: 'Cripto', estado: !ultCri ? 'sin_carga' : esViejo(ultCri.fecha, hoy, feriados) ? 'viejo' : 'tipeado', fecha: ultCri?.fecha ?? null, carga_id: ultCri?.carga_id ?? null, detalle: ultCri ? `Tipeado el ${fechaCorta(ultCri.fecha)}` : null, valor: ultCri?.cripto_venta?.toFixed() ?? null })
   void d1
   return out
+}
+
+/**
+ * La hora en que se guardó la última carga del día de los datos: la de las
+ * fuentes del día (una cuenta o el tipo de cambio tipeado), no la de un
+ * guardado de Datos. null si no hay cargas ese día.
+ */
+export function guardadoEn(h: Hechos, d1: Fecha | null): string | null {
+  if (d1 === null) return null
+  const delDia = h.cargas.filter((c) => c.fecha === d1 && c.estado === 'vigente')
+  const fuentes = delDia.filter((c) => c.cuenta_id !== null || c.lector === 'tipeado')
+  const elegidas = fuentes.length ? fuentes : delDia
+  return elegidas.reduce<string | null>((max, c) => (max === null || c.creado_en > max ? c.creado_en : max), null)
 }
 
 // ───────────── Registro ─────────────

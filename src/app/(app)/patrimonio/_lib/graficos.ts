@@ -7,6 +7,7 @@ import { fechaCorta } from '@/lib/domain/fechas'
 import type { Moneda } from '@/lib/domain/tipos'
 import type { PuntoBalance } from '@/lib/vistas/contratos-balance'
 import { COLOR_CLASE, NOMBRE_CLASE } from '@/lib/vistas/colores'
+import { colorTema } from '@/components/graficos/tema'
 
 /** El orden de las capas: de lo más líquido (abajo) a los bienes (arriba). */
 const ORDEN = ['liquidez', 'fci', 'lecap', 'bono', 'accion_local', 'cedear', 'otro', 'inmueble', 'vehiculo']
@@ -65,7 +66,8 @@ export function leyendaEvolucion(serie: readonly PuntoBalance[], rotuloFirme: st
 export function opcionEvolucion(serie: readonly PuntoBalance[], o: OpcionesEvolucion): Record<string, unknown> {
   const k = clave(o.moneda)
   const uno = serie.length === 1
-  const tinta = o.oscuro ? '#e6eaf0' : '#121722'
+  // La tinta del tema vigente (la resuelve el envoltorio al dibujar).
+  const tinta = colorTema('texto')
   const estimado = serie.some((p) => p.completo_estimado)
   const series: Record<string, unknown>[] = clasesDe(serie).map((c) => ({
     type: 'line',

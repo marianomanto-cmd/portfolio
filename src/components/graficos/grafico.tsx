@@ -1,17 +1,23 @@
 'use client'
 
-// El único envoltorio de ECharts de la app (plan de la entrega 4, §8). Cada
-// pantalla arma la opción con una función pura en su _lib/graficos.ts (con
-// test) y la pasa acá; este componente solo dibuja.
+// El único envoltorio de ECharts de la app (plan de la entrega 4, §8; sistema
+// visual D-157). Cada pantalla arma la opción con una función pura en su
+// _lib/graficos.ts (con test) y la pasa acá; este componente solo dibuja.
+//
+//   <Grafico opcion={opcion} tabla={tabla} titulo="Patrimonio neto · 12 meses" alto={{ movil: 200, escritorio: 220 }} />
 //
 // - ECharts se importa por partes y recién en el navegador (no pesa en el
 //   servidor ni en las pantallas sin gráficos), con el renderer SVG.
-// - Toma los colores de los tokens CSS y se vuelve a dibujar al cambiar el
-//   tema, la paleta o el ancho; sin animación con "reducir movimiento".
+// - Le pone el tema (tema.ts): ejes en mono 10 px, grilla hairline, tooltip de
+//   vidrio, la paleta del sistema y los colorTema(…) de la opción resueltos
+//   con el tema vigente. Se vuelve a dibujar al cambiar el tema, la paleta o
+//   el ancho; sin animación con "reducir movimiento".
 // - Alto fijo (uno para el teléfono y otro desde 768 px): nunca empuja la
 //   pantalla ni deja scroll horizontal.
 // - La misma información va en una tabla para el lector de pantalla, y "Ver
 //   como tabla" la muestra a la vista.
+// - El modo privado lo resuelve la opción (sin montos en ejes, etiquetas ni
+//   tooltip); el test de interacción lo controla en cada pantalla.
 
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
 import { conTema, leerTema } from './tema'
@@ -161,7 +167,7 @@ export function Grafico({ opcion, alto = { movil: 240, escritorio: 320 }, titulo
           onClick={() => setVerTabla((v) => !v)}
           aria-expanded={verTabla}
           aria-controls={idTabla}
-          className="tocable inline-flex min-h-11 items-center rounded-lg px-2 text-sm text-muted hover:text-text lg:min-h-9"
+          className="tocable inline-flex min-h-11 items-center rounded-lg px-2 text-[13px] text-muted transition-colors hover:text-text lg:min-h-9"
         >
           {verTabla ? 'Ocultar la tabla' : 'Ver como tabla'}
         </button>
@@ -176,7 +182,7 @@ export function Grafico({ opcion, alto = { movil: 240, escritorio: 320 }, titulo
           <thead>
             <tr>
               {tabla.columnas.map((c, i) => (
-                <th key={i} scope="col" className="px-2 py-1 text-left font-medium text-muted">
+                <th key={i} scope="col" className="rotulo px-2 py-1 text-left text-[10px]">
                   {c}
                 </th>
               ))}

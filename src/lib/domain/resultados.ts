@@ -24,6 +24,7 @@
 // realizado lo son, y el resultado sigue conocido.
 
 import { calc, deCalc, sinDato, unicas, type Calc, type DobleCalc, type Etiqueta, type Insumo } from './calc'
+import { COLOR_BIEN, COLOR_LIQUIDEZ_ARS, COLOR_PASIVO, COLOR_SIN_ELEGIR } from './colores'
 import { CERO, Decimal, monto, numero, porcentaje } from './dinero'
 import { diasEntre, fechaCorta, sumarDias } from './fechas'
 import type { FlujoReal, RecurrenteBase } from './flujo/tipos'
@@ -592,16 +593,22 @@ function noRealizadoPosicion(c: Contribucion, resultado: Calc, realizado: Calc, 
   )
 }
 
+/** El color de una partida que no está en ninguna de las dos fotos: el de su clase (D-157). */
+function colorDeClase(clase: string): string {
+  return clase === 'saldo' ? COLOR_LIQUIDEZ_ARS : clase === 'bien' ? COLOR_BIEN : clase === 'pasivo' ? COLOR_PASIVO : COLOR_SIN_ELEGIR
+}
+
 /** Datos de presentación de una partida (de la foto de llegada o de salida; si abrió y cerró adentro, del catálogo). */
-function metaPartida(h: Hechos, c: Contribucion, items: Map<string, ItemFoto>): { ticker: string; cuenta: string | null; tipo: string; color: string } {
+function metaPartida(h: Hechos, c: Contribucion, items: Map<string, ItemFoto>, ix: Indices): { ticker: string; cuenta: string | null; tipo: string; color: string } {
   const it = items.get(c.clave)
   if (it) return { ticker: it.ticker, cuenta: it.cuenta?.nombre ?? null, tipo: it.tipo, color: it.color }
   const [p, a, b] = c.clave.split(':')
   if (p === 'p') {
     const act = h.activos.find((x) => x.id === Number(b))
-    return { ticker: act?.ticker ?? c.nombre, cuenta: h.cuentas.find((x) => x.id === Number(a))?.nombre ?? null, tipo: act?.tipo ?? 'otro', color: act?.color ?? '#6b7a90' }
+    // El color del activo, el mismo que en las fotos (el del catálogo o el de su familia).
+    return { ticker: act?.ticker ?? c.nombre, cuenta: h.cuentas.find((x) => x.id === Number(a))?.nombre ?? null, tipo: act?.tipo ?? 'otro', color: (act && ix.colores.get(act.id)) || COLOR_SIN_ELEGIR }
   }
-  return { ticker: c.nombre, cuenta: null, tipo: c.clase, color: '#6b7a90' }
+  return { ticker: c.nombre, cuenta: null, tipo: c.clase, color: colorDeClase(c.clase) }
 }
 
 /**
@@ -622,7 +629,7 @@ export function resultadosPorPartida(h: Hechos, d0: Fecha, d1: Fecha, hoy: Fecha
   for (const i of f1.items) items.set(i.clave, i)
   const out: ResultadoPartida[] = []
   for (const c of v.contribuciones.filter((x) => enVista(x, vistaSel))) {
-    const meta = metaPartida(h, c, items)
+    const meta = metaPartida(h, c, items, ix)
     // D-154: la fila de una deuda estimada lleva el chip donde la deuda pone algo.
     const ed = c.clase === 'pasivo' ? firmeza([...f0.items, ...f1.items].filter((i) => i.clave === c.clave)) : []
     const det = (p: Parte): DobleCalc =>
@@ -665,7 +672,7 @@ export function resultadosPorPartida(h: Hechos, d0: Fecha, d1: Fecha, hoy: Fecha
       cuenta: it?.cuenta?.nombre ?? null,
       clase,
       tipo: it?.tipo ?? clase,
-      color: it?.color ?? '#6b7a90',
+      color: it?.color ?? colorDeClase(clase),
       moneda_riesgo: it?.moneda_riesgo ?? 'ARS',
       resultado: nd,
       activo: nd,

@@ -44,6 +44,12 @@ const nextConfig = {
   async headers() {
     return [{ source: '/:path*', headers: ENCABEZADOS_SEGURIDAD }]
   },
+  // Balance vive dentro de Exposición (D-156): la dirección vieja lleva ahí,
+  // con su búsqueda (?fecha=, ?agrupar=, ?comparar=). Temporal (307): la ruta
+  // se puede volver a usar.
+  async redirects() {
+    return [{ source: '/patrimonio/:resto*', destination: '/exposicion', permanent: false }]
+  },
 }
 
 export default nextConfig

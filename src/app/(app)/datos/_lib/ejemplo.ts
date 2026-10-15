@@ -6,11 +6,11 @@ import type { DatosPantalla } from './servidor'
 export function ejemploDatos(): Omit<DatosPantalla, 'modo' | 'aviso'> {
   return {
     activos: [
-      { id: 1, ticker: 'SPY', nombre: 'SPDR S&P 500 (CEDEAR)', tipo: 'cedear', moneda_riesgo: 'USD', geografia: 'US', indexacion: null, ticker_subyacente: 'SPY', fecha_vencimiento: null, color: '#2f5bd3', activo_bool: true },
-      { id: 2, ticker: 'YPFD', nombre: 'YPF S.A. clase D', tipo: 'accion_local', moneda_riesgo: 'ARS', geografia: 'AR', indexacion: null, ticker_subyacente: null, fecha_vencimiento: null, color: '#c8650a', activo_bool: true },
-      { id: 3, ticker: 'T30J7', nombre: 'BONCAP T30J7', tipo: 'bono', moneda_riesgo: 'ARS', geografia: 'AR', indexacion: 'fija', ticker_subyacente: null, fecha_vencimiento: '2027-06-30', color: '#0f7a43', activo_bool: true },
+      { id: 1, ticker: 'SPY', nombre: 'SPDR S&P 500 (CEDEAR)', tipo: 'cedear', moneda_riesgo: 'USD', geografia: 'US', indexacion: null, ticker_subyacente: 'SPY', fecha_vencimiento: null, color: null, activo_bool: true },
+      { id: 2, ticker: 'YPFD', nombre: 'YPF S.A. clase D', tipo: 'accion_local', moneda_riesgo: 'ARS', geografia: 'AR', indexacion: null, ticker_subyacente: null, fecha_vencimiento: null, color: null, activo_bool: true },
+      { id: 3, ticker: 'T30J7', nombre: 'BONCAP T30J7', tipo: 'bono', moneda_riesgo: 'ARS', geografia: 'AR', indexacion: 'fija', ticker_subyacente: null, fecha_vencimiento: '2027-06-30', color: null, activo_bool: true },
       { id: 4, ticker: 'TXMJ0', nombre: 'BONTE dual TXMJ0', tipo: 'bono', moneda_riesgo: 'ARS', geografia: 'AR', indexacion: 'dual_cer_tamar', ticker_subyacente: null, fecha_vencimiento: null, color: null, activo_bool: true },
-      { id: 5, ticker: 'S13N6', nombre: 'LECAP S13N6', tipo: 'lecap', moneda_riesgo: 'ARS', geografia: 'AR', indexacion: 'fija', ticker_subyacente: null, fecha_vencimiento: '2026-11-13', color: '#8a5a00', activo_bool: true },
+      { id: 5, ticker: 'S13N6', nombre: 'LECAP S13N6', tipo: 'lecap', moneda_riesgo: 'ARS', geografia: 'AR', indexacion: 'fija', ticker_subyacente: null, fecha_vencimiento: '2026-11-13', color: null, activo_bool: true },
       { id: 6, ticker: 'FIMA', nombre: 'FIMA Premium clase A', tipo: 'fci', moneda_riesgo: 'ARS', geografia: 'AR', indexacion: null, ticker_subyacente: null, fecha_vencimiento: null, color: null, activo_bool: true },
     ],
     ratios: [

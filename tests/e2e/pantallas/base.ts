@@ -13,6 +13,7 @@ export const PANTALLAS_BASE: Pantalla[] = [
   { ruta: '/exposicion?vista=total', nombre: 'exposicion-total' },
   { ruta: '/registro', nombre: 'registro' },
   { ruta: '/ajustes', nombre: 'ajustes' },
+  { ruta: '/mapa', nombre: 'mapa' },
   { ruta: '/carga', nombre: 'carga' },
   { ruta: '/datos/catalogo', nombre: 'datos-catalogo' },
   { ruta: '/datos/cuentas', nombre: 'datos-cuentas' },
