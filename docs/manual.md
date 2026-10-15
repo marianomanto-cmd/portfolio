@@ -53,22 +53,26 @@ Toda cifra existe en ARS y en USD. Toda cifra se toca y muestra de dónde sale: 
 
 ### Pesos y dólares, sin leer el símbolo
 
-- El monto en **dólares** va siempre dentro de una **pastilla** levemente tintada, con "US$". El de **pesos** va en tinta normal, con "$".
+- El monto en **dólares** va siempre dentro de una **pastilla dorada**, con "US$". El de **pesos** va en tinta normal, sin pastilla, con "$" (D-157).
 - En tablas y pares, los pesos van a la izquierda (o arriba) y los dólares a la derecha (o abajo).
 - En la tarjeta de un activo, el número grande es el de la moneda en la que el activo **arriesga**: un CEDEAR muestra dólares arriba; una LECAP, pesos.
-- Positivo y negativo van por color **y** por signo y flecha: "+1,8% ▲", "−0,6% ▼". Verde y rojo, solo para resultados.
+- Positivo y negativo van por color **y** por signo y flecha: "+1,8% ▲", "−0,6% ▼". Verde y rojo, solo para resultados. El rojo sangría es también el de la deuda y el de Cargar: siempre con signo, nunca solo el color.
+- Cada activo tiene su color, el mismo en todos los gráficos: dorados los que arriesgan dólares, color piedra los de pesos, lavanda la liquidez (D-157). El que elijas en Datos › Catálogo manda.
 
 ### "¿De dónde sale?": la traza
 
-**Tocá cualquier cifra** (o hacé clic, o llegá con Tab y apretá Enter). Se abre un panel; en el teléfono, una hoja desde abajo. Tiene, en este orden:
+Las cifras que tienen traza llevan un **subrayado punteado**. **Tocá cualquiera** (o hacé clic, o llegá con Tab y apretá Enter). En la compu se abre una placa de vidrio abajo a la derecha; en el teléfono, una hoja desde abajo. Tiene, en este orden:
 
-1. **La fórmula con los valores reales**, por ejemplo: `1.240 × $35.150 ÷ CCL 1.548,20 = US$ 28.152,69`.
-2. **Ver insumos ▸**: de qué está hecha esa cifra, de a un nivel. Cada insumo dice de qué carga salió y, si vino de un archivo, de dónde: "Excel de IEB, hoja Patrimonio, fila 18".
-3. **¿Qué es esto?**: una línea en castellano. Por ejemplo, "Lo que valen tus CEDEARs de SPY si los pasás a dólares al CCL que cargaste".
+1. **De dónde sale** y el nombre de la cifra.
+2. **La fórmula con los valores reales**, por ejemplo: `1.240 × $35.150 ÷ CCL 1.548,20 = US$ 28.152,69`. Si es "sin dato", qué falta.
+3. Sus **etiquetas**, si tiene (las de abajo).
+4. **Los insumos**, a la vista: de qué está hecha esa cifra, cada uno con su valor, de qué carga salió y, si vino de un archivo, de dónde ("Excel de IEB, hoja Patrimonio, fila 18"). Un insumo calculado trae **ver cálculo ▸**, con su propia fórmula.
+5. **¿Qué es esto?**: una línea en castellano. Por ejemplo, "Lo que valen tus CEDEARs de SPY si los pasás a dólares al CCL que cargaste".
+6. **Copiar valor exacto**, con todos sus decimales.
 
 En el desglose, la traza dice además "de lo cual: interacción": la parte que se debe a que se movieron a la vez el activo y el CCL. Ya está incluida; se muestra para que sepas cuánto es.
 
-Escape, o tocar afuera, la cierra. En la compu, cada cifra de la frase de Hoy se toca en el lugar. En el teléfono, "Ver la frase completa y cada cifra" abre una hoja con cada número en su renglón, y ahí "Tocá una cifra para ver de dónde sale" te lo recuerda.
+Escape, la ×, o tocar afuera, la cierra, y el foco vuelve a la cifra. Hay una sola abierta a la vez. En la compu, cada cifra de la frase de Hoy se toca en el lugar. En el teléfono, "Ver la frase completa y cada cifra" abre una hoja con cada número en su renglón, y ahí "Tocá una cifra para ver de dónde sale" te lo recuerda.
 
 ### "Sin dato"
 
@@ -82,7 +86,7 @@ Una cifra que no es un dato verificado lleva un chip gris chico, con una palabra
 
 | Etiqueta | Qué quiere decir | Ejemplo |
 |---|---|---|
-| **parcial** | Es un total y le faltan partes. El valor es "sin dato" y la suma parcial va abajo | El total de "Res. USD" de Cartera cuando una posición no tiene CCL de compra |
+| **parcial** | Es un total y le faltan partes. El valor es "sin dato" y la suma parcial va abajo | El total de "Res. USD" de Posiciones cuando una posición no tiene CCL de compra |
 | **pendiente** | Falta un dato que llega después | El costo de una compra del día, que IEB muestra con PPP `-` hasta el día siguiente |
 | **viejo** | El dato tiene más de 2 días hábiles. Los feriados y los días sin rueda en BYMA no cuentan; un día con rueda aunque los bancos cierren (el Día del Bancario, un no laborable con fines turísticos) sí cuenta (D-129) | Un precio que no se actualiza porque no cargaste esa cuenta; el CCL de hace tres días hábiles (D-16, D-109) |
 | **inferido** | Se calculó a partir de otro dato; no se leyó tal cual | El precio de una compra deducido del cambio de PPP; una compra pendiente valuada al precio del día (D-110) |
@@ -103,12 +107,23 @@ Cada pantalla pasa a dólares con el CCL del día de los datos. Si ese día no t
 
 - `c` abre Cargar; `h` prende y apaga el modo privado. Las teclas de una letra andan solo si ningún campo tiene el foco.
 - En Cargar alcanzan Tab y Enter: no hace falta el mouse. En la bandeja, ↑ y ↓ pasan de fila, y A, E y P aceptan, editan o dejan pendiente la fila que tiene el foco.
+- En una tabla (Registro y las que se suman con el rediseño), las flechas pasan de celda; **Enter** entra a lo que tiene la celda (una cifra: otro Enter abre su traza; un botón: otro Enter lo aprieta), Tab recorre lo de adentro y **Escape** vuelve a la celda. Un clic en el encabezado ordena por esa columna: los números, de mayor a menor al primer clic; lo que es "sin dato" va siempre al final.
 
 ## 4. Las pantallas
 
-En la compu, la barra lateral tiene cuatro grupos: **Diario** (Hoy y Cargar), **Patrimonio** (Balance, Cartera, Exposición y Evolución y PnL), **Contexto** (Pasivos y Flujo y escenarios) y **Al pie** (Registro, Datos y Ajustes). Se colapsa a íconos con su botón. En el teléfono, abajo: **Hoy · Balance · [Cargar] · Evolución · Más**; "Más" abre Cartera, Exposición, Pasivos, Flujo y escenarios, Registro, Datos y Ajustes (D-151).
+El menú se ordena por la pregunta que contesta cada pantalla (D-156). En la compu, la barra lateral tiene:
 
-Arriba, en todas las pantallas, el **chip de estado de los datos**: "Datos al cierre del mié 14/10 · 5 de 5 fuentes". Tocalo y muestra cada fuente con su estado:
+- **Diario:** Hoy ("¿Cómo estoy hoy?").
+- **Patrimonio:** Posiciones ("¿Cómo le va a cada cosa?") y Exposición ("¿Cuánto estoy jugado al peso?", con el balance adentro).
+- **Resultados:** Evolución y PnL ("¿Gané o perdí, y por qué?").
+- **Compromisos y futuro:** Pasivos ("¿Cuánto me falta pagar?") y Flujo y escenarios ("¿Adónde me lleva?").
+- **Al pie:** Registro, Datos, Ajustes y el **Mapa de la app**, que muestra todo esto, cómo se lee cada pantalla y qué quiere decir cada color.
+
+Se colapsa a íconos con su botón (o en Ajustes). **Cartera ahora se llama Posiciones** (la dirección sigue siendo `/cartera`), y **el Balance está dentro de Exposición**: `/patrimonio` te lleva ahí.
+
+**Cargar no está en el menú: es el botón fijo** arriba a la derecha (o la tecla `c`). En el teléfono es el botón del centro de la barra de abajo: **Hoy · Patrimonio · [Cargar] · Resultados · Más**. Patrimonio abre Posiciones, con una pestaña arriba para pasar a Exposición; Resultados abre Evolución y PnL; "Más" abre Pasivos, Flujo y escenarios, Registro, Datos, Ajustes y el Mapa de la app.
+
+Arriba, en todas las pantallas, va el nombre de la pantalla con una línea que dice para qué es, el **chip de estado de los datos**, el ojo del modo privado y Cargar. El chip dice de cuándo es tu última carga y con qué CCL y cripto está la app: "CARGA DE HOY · 09:41 | CCL 1.548,20 CRIPTO 1.541", u "ÚLTIMA CARGA · 14/10" si fue otro día (en el teléfono, solo la fecha). Su punto es verde si cada fuente está al día y dorado si alguna tiene algo para revisar. Tocalo y muestra cada fuente con su estado:
 
 | Signo | Quiere decir |
 |---|---|
@@ -117,7 +132,7 @@ Arriba, en todas las pantallas, el **chip de estado de los datos**: "Datos al ci
 | ○ | Tipeado, sin control posible: el CCL y el cripto |
 | ◷ | Más de 2 días hábiles sin carga |
 
-El resultado de cada control (el Excel contra B2 y sus Subtotales, la captura de Galicia contra su total) se ve en la bandeja de esa carga. En la barra, el botón de Cargar lleva un punto gris cuando es día hábil, ya cerró BYMA (17 h) y todavía no cargaste (D-127).
+El resultado de cada control (el Excel contra B2 y sus Subtotales, la captura de Galicia contra su total) se ve en la bandeja de esa carga. El botón de Cargar lleva un punto cuando es día hábil, ya cerró BYMA (17 h) y todavía no cargaste (D-127).
 
 ### 4.1 Hoy
 
@@ -139,7 +154,7 @@ El resultado de cada control (el Excel contra B2 y sus Subtotales, la captura de
 - En el teléfono, la frase es texto corrido. **"Ver la frase completa y cada cifra"** abre una hoja con cada número en su renglón, para tocarlo; en una carga express, también cada cifra de la segunda oración (por ejemplo, "De SPY"). La frase se recorta solo con el dedo: con mouse, aunque la ventana sea angosta, se lee entera.
 
 **Las dos tarjetas** (D-03):
-- **Patrimonio financiero**: lo invertible. Tus posiciones de IEB y Galicia y la liquidez de las tres cuentas. Sobre esto se miden Cartera, la concentración y los resultados. Debajo, su variación y su desglose: activos, CCL y, si hay, sin atribuir. Las tres partes suman la variación.
+- **Patrimonio financiero**: lo invertible. Tus posiciones de IEB y Galicia y la liquidez de las tres cuentas. Sobre esto se miden Posiciones, la concentración y los resultados. Debajo, su variación y su desglose: activos, CCL y, si hay, sin atribuir. Las tres partes suman la variación.
 - **Patrimonio total**: el financiero, más la casa, más tu parte de la camioneta (su valuación menos la deuda del leasing), "sujeta a opción de compra". Dice la fecha de cada valuación. Mientras no cargues tus bienes o el leasing (Datos), el patrimonio total y su variación son "sin dato", con la suma de lo que sí cargaste a la vista (D-65, D-126). La deuda del leasing es una sola en toda la app: el valor de cancelación que informe la leasera o, sin él, la **según el cuadro de marcha** (baja con cada cuota que pagás) o, sin el cuadro, el estimado que aprobaste (D-131). Las dos últimas son estimados: el total lleva el chip "estimado", y su traza dice cómo se calculó (D-154).
 - En la compu, debajo de cada tarjeta, un enlace: **"Ver la evolución y el PnL"** (financiero) y **"Ver el balance"** (total).
 
@@ -208,7 +223,7 @@ Lo que podés encontrar en la bandeja:
 
 **Después del Enter:** "Guardado · 41 s activos", con lo que se grabó por cuenta (precios, saldos, operaciones y, si hubo, precios completados), y tres botones: **Ver Hoy**, **Deshacer** y **Nueva carga**. Si el guardado falla, la pantalla ofrece **Ver Registro** y **Nueva carga**. Si se cortó la conexión y volvés a tocar Enter, la app reconoce el mismo envío y muestra lo que de verdad quedó grabado ("Ya estaba guardado"); si cambiaste algo en el medio, no lo graba y te pide una carga nueva (D-120).
 
-### 4.3 Cartera
+### 4.3 Posiciones (antes Cartera)
 
 **Para qué:** cada posición en pesos y en dólares, con su desglose.
 
@@ -229,7 +244,7 @@ Lo que podés encontrar en la bandeja:
 **Cómo leer el desglose.** La moneda de riesgo decide dónde aparece el efecto del CCL:
 - **Un CEDEAR** arriesga dólares. En pesos, su resultado tiene una parte de activo y otra de CCL: "De tus +$ 6,2 M en pesos, +$ 3,4 M fueron el CCL" (los montos compactos llevan su signo). En dólares, todo es activo.
 - **Una LECAP o un bono en pesos** arriesgan pesos. En dólares, su resultado tiene una parte de activo y otra de CCL; por ejemplo, S13N6: +US$ 326,16 de activo y −US$ 247,94 de CCL = +US$ 78,22. En pesos, todo es activo.
-- El desglose desde la compra es la **suma de los mismos intervalos** que usa Hoy, así que Cartera y Hoy dan el mismo reparto (D-35). Lo anterior a tu primera carga es un solo tramo por compra, con el CCL de compra. Si la última carga no trajo precio o CCL nuevo para esa posición, el desglose muestra también lo que queda **sin atribuir**. La traza lista cada tramo.
+- El desglose desde la compra es la **suma de los mismos intervalos** que usa Hoy, así que Posiciones y Hoy dan el mismo reparto (D-35). Lo anterior a tu primera carga es un solo tramo por compra, con el CCL de compra. Si la última carga no trajo precio o CCL nuevo para esa posición, el desglose muestra también lo que queda **sin atribuir**. La traza lista cada tramo.
 - El desglose es el de **lo que tenés hoy**: después de una venta parcial, lo acumulado se reparte en la proporción que queda (como el costo), y los cupones y dividendos no entran (D-114). Lo que ves suma el resultado de la fila (D-35).
 - Si el resultado es "sin dato" (una compra con precio pendiente, o una tenencia que la fuente ya no lista), el desglose también, con el mismo motivo (D-126). Una tenencia que la fuente ya no lista dice "IEB ya no la lista desde el …: registrá la venta o el vencimiento en Cargar" (D-117). En una apertura sin CCL de compra, ese CCL se declara desde la 1b (Pendientes).
 
@@ -269,7 +284,7 @@ Lo que podés encontrar en la bandeja:
 
 **Para qué:** el log de cargas que pediste (D-17): qué entró, de qué archivo, cuánto tardó, y dónde se revierte.
 
-- **Una tarjeta por lote** (un Enter, o un guardado de Datos): la fecha de los datos, la hora en que guardaste, el tiempo activo y las fuentes. Si guardaste otro día que el de los datos, la tarjeta lo dice: "mié 14/10 · guardado el jue 15/10 a las 08:00".
+- **Una fila por lote** (un Enter, o un guardado de Datos), del más nuevo al más viejo: la fecha de los datos y la hora en que guardaste, sus cargas, el tiempo activo y el lote con **Revertir el lote**. Si guardaste otro día que el de los datos, lo dice: "mié 14/10 · guardado el jue 15/10 a las 08:00". Se ordena por fecha o por tiempo activo (un clic en el encabezado). Si la pantalla es angosta y el tiempo activo no entra, el botón **⋯** de cada fila lo muestra.
 - **Cada carga del lote** (una por cuenta, más la del tipo de cambio): origen (Excel, captura, planilla CSV para el cuadro de marcha, manual para Datos y para Cargar ingreso o gasto, tipeado para el CCL y el cripto), cuántos precios, saldos y operaciones grabó, el archivo, el número de carga y su estado:
   - **vigente:** sus datos son los que valen;
   - **reemplazada:** ese día y esa cuenta se volvieron a cargar después; la carga sigue a la vista;
@@ -277,7 +292,7 @@ Lo que podés encontrar en la bandeja:
 - **Un guardado de Datos** se llama "Datos" y dice qué grabó ("valuación de Casa", "capital pendiente de Leasing", "aporte a Mercado Pago"), también en el resumen del lote y al revertir.
 - **Revertir el lote:** ver la sección 8.
 
-En el teléfono, las cargas de cada lote se abren al tocar la tarjeta.
+En el teléfono, una tarjeta por lote, con la fecha, el tiempo activo y las fuentes; las cargas se abren al tocar "Ver las N cargas".
 
 ### 4.6 Datos
 
@@ -296,7 +311,7 @@ El título es el selector: tocá **"Datos · Catálogo ▾"** para cambiar de su
 
 ### 4.7 Ajustes
 
-- **Tema:** el del sistema, claro u oscuro.
+- **Tema:** oscuro (el de la app), claro o el del sistema (D-157).
 - **Paleta para daltonismo:** positivo en azul y negativo en naranja, en lugar de verde y rojo. El signo y la flecha siempre están.
 - **Modo privado:** oculta los montos y deja los porcentajes. Atajo: `h`, o el ojo de la barra de arriba.
 - **Barra lateral:** automática (expandida desde 1280 px), siempre expandida o siempre en íconos.
@@ -307,7 +322,7 @@ Todo esto se recuerda **por dispositivo**: el teléfono y la compu tienen cada u
 
 ### 4.8 Balance
 
-**Para qué:** tu estado de situación patrimonial, el que te pediría un contador: qué tenés (activo), qué debés (pasivo) y cuánto es tuyo (patrimonio neto), en pesos y en dólares, a cualquier fecha de carga. Está en **Patrimonio › Balance** (`/patrimonio`).
+**Para qué:** tu estado de situación patrimonial, el que te pediría un contador: qué tenés (activo), qué debés (pasivo) y cuánto es tuyo (patrimonio neto), en pesos y en dólares, a cualquier fecha de carga. Desde el rediseño (15/10) está dentro de **Patrimonio › Exposición**: `/patrimonio` te lleva ahí (D-156).
 
 **La frase de arriba** (números inventados):
 
@@ -532,7 +547,7 @@ Debajo, "Últimos movimientos": cada uno con lo que salió y lo que entró, en l
 ## 10. Modo privado, tema y paleta
 
 - **Modo privado:** el ojo de la barra de arriba, o `h`. Desenfoca los montos y deja los porcentajes, para mirar la app con gente al lado. Vale en todas las pantallas, Cargar y Datos incluidas, y también para los montos dentro de un texto (por ejemplo, el motivo de un "sin dato"). Las trazas que abrís a propósito muestran la cuenta entera.
-- **Tema:** en Ajustes, el del sistema, claro u oscuro.
+- **Tema:** en Ajustes: oscuro (el de la app, también si nunca elegiste), claro o el del sistema. Con el claro, los colores quieren decir lo mismo.
 - **Paleta para daltonismo:** en Ajustes. Positivo en azul, negativo en naranja.
 
 Los tres se recuerdan por dispositivo.

@@ -1,53 +1,64 @@
 'use client'
 
-import { Eye, EyeOff, Monitor, Moon, Sun } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
+import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect } from 'react'
-import { cambiarPreferencia, usePreferencias, type Tema } from '@/components/preferencias'
-import { seccionActiva } from './secciones'
+import { useEffect, type ReactNode } from 'react'
+import { cambiarPreferencia, usePreferencias } from '@/components/preferencias'
+import { clasesBoton } from '@/components/ui'
+import { CARGAR, seccionActiva } from './secciones'
 
+// La barra superior (D-156): sticky, 60 px (52 en el teléfono), vidrio sobre
+// el fondo. De izquierda a derecha: el nombre de la pantalla con su
+// descripción, el chip de estado de los datos, el ojo del modo privado y
+// Cargar (botón primario, atajo C, con el punto de "falta cargar"). En el
+// teléfono, Cargar está en el centro de la barra inferior.
+
+/** Nombre de la pantalla (Geist 15/500) y su descripción (12 px, una línea con puntos suspensivos). */
 export function TituloSeccion() {
   const s = seccionActiva(usePathname() ?? '/')
   return (
-    <p className="min-w-0 truncate text-[17px] font-semibold tracking-tight md:text-lg">{s?.nombre ?? 'Portfolio'}</p>
+    <div className="flex min-w-0 flex-1 flex-col justify-center">
+      <p className="truncate text-[15px] font-medium leading-tight">{s?.nombre ?? 'Portfolio'}</p>
+      {s?.descripcion ? <p className="hidden truncate text-[12px] leading-snug text-muted sm:block">{s.descripcion}</p> : null}
+    </div>
   )
 }
 
-const BOTON =
-  'tocable grid size-9 shrink-0 place-items-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-text max-md:size-11'
-
+/** El ojo del modo privado: un círculo de 36 px con borde (44 px con el dedo). Atajo: h. */
 export function BotonPrivado() {
   const { privado } = usePreferencias()
   return (
     <button
       type="button"
-      className={BOTON}
+      className="tocable grid size-9 shrink-0 place-items-center rounded-full border border-border text-muted transition-colors hover:border-border-strong hover:text-text max-md:size-11"
       onClick={() => cambiarPreferencia('privado', !privado)}
       aria-pressed={privado}
       aria-label={privado ? 'Mostrar los montos' : 'Ocultar los montos (modo privado)'}
       title={privado ? 'Mostrar montos (h)' : 'Ocultar montos (h)'}
     >
-      {privado ? <EyeOff aria-hidden className="size-5" /> : <Eye aria-hidden className="size-5" />}
+      {privado ? <EyeOff aria-hidden className="size-4" /> : <Eye aria-hidden className="size-4" />}
     </button>
   )
 }
 
-const SIGUIENTE: Record<Tema, Tema> = { sistema: 'claro', claro: 'oscuro', oscuro: 'sistema' }
-const NOMBRE: Record<Tema, string> = { sistema: 'el del sistema', claro: 'claro', oscuro: 'oscuro' }
-
-export function BotonTema() {
-  const { tema } = usePreferencias()
-  const Icono = tema === 'claro' ? Sun : tema === 'oscuro' ? Moon : Monitor
+/** Cargar: el botón primario de la barra superior, con su atajo y el punto de "falta cargar". */
+export function BotonCargar({ puntoCarga }: { puntoCarga?: ReactNode }) {
+  const actual = (usePathname() ?? '/') === CARGAR.href
   return (
-    <button
-      type="button"
-      className={BOTON}
-      onClick={() => cambiarPreferencia('tema', SIGUIENTE[tema])}
-      aria-label={`Tema: ${NOMBRE[tema]}. Cambiar a ${NOMBRE[SIGUIENTE[tema]]}`}
-      title={`Tema: ${NOMBRE[tema]}`}
+    <Link
+      href={CARGAR.href}
+      aria-label="Cargar los datos de hoy"
+      aria-current={actual ? 'page' : undefined}
+      title="Cargar (c)"
+      className={`${clasesBoton('primario', 'sm')} relative shrink-0 max-md:hidden`}
     >
-      <Icono aria-hidden className="size-5" />
-    </button>
+      Cargar
+      <span aria-hidden className="opacity-60">
+        C
+      </span>
+      {puntoCarga ? <span className="absolute -right-0.5 -top-0.5">{puntoCarga}</span> : null}
+    </Link>
   )
 }
 
@@ -65,8 +76,9 @@ export function Atajos() {
       const t = e.target as HTMLElement | null
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return
       if (document.querySelector('dialog[open]')) return
-      if (e.key === 'c') router.push('/carga')
-      else if (e.key === 'h') cambiarPreferencia('privado', !privado)
+      const k = e.key.toLowerCase()
+      if (k === 'c') router.push(CARGAR.href)
+      else if (k === 'h') cambiarPreferencia('privado', !privado)
     }
     window.addEventListener('keydown', f)
     return () => window.removeEventListener('keydown', f)

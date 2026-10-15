@@ -1,12 +1,15 @@
 import { expect, test, type Browser, type Page } from '@playwright/test'
 import path from 'node:path'
-import { carpetaCapturas, esperarHidratacion, revisarAxe, revisarLayout, sinIndicadorDev } from './ayudas'
+import { carpetaCapturas, esperarHidratacion, revisarAxe, revisarGrillas, revisarLayout, sinIndicadorDev } from './ayudas'
 import { pantallas, type Pantalla } from './pantallas'
 
 // Test de layout (D-30, docs/calidad.md §4): cada pantalla, en cada ancho, en
 // claro y en oscuro. Falla si hay scroll horizontal, algo fuera de la
 // pantalla, texto cortado o controles superpuestos, o (con puntero grueso) un
-// tocable de menos de 44 px; y si axe-core encuentra violaciones serias.
+// tocable de menos de 44 px; si una grilla (AG Grid, D-157) tiene scroll
+// horizontal adentro; y si axe-core encuentra violaciones serias.
+// El tema se elige como lo elige el dueño (Ajustes, en localStorage): el
+// oscuro es el de siempre y no depende del sistema (D-157).
 // Todas las pantallas frenan el test, también Cargar y Datos. La lista está en
 // tests/e2e/pantallas/ (un archivo por pantalla nueva; E2E_PANTALLAS elige grupos).
 //
@@ -46,6 +49,13 @@ async function recorrer(browser: Browser, ancho: number, tema: 'light' | 'dark',
     hasTouch: grueso,
     deviceScaleFactor: 1,
   })
+  await ctx.addInitScript((t) => {
+    try {
+      window.localStorage.setItem('portfolio:tema', t)
+    } catch {
+      // Sin almacenamiento, el tema por defecto (oscuro).
+    }
+  }, tema === 'light' ? 'claro' : 'oscuro')
   const page = await ctx.newPage()
   const errores: string[] = []
   page.on('pageerror', (e) => errores.push(`error de JavaScript: ${e.message}`))
@@ -67,6 +77,7 @@ async function recorrer(browser: Browser, ancho: number, tema: 'light' | 'dark',
       if (!hidrato) r.push('no hidrató (¿error de JavaScript?)')
       r.push(...errores)
       r.push(...(await revisarLayout(page, grueso)))
+      r.push(...(await revisarGrillas(page)))
       // Un h1 por pantalla (aunque sea solo para el lector de pantalla).
       const h1 = await page.locator('h1').count()
       if (h1 !== 1) r.push(`tiene ${h1} h1 y tiene que tener uno`)

@@ -38,6 +38,7 @@ import { fechasDeCarga } from '@/lib/domain/variacion'
 import type { Fecha, Hechos, Moneda } from '@/lib/domain/tipos'
 import { decimalesPrecio, restoMayor } from '@/components/calculos'
 import { COLOR_CLASE, NOMBRE_CLASE } from './colores'
+import { COLOR_FINANCIERO } from '@/lib/domain/colores'
 import type { Par } from './contratos'
 import type {
   Accion,
@@ -74,7 +75,6 @@ export interface PedidoBalance {
 const par = (d: DobleCalc): Par => ({ ars: vista(d.ars), usd: vista(d.usd) })
 const parDe = (ars: Calc, usd: Calc): Par => ({ ars: vista(ars), usd: vista(usd) })
 const minuscula = (s: string) => s.charAt(0).toLowerCase() + s.slice(1)
-const COLOR_FINANCIERO = '#2f5bd3'
 /** Cuántas fechas de carga dibuja la evolución como mucho (un año y medio de cargas diarias). */
 const MAX_SERIE = 400
 

@@ -72,7 +72,7 @@ export default async function PaginaHoy({ searchParams }: { searchParams: Promis
           </Tarjeta>
           <div className="grid gap-2 md:grid-cols-2 md:gap-4">
             <TarjetaKpi t={v.financiero} m={m} corto="Financiero" desglose ver={{ href: '/evolucion', texto: 'Ver la evolución y el PnL' }} />
-            <TarjetaKpi t={v.total} m={m} corto="Total" ver={{ href: '/patrimonio', texto: 'Ver el balance' }} />
+            <TarjetaKpi t={v.total} m={m} corto="Total" ver={{ href: '/exposicion', texto: 'Ver el balance' }} />
           </div>
         </div>
 

@@ -22,7 +22,7 @@ export default function PaginaAjustes() {
 
       <div className="grid gap-3 md:gap-4 lg:grid-cols-2">
         <Tarjeta className="p-4 md:p-6" aria-labelledby="atajos">
-          <h2 id="atajos" className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+          <h2 id="atajos" className="rotulo mb-3 text-[11px]">
             Teclado
           </h2>
           <dl className="divide-y divide-border">
@@ -30,7 +30,7 @@ export default function PaginaAjustes() {
               <div key={k} className="flex items-center justify-between gap-4 py-2 text-sm">
                 <dt className="text-muted">{d}</dt>
                 <dd>
-                  <kbd className="rounded-md border border-border bg-surface-2 px-2 py-0.5 font-mono text-[13px]">{k}</kbd>
+                  <kbd className="whitespace-nowrap rounded-md border border-border bg-surface-2 px-2 py-0.5 font-mono text-[12px]">{k}</kbd>
                 </dd>
               </div>
             ))}
@@ -39,7 +39,7 @@ export default function PaginaAjustes() {
         </Tarjeta>
 
         <Tarjeta className="p-4 md:p-6" aria-labelledby="sesion">
-          <h2 id="sesion" className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+          <h2 id="sesion" className="rotulo mb-3 text-[11px]">
             Sesión
           </h2>
           <p className="text-sm text-muted">
@@ -50,7 +50,7 @@ export default function PaginaAjustes() {
           <form action={salir} className="mt-4">
             <button
               type="submit"
-              className="tocable inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-4 text-sm font-medium hover:bg-surface-2"
+              className="tocable inline-flex h-10 items-center gap-2 rounded-full border border-border-strong px-4 font-mono text-[12px] font-semibold uppercase tracking-[0.08em] transition-colors hover:border-text"
             >
               <LogOut aria-hidden className="size-4" /> Salir
             </button>

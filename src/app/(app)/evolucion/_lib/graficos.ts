@@ -9,6 +9,7 @@
 // muestran montos.
 
 import { compacto, monto } from '@/lib/domain/dinero'
+import { colorTema } from '@/components/graficos/tema'
 import type { Moneda } from '@/lib/domain/tipos'
 import type { Par } from '@/lib/vistas/contratos'
 import type { ContribuyenteVista, FuturoVista, LineaPuenteVista, MesVista, PuntoSerieVista } from '@/lib/vistas/contratos-evolucion'
@@ -25,7 +26,8 @@ export interface Colores {
   tenue: string
   acento: string
 }
-export const COLORES_CLAROS: Colores = { positivo: '#0f7a43', negativo: '#c2321f', neutro: '#8a93a3', tenue: '#5b6474', acento: '#2f5bd3' }
+// Los del tema claro (D-157), para el servidor y los tests: en el navegador, los del tema vigente (salvo neutro, que anda en los dos).
+export const COLORES_CLAROS: Colores = { positivo: '#0e7340', negativo: '#b8183d', neutro: '#8C8696', tenue: '#635a4b', acento: '#c8193f' }
 
 const OCULTO = '•••'
 const k = (m: Moneda) => (m === 'ARS' ? 'ars' : 'usd')
@@ -192,8 +194,8 @@ export function opcionContribuyentes(cs: ContribuyenteVista[], m: Moneda, privad
         name: 'Por el dólar',
         stack: 'quien',
         barMaxWidth: 22,
-        itemStyle: { color: c.neutro, decal: { symbol: 'rect', dashArrayX: [1, 0], dashArrayY: [2, 3], rotation: Math.PI / 4, color: 'rgba(255,255,255,0.55)' } },
-        data: lista.map((x) => ({ value: num(enPar(x.tc, m)), itemStyle: { color: x.color, opacity: 0.55 } })),
+        itemStyle: { color: colorTema('viz'), decal: { symbol: 'rect', dashArrayX: [1, 0], dashArrayY: [2, 3], rotation: Math.PI / 4, color: 'rgba(255,255,255,0.55)' } },
+        data: lista.map((x) => ({ value: num(enPar(x.tc, m)), itemStyle: { color: colorTema('viz') } })),
       },
     ],
   }
@@ -252,7 +254,7 @@ export function opcionPatrimonio(
   const nombreDe = new Map<string, string>([...serie.map((p): [string, string] => [p.fecha, corta(p.fecha)]), ...meses.map((x): [string, string] => [finDeMes(x.mes), `${x.nombre} (cierre, supuesto)`])])
   const viejoEn = new Set(serie.filter((p) => p.viejo).map((p) => p.fecha))
   const series: Opcion[] = [
-    { type: 'line', name: 'Tu patrimonio', data: real, connectNulls: false, symbol: serie.length === 1 ? 'circle' : 'none', symbolSize: 8, lineStyle: { width: 2.5, color: c.acento }, itemStyle: { color: c.acento } },
+    { type: 'line', name: 'Tu patrimonio', data: real, connectNulls: false, symbol: serie.length === 1 ? 'circle' : 'none', symbolSize: 8, lineStyle: { width: 2.5, color: colorTema('texto') }, itemStyle: { color: colorTema('texto') } },
     { type: 'line', name: 'Capital aportado', data: cap, connectNulls: false, symbol: serie.length === 1 ? 'diamond' : 'none', symbolSize: 8, lineStyle: { width: 1.5, type: 'dashed', color: c.tenue }, itemStyle: { color: c.tenue } },
   ]
   if (esc.length) {
@@ -262,9 +264,9 @@ export function opcionPatrimonio(
       data: esc,
       connectNulls: false,
       symbol: 'none',
-      lineStyle: { width: 2, type: 'dotted', color: c.acento },
-      itemStyle: { color: c.acento },
-      markArea: { silent: true, itemStyle: { color: 'rgba(138,147,163,0.14)' }, data: [[{ xAxis: esc[0][0] }, { xAxis: esc.at(-1)![0] }]] },
+      lineStyle: { width: 2, type: 'dotted', color: colorTema('texto') },
+      itemStyle: { color: colorTema('texto') },
+      markArea: { silent: true, itemStyle: { color: colorTema('texto', 0.04) }, data: [[{ xAxis: esc[0][0] }, { xAxis: esc.at(-1)![0] }]] },
     })
   }
   const opcion: Opcion = {
@@ -331,8 +333,8 @@ export function opcionIndice(serie: PuntoSerieVista[], c: Colores = COLORES_CLAR
         [corta(ps[0]?.value[0] ?? ''), ...ps.map((p) => `${p.seriesName}: ${fmt(p.value[1])}`)].join('<br/>'),
     },
     series: [
-      { type: 'line', name: 'En pesos', data: serie.map((p, i) => [p.fecha, ars[i]]), connectNulls: false, symbol: 'none', lineStyle: { width: 2.5, color: c.acento }, itemStyle: { color: c.acento } },
-      { type: 'line', name: 'En dólares', data: serie.map((p, i) => [p.fecha, usd[i]]), connectNulls: false, symbol: 'none', lineStyle: { width: 2.5, color: '#0f8b8d' }, itemStyle: { color: '#0f8b8d' } },
+      { type: 'line', name: 'En pesos', data: serie.map((p, i) => [p.fecha, ars[i]]), connectNulls: false, symbol: 'none', lineStyle: { width: 2.5, color: colorTema('texto') }, itemStyle: { color: colorTema('texto') } },
+      { type: 'line', name: 'En dólares', data: serie.map((p, i) => [p.fecha, usd[i]]), connectNulls: false, symbol: 'none', lineStyle: { width: 2.5, color: colorTema('viz') }, itemStyle: { color: colorTema('viz') } },
     ],
   }
   const tabla: Tabla = { columnas: ['Fecha', 'En pesos (índice)', 'En dólares (índice)'], filas: serie.map((p, i) => [corta(p.fecha), fmt(ars[i]), fmt(usd[i])]) }
@@ -341,10 +343,10 @@ export function opcionIndice(serie: PuntoSerieVista[], c: Colores = COLORES_CLAR
 
 const SERIES_MES: { clave: string; nombre: string; color: (c: Colores) => string }[] = [
   { clave: 'aportes', nombre: 'Aportes', color: (c) => c.neutro },
-  { clave: 'cuotas', nombre: 'Cuotas', color: (c) => c.tenue },
-  { clave: 'activo', nombre: 'Activos', color: (c) => c.acento },
-  { clave: 'tc', nombre: 'Dólar', color: () => '#0f8b8d' },
-  { clave: 'sin_atribuir', nombre: 'Sin atrib.', color: () => '#b5b8bd' },
+  { clave: 'cuotas', nombre: 'Cuotas', color: () => colorTema('acento') },
+  { clave: 'activo', nombre: 'Activos', color: () => colorTema('texto') },
+  { clave: 'tc', nombre: 'Dólar', color: () => colorTema('viz') },
+  { clave: 'sin_atribuir', nombre: 'Sin atrib.', color: () => colorTema('faint') },
 ]
 
 /** PnL por mes: barras apiladas por línea del puente, lo positivo arriba y lo negativo abajo. */

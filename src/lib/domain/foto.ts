@@ -7,6 +7,7 @@
 // Saldo en USD: monto × CCL en pesos. Bien en USD: valuación × CCL.
 
 import { calc, deCalc, sinDato, type Calc, type Etiqueta, type Insumo } from './calc'
+import { COLOR_BIEN, COLOR_LIQUIDEZ_ARS, COLOR_LIQUIDEZ_USD, COLOR_PASIVO, colorDeFamilia, coloresDeActivos, familiaDe } from './colores'
 import { CERO, Decimal, monto, numero } from './dinero'
 import { conjuntoFeriados, esViejo, fechaCorta } from './fechas'
 import { tenencias, type Tenencia } from './posiciones'
@@ -97,6 +98,8 @@ export interface Indices {
   tipos: TipoCambio[]
   feriados: Set<Fecha>
   activos: Map<number, Activo>
+  /** El color de cada activo: el del catálogo o el de su familia por orden de alta (D-157). */
+  colores: Map<number, string>
   cuentas: Map<number, Cuenta>
   /** Ausentes por `${cuenta_id}:${activo_id}`, por fecha ascendente. */
   ausentes: Map<string, Ausente[]>
@@ -111,6 +114,7 @@ export function indexar(h: Hechos): Indices {
     tipos: [...h.tipos_cambio].filter((t) => t.ccl !== null).sort((a, b) => (a.fecha < b.fecha ? -1 : 1)),
     feriados: conjuntoFeriados(h.feriados, 'AR'),
     activos: new Map(h.activos.map((a) => [a.id, a])),
+    colores: coloresDeActivos(h.activos),
     cuentas: new Map(h.cuentas.map((c) => [c.id, c])),
     ausentes: agrupar(h.ausentes ?? [], (a) => `${a.cuenta_id}:${a.activo_id}`),
   }
@@ -162,15 +166,6 @@ export function cclA(ix: Indices, fecha: Fecha, hoy: Fecha = fecha): { calc: Cal
     ),
     fecha: t.fecha,
   }
-}
-
-const COLORES = [
-  '#2f5bd3', '#0f8b8d', '#c2621f', '#7a4fc9', '#3b8f3e', '#b8336a', '#8a6d1f', '#4a6fa5',
-  '#d1495b', '#2e7d6b', '#9c6644', '#5d5fef',
-]
-
-function colorDe(id: number, propio: string | null): string {
-  return propio ?? COLORES[id % COLORES.length]
 }
 
 function convertir(
@@ -273,7 +268,7 @@ function armarFoto(h: Hechos, fecha: Fecha, opciones: { hoy?: Fecha; ix?: Indice
       tipo: activo.tipo,
       moneda_riesgo: activo.moneda_riesgo,
       geografia: activo.geografia,
-      color: colorDe(activo.id, activo.color),
+      color: ix.colores.get(activo.id) ?? colorDeFamilia(familiaDe(activo), activo.id),
       tenencia: t,
       cantidad: t.cantidad,
       precio,
@@ -318,7 +313,7 @@ function armarFoto(h: Hechos, fecha: Fecha, opciones: { hoy?: Fecha; ix?: Indice
       tipo: 'liquidez',
       moneda_riesgo: moneda,
       geografia: 'AR',
-      color: moneda === 'ARS' ? '#6b7a90' : '#3d6fb6',
+      color: moneda === 'ARS' ? COLOR_LIQUIDEZ_ARS : COLOR_LIQUIDEZ_USD,
       tenencia: null,
       cantidad: null,
       precio: base,
@@ -395,7 +390,7 @@ function itemBien(b: Bien, v: BienValuacion | null, ccl: Calc, insCcl: Insumo): 
     tipo: b.tipo,
     moneda_riesgo: b.moneda_valuacion,
     geografia: b.geografia,
-    color: '#8a8f98',
+    color: COLOR_BIEN,
     tenencia: null,
     cantidad: null,
     precio: base,
@@ -434,7 +429,7 @@ function itemPasivoSegunCuadro(p: Pasivo, cuadro: Calc, fecha: Fecha, ccl: Calc,
     tipo: 'deuda',
     moneda_riesgo: p.moneda,
     geografia: 'AR',
-    color: '#9a5b5b',
+    color: COLOR_PASIVO,
     tenencia: null,
     cantidad: null,
     precio: base,
@@ -488,7 +483,7 @@ function itemPasivo(p: Pasivo, s: PasivoSaldo | null, ccl: Calc, insCcl: Insumo,
     tipo: 'deuda',
     moneda_riesgo: p.moneda,
     geografia: 'AR',
-    color: '#9a5b5b',
+    color: COLOR_PASIVO,
     tenencia: null,
     cantidad: null,
     precio: base,

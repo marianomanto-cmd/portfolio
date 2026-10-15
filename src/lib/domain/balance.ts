@@ -15,6 +15,7 @@ import { CERO, monto, numero, porcentaje, type Decimal } from './dinero'
 import { fechaCorta } from './fechas'
 import { financieros, foto, indexar, sumaCalc, type Foto, type ItemFoto } from './foto'
 import type { Bien, Fecha, Hechos, Moneda, Pasivo } from './tipos'
+import { COLOR_MONEDA, COLOR_POR_LIQUIDEZ, COLOR_SIN_ELEGIR } from './colores'
 
 export type Liquidez = 'disponible' | 'mercado' | 'iliquido'
 export type Agrupar = 'cuenta' | 'instrumento' | 'clase'
@@ -28,11 +29,7 @@ export const NOMBRE_LIQUIDEZ: Record<Liquidez, string> = {
   mercado: 'Con venta en el mercado',
   iliquido: 'Bienes (ilíquido)',
 }
-export const COLOR_LIQUIDEZ: Record<Liquidez, string> = {
-  disponible: '#0f8b8d',
-  mercado: '#2f5bd3',
-  iliquido: '#8a8f98',
-}
+export const COLOR_LIQUIDEZ: Record<Liquidez, string> = { ...COLOR_POR_LIQUIDEZ }
 
 /** Nombres de los tipos de partida en singular, para el detalle de una fila. */
 export const TIPO_SINGULAR: Record<string, string> = {
@@ -482,7 +479,6 @@ export interface PartidaComposicion {
   regla: string | null
 }
 
-const COLOR_MONEDA: Record<string, string> = { ARS: '#6b7a90', USD: '#2f5bd3', sin_elegir: '#9aa1ac' }
 const NOMBRE_MONEDA: Record<string, string> = { ARS: 'Pesos', USD: 'Dólares', sin_elegir: 'Sin elegir' }
 const ORDEN_LIQUIDEZ: Liquidez[] = ['disponible', 'mercado', 'iliquido']
 
@@ -502,7 +498,7 @@ export function composicion(
     eje === 'moneda' ? (i.clase === 'bien' ? 'sin_elegir' : i.moneda_riesgo) : eje === 'clase' ? i.tipo : liquidezDe(i).liquidez
   const nombreDe = (k: string) =>
     eje === 'moneda' ? (NOMBRE_MONEDA[k] ?? k) : eje === 'clase' ? (colores.nombreClase[k] ?? k) : NOMBRE_LIQUIDEZ[k as Liquidez]
-  const colorDe = (k: string) => (eje === 'moneda' ? (COLOR_MONEDA[k] ?? '#888') : eje === 'clase' ? (colores.clase[k] ?? '#888') : COLOR_LIQUIDEZ[k as Liquidez])
+  const colorDe = (k: string) => (eje === 'moneda' ? (COLOR_MONEDA[k as keyof typeof COLOR_MONEDA] ?? COLOR_SIN_ELEGIR) : eje === 'clase' ? (colores.clase[k] ?? '#888') : COLOR_LIQUIDEZ[k as Liquidez])
   const reglaDe = (k: string): string | null => {
     if (eje === 'liquidez') {
       return k === 'disponible'

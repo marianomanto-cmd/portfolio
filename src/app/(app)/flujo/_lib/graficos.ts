@@ -9,6 +9,7 @@ import { compacto, monto } from '@/lib/domain/dinero'
 import { nombreMes } from '@/lib/domain/flujo/proyeccion'
 import type { MesProyectado, ParNum } from '@/lib/domain/flujo/tipos'
 import type { TablaGrafico } from '@/components/graficos/grafico'
+import { colorTema } from '@/components/graficos/tema'
 
 type Moneda = 'ARS' | 'USD'
 type Opcion = Record<string, unknown>
@@ -28,13 +29,18 @@ const esProyectado = (m: MesProyectado) => !m.real
 
 const RAYADO = { symbol: 'rect', symbolSize: 1, dashArrayX: [1, 0], dashArrayY: [3, 4], rotation: Math.PI / 4, color: 'rgba(255,255,255,0.45)' }
 
-/** Colores de las líneas del flujo: neutros (verde y rojo quedan para resultados). */
+/**
+ * Colores de las líneas del flujo (sistema visual, D-157): los ingresos en
+ * dólares en oro, los vencimientos de la renta fija en piedra, los gastos en
+ * lavanda y la cuota del leasing en sangría (deuda). Verde y rojo quedan para
+ * resultados. Los colorTema(…) se resuelven al dibujar con el tema vigente.
+ */
 export const COLOR_FLUJO = {
-  ingresos: '#2f5bd3',
-  vencimientos: '#0f8b8d',
-  gastos: '#8a8f98',
-  cuota: '#c2621f',
-  excedente: '#121722',
+  ingresos: colorTema('viz'),
+  vencimientos: '#C7BDAB',
+  gastos: '#8C8696',
+  cuota: colorTema('acento'),
+  excedente: colorTema('texto'),
 }
 
 function barras(meses: readonly MesProyectado[], nombre: string, color: string, valor: (m: MesProyectado) => number | null) {
@@ -95,7 +101,7 @@ export function opcionFlujoMensual(meses: readonly MesProyectado[], moneda: Mone
         itemStyle: { color: opciones.colorTexto ?? COLOR_FLUJO.excedente },
         lineStyle: { width: 2, color: opciones.colorTexto ?? COLOR_FLUJO.excedente },
         data: meses.map((m) => numeroDe(m.excedente, moneda)),
-        markLine: meses.length > 1 ? { symbol: 'none', silent: true, label: { formatter: 'hoy', position: 'insideEndTop' }, lineStyle: { type: 'dashed', color: '#8a8f98' }, data: [{ xAxis: hoy }] } : undefined,
+        markLine: meses.length > 1 ? { symbol: 'none', silent: true, label: { formatter: 'hoy', position: 'insideEndTop' }, lineStyle: { type: 'dashed', color: colorTema('tenue') }, data: [{ xAxis: hoy }] } : undefined,
       },
     ],
   }
@@ -126,7 +132,7 @@ export interface SeriePatrimonio {
 }
 
 /** Colores de Comparar (además del trazo, que no depende del color). */
-const COLOR_COMPARAR = ['#2f5bd3', '#0f8b8d', '#c2621f']
+const COLOR_COMPARAR = [colorTema('viz'), colorTema('texto'), '#C7BDAB']
 
 /** Tres trazos distinguibles sin color (Comparar: sólida, rayada, punteada). */
 export const TRAZOS: Trazo[] = ['solid', 'dashed', 'dotted']
@@ -146,10 +152,10 @@ export function opcionPatrimonio(series: readonly SeriePatrimonio[], moneda: Mon
   const tramo = (vals: (number | null)[], desde: number, hasta: number) => vals.map((v, j) => (j >= desde && j <= hasta ? v : null))
   const lineas = series.flatMap((s, i) => {
     const comun = { type: 'line', symbol: 'none', smooth: false, emphasis: { focus: 'series' } }
-    const color = comparar ? COLOR_COMPARAR[i % COLOR_COMPARAR.length] : '#2f5bd3'
+    const color = comparar ? COLOR_COMPARAR[i % COLOR_COMPARAR.length] : colorTema('viz')
     const fin = s.meses.map((m) => numeroDe(m.financiero, moneda))
     const area =
-      i === 0 && base.length > 1 ? { silent: true, itemStyle: { color: 'rgba(138,143,152,0.10)' }, data: [[{ xAxis: hoy }, { xAxis: base.length - 1 }]] } : undefined
+      i === 0 && base.length > 1 ? { silent: true, itemStyle: { color: colorTema('texto', 0.04) }, data: [[{ xAxis: hoy }, { xAxis: base.length - 1 }]] } : undefined
     if (comparar) {
       return [{ ...comun, name: s.nombre, lineStyle: { width: 2, type: s.trazo, color }, itemStyle: { color }, data: fin, markArea: area }]
     }
@@ -160,15 +166,15 @@ export function opcionPatrimonio(series: readonly SeriePatrimonio[], moneda: Mon
       {
         ...comun,
         name: 'Neto sin la camioneta',
-        lineStyle: { width: 2, type: 'dotted', color: '#0f8b8d' },
-        itemStyle: { color: '#0f8b8d' },
+        lineStyle: { width: 2, type: 'dotted', color: colorTema('texto') },
+        itemStyle: { color: colorTema('texto') },
         data: hayReal ? tramo(neto, desdeProy, base.length - 1) : neto,
       },
     ]
     if (!hayReal) return proyectadas
     return [
       { ...comun, name: 'Financiero', lineStyle: { width: 2, type: 'solid', color }, itemStyle: { color }, data: tramo(fin, 0, hoy - 1) },
-      { ...comun, name: 'Neto sin la camioneta', lineStyle: { width: 2, type: 'solid', color: '#0f8b8d' }, itemStyle: { color: '#0f8b8d' }, data: tramo(neto, 0, hoy - 1) },
+      { ...comun, name: 'Neto sin la camioneta', lineStyle: { width: 2, type: 'solid', color: colorTema('texto') }, itemStyle: { color: colorTema('texto') }, data: tramo(neto, 0, hoy - 1) },
       ...proyectadas,
     ]
   })

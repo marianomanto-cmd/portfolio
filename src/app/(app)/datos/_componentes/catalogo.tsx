@@ -4,9 +4,10 @@
 // indexación, ratio con historia y color fijo. Tabla en desktop, tarjetas
 // debajo de 768 px (D-30). La moneda de riesgo la elegís vos (D-73).
 
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Pencil, Plus } from 'lucide-react'
 import type { Activo, Fecha } from '@/lib/domain/tipos'
+import { coloresDeActivos } from '@/lib/domain/colores'
 import { numero } from '@/lib/domain/dinero'
 import { fechaLarga } from '@/lib/domain/fechas'
 import { Boton, Campo, Chip, Entrada, Selector } from '../../carga/_componentes/ui'
@@ -201,13 +202,14 @@ function etiquetas(a: Activo, ratios: Ratio[], hoy: Fecha) {
   }
 }
 
-function Punto({ color }: { color: string | null }) {
+/** El color del activo en los gráficos (D-157): el elegido a mano o el de su familia por orden de alta. */
+function Punto({ color, propio }: { color: string | null; propio: boolean }) {
   return (
     <span
       aria-hidden
       className="inline-block size-3 shrink-0 rounded-full border border-border"
       style={{ background: color ?? 'transparent' }}
-      title={color ?? 'sin color'}
+      title={color ? `${color}${propio ? ' (elegido)' : ' (de su familia)'}` : 'sin color'}
     />
   )
 }
@@ -216,6 +218,7 @@ export function Catalogo({ activos, ratios, hoy }: { activos: Activo[]; ratios: 
   const [editando, setEditando] = useState<number | 'nuevo' | null>(null)
   const panel = useRef<HTMLDivElement>(null)
   const activo = typeof editando === 'number' ? (activos.find((a) => a.id === editando) ?? null) : null
+  const colores = useMemo(() => coloresDeActivos(activos), [activos])
 
   useEffect(() => {
     if (editando !== null) panel.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -271,7 +274,7 @@ export function Catalogo({ activos, ratios, hoy }: { activos: Activo[]; ratios: 
                   <tr key={a.id} className={a.activo_bool ? '' : 'text-muted'}>
                     <td className="px-3 py-2">
                       <span className="flex items-center gap-2">
-                        <Punto color={a.color} />
+                        <Punto color={colores.get(a.id) ?? null} propio={Boolean(a.color)} />
                         <span className="num font-medium">{a.ticker}</span>
                       </span>
                     </td>
@@ -304,7 +307,7 @@ export function Catalogo({ activos, ratios, hoy }: { activos: Activo[]; ratios: 
           return (
             <li key={a.id} className="rounded-2xl border border-border bg-surface p-3">
               <div className="flex min-w-0 items-center gap-2">
-                <Punto color={a.color} />
+                <Punto color={colores.get(a.id) ?? null} propio={Boolean(a.color)} />
                 <span className="num font-semibold text-text">{a.ticker}</span>
                 <span className="min-w-0 truncate text-sm text-muted">{a.nombre}</span>
               </div>

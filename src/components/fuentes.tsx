@@ -1,6 +1,6 @@
 import type { EstadoFuente } from '@/lib/vistas/contratos'
 
-// Estado de una fuente (HO-4, visión §4.0): tinta neutra o azul, nunca verde ni
+// Estado de una fuente (HO-4, visión §4.0): tinta neutra u oro, nunca verde ni
 // rojo. ✓ cargada y al día · ≠ diferencia sin resolver · ○ tipeado, sin control
 // posible · ◷ más de 2 días hábiles sin carga.
 
@@ -21,7 +21,9 @@ export const NOMBRE_ESTADO: Record<EstadoFuente, string> = {
 }
 
 export function IconoFuente({ estado }: { estado: EstadoFuente }) {
-  const tono = estado === 'ok' || estado === 'diferencia' ? 'text-accent' : 'text-muted'
+  // Tinta para lo que está al día, oro para lo que hay que revisar: nunca verde
+  // ni sangría, que son resultado y deuda (D-157).
+  const tono = estado === 'ok' ? 'text-text' : estado === 'diferencia' ? 'text-warn' : 'text-muted'
   return (
     <span
       role="img"

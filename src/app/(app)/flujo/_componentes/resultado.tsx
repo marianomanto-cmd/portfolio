@@ -14,6 +14,7 @@ import type { BaseProyeccion, CampoMes, MesProyectado, ParNum, Proyeccion, Supue
 import { GraficoFlujo as Grafico } from './grafico-flujo'
 import { MontoTrazado, Monto, SinDato, TextoConMontos } from '@/components/monto'
 import { useMedia, usePreferencias } from '@/components/preferencias'
+import { colorTema } from '@/components/graficos/tema'
 import { Chip } from '@/components/ui'
 import { TrazaDiferida } from '@/components/escenarios/traza-diferida'
 import { opcionFlujoMensual, opcionPatrimonio, tablaFlujoMensual, tablaPatrimonio } from '../_lib/graficos'
@@ -90,10 +91,8 @@ export const Resultado = memo(function Resultado({ base, s, proy, nombre }: { ba
   const preferencias = usePreferencias()
   const { privado } = preferencias
   const movil = useMedia('(max-width: 767.98px)')
-  const sistemaOscuro = useMedia('(prefers-color-scheme: dark)')
-  // La línea del excedente va en el color del texto (--text), que cambia con el tema.
-  const oscuro = preferencias.tema === 'oscuro' || (preferencias.tema === 'sistema' && sistemaOscuro)
-  const colorTexto = oscuro ? '#e6eaf0' : '#121722'
+  // La línea del excedente va en el color del texto (--text): el envoltorio lo resuelve con el tema vigente.
+  const colorTexto = colorTema('texto')
   const meses = proy.meses
   const resumen = useMemo(() => resumenHorizonte(proy), [proy])
   const mesesGrafico = useMemo(() => (movil && !graficoEntero ? meses.slice(0, 7) : meses), [meses, movil, graficoEntero])

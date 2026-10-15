@@ -4,7 +4,7 @@ Registro de cada decisión de diseño que ajusta o completa `docs/spec.md`: qué
 
 Estado: **D** = decidida · **P** = propuesta, esperando confirmación del dueño · **P (provisoria, a confirmar)** = propuesta que la fase 1a ya implementa mientras esperás para confirmarla. Si la rechazás, el código se cambia.
 
-Numeración: D-01 a D-34 están acá. D-35 a D-53 son propuestas de `docs/investigacion-mercado.md` y D-54 a D-103 de `docs/vision.md` §6 (todas esperan tu aprobación). Las decisiones nuevas siguen desde **D-104** (ver "Fase 1a" y, desde **D-117**, "Revisión de la 1a"). Al final, "Propuestas que la 1a implementa en forma provisoria" lista cuáles de esas propuestas ya están en el código y cómo.
+Numeración: D-01 a D-34 están acá. D-35 a D-53 son propuestas de `docs/investigacion-mercado.md` y D-54 a D-103 de `docs/vision.md` §6 (todas esperan tu aprobación). Las decisiones nuevas siguen desde **D-104** (ver "Fase 1a", desde **D-117** "Revisión de la 1a" y, desde **D-156**, "Rediseño"). Al final, "Propuestas que la 1a implementa en forma provisoria" lista cuáles de esas propuestas ya están en el código y cómo.
 
 ---
 
@@ -659,10 +659,117 @@ Lo pidió el dueño el 14/10: "cada vez que entra guita se reparte en partes pro
   - las recomendaciones, que no van en ninguna fase (D-07).
 - **El costo, a la vista (como pide D-99):** cuatro pantallas nuevas sobre una sola fecha de carga. Hasta la segunda carga, Evolución no tiene período, y el Flujo proyecta desde un único punto de partida.
 
-### D-151 · La barra inferior del teléfono: Hoy · Balance · Cargar · Evolución · Más — P (provisoria, a confirmar)
+### D-151 · La barra inferior del teléfono: Hoy · Balance · Cargar · Evolución · Más — reemplazada por D-156
+**Reemplazada por D-156** (rediseño del 15/10): abajo van Hoy · Patrimonio · Cargar · Resultados · Más, y el Balance pasa a Exposición.
+
 - **Qué:** Balance toma el segundo lugar, que era de Cartera (visión §3.2), y Evolución toma el cuarto, que era de Exposición. Cartera, Exposición, Pasivos y Flujo quedan en Más. En la barra lateral, Balance y Evolución y PnL van en el grupo Patrimonio, y el grupo nuevo **Contexto** tiene Pasivos y Flujo y escenarios.
 - **Por qué:** el dueño preguntó "¿dónde está mi balance?". Mientras haya poca historia, Evolución muestra el día cero y la sensibilidad al CCL, no una pantalla vacía (D-136).
 - **Falta:** que el dueño confirme el orden, o elija Flujo en lugar de Evolución para el cuarto lugar.
+
+## Rediseño (15/10/2026)
+
+El 15/10 pediste un diseño nuevo para toda la app: «nuevo diseño de app, implementalo», con el pedido de no romper nada. También pediste «usa Apache ECharts y AG Grid Community para tablas». El diseño (el handoff "Portfolio UI": medidas, tokens, tipografía, reglas de color y la anatomía de cada pantalla) cambia cómo se ve la app y dónde está cada cosa, no lo que hace. Estas dos decisiones son la base; lo de cada pantalla está en `CHANGELOG.md`, «Rediseño (15/10)».
+
+### D-156 · La navegación se ordena por pregunta; Cargar es una acción fija y el Balance vive en Exposición (reemplaza D-151) — D
+- **Qué:** el menú se ordena por la pregunta que contesta cada pantalla, no por el tipo de dato:
+  - **Diario:** Hoy ("¿Cómo estoy hoy?").
+  - **Patrimonio:** Posiciones ("¿Cómo le va a cada cosa?") y Exposición ("¿Cuánto estoy jugado al peso?", con el balance adentro).
+  - **Resultados:** Evolución y PnL ("¿Gané o perdí, y por qué?").
+  - **Compromisos y futuro:** Pasivos ("¿Cuánto me falta pagar?") y Flujo y escenarios ("¿Adónde me lleva?").
+  - **Al pie:** Registro, Datos, Ajustes y el Mapa de la app.
+
+  La lista vive en un solo lugar (`src/components/shell/secciones.ts`, con test): la barra lateral, la de abajo, la hoja "Más", el título de la barra superior y el Mapa salen de ahí.
+- **Cartera se llama Posiciones** en la pantalla. La ruta sigue siendo `/cartera`: los links y marcadores no se rompen.
+- **El Balance se fusiona en Exposición:** las dos contestan qué tenés y qué debés. `/patrimonio`, y cualquier `/patrimonio/…`, redirige (307, `next.config.mjs`) a `/exposicion` con lo que traía en la dirección (`?agrupar=…`, `?fecha=…`). Lo que mostraba el Balance pasa a Exposición: nada se pierde. "Ver el balance", en Hoy, lleva a Exposición.
+- **Cargar sale del menú:** es la acción de todos los días.
+  - Desde 768 px, el botón primario fijo arriba a la derecha (tecla C), con el punto de "todavía no cargaste" (D-127).
+  - En el teléfono, el botón del centro de la barra de abajo, con el mismo punto.
+- **Barra lateral, desde 768 px:**
+  - 232 px de ancho, colapsable a 68 con su botón al pie o en Ajustes › Barra lateral; en automático, expandida desde 1280 px.
+  - Ítems de 38 px (44 con el dedo), radio 10 e ícono de 18. El activo va en surface-2 con una barrita sangría a la izquierda.
+- **Barra superior, sticky (60 px; 52 en el teléfono):**
+  - el nombre de la pantalla y una línea que dice para qué es;
+  - el chip de los datos, que absorbe el de antes: "CARGA DE HOY · 09:41" o "ÚLTIMA CARGA · 14/10", el CCL y el cripto con que está la app y un punto verde (todo al día) u oro (algo para revisar). Al tocarlo muestra el estado de cada fuente, ✓ ≠ ○ ◷, como antes;
+  - el ojo del modo privado (tecla H) y Cargar.
+
+  El tema sale de la barra y queda en Ajustes.
+- **En el teléfono (reemplaza D-151):** abajo, **Hoy · Patrimonio · [Cargar] · Resultados · Más**.
+  - Patrimonio abre Posiciones, con dos pestañas arriba: Posiciones | Exposición.
+  - Resultados abre Evolución y PnL.
+  - Más abre una hoja con Pasivos, Flujo y escenarios, Registro, Datos, Ajustes y el Mapa de la app.
+- **El Mapa de la app** (`/mapa`, al pie): las pantallas por pregunta, cómo se lee cada una (la pregunta, la lectura, las cifras clave, el gráfico principal y el detalle) y qué quiere decir cada color.
+- **Lo que no cambia:**
+  - toda función sigue al alcance;
+  - lo no desplegado no aparece (D-69);
+  - las teclas C y H;
+  - el estado de cada fuente.
+- **Por qué:** con el menú por tipo de dato había que saber dónde estaba cada cosa. Con el menú por pregunta vas directo a la respuesta, y Cargar, que es lo que hacés todos los días, está siempre a un toque.
+- **Descartado:**
+  - el Balance como sección aparte: el diseño lo fusiona con Exposición;
+  - Cargar también en el menú: serían dos caminos para lo mismo;
+  - Flujo en la barra de abajo: queda en Más, a dos toques.
+
+### D-157 · Sistema visual: oscuro por defecto, tres fuentes, reglas de color fijas y AG Grid para toda tabla — D
+- **Tema:** el oscuro es el de la app. Sin una preferencia guardada es oscuro, diga lo que diga el sistema. En Ajustes › Tema elegís Oscuro, Claro o Sistema. El claro es una variante con las mismas reglas de color sobre superficies claras, con contraste AA.
+- **Tokens** (`src/app/globals.css`):
+  - Los nombres de siempre siguen: `bg`, `surface`, `text`, `muted`, `border`, `accent`, `positive`, `negative`, `warn` y `usd-*` (la pastilla, ahora dorada). Se suman `surface-2`, `surface-3`, `faint`, `border-strong`, `border-accent`, `accent-soft`, `accent-glow`, `accent-deep`, `on-accent`, `viz`, `viz-soft` y `viz-strong`.
+  - Radios: 14 px para las tarjetas y 10 para los ítems.
+  - La profundidad sale del escalón de superficie y el hairline, sin sombras. El brillo es solo para el botón primario.
+- **Reglas de color:**
+  - **Tinta = pesos.** Los montos en pesos van sin pastilla.
+  - **Oro = dólares.** El monto en dólares va siempre en la pastilla dorada. Lo dolarizado va en la familia dorada, y el tramo del tipo de cambio de los desgloses en `viz`.
+  - **Sangría = deuda, pérdida y Cargar**, siempre con signo.
+  - **Verde = ganancia**, solo en resultados y con "+".
+  - Los estados de los datos van en tinta neutra: un dato viejo no se pinta de rojo.
+- **Un color por activo, el mismo en todos los gráficos** (`src/lib/domain/colores.ts`, con test):
+  - dorada para lo que arriesga dólares, piedra para lo que arriesga pesos, lavanda para la liquidez y sangría para los pasivos;
+  - es estable: dentro de su familia va por orden de alta, y un activo nuevo no le cambia el color a los demás;
+  - el color que elegís a mano en Datos › Catálogo manda;
+  - las barras por moneda de riesgo van en oro (dólares) y piedra (pesos), y las de liquidez en los colores de la liquidez, la piedra clara y los bienes (`COLOR_MONEDA` y `COLOR_POR_LIQUIDEZ`).
+- **Tipografía:**
+  - **Newsreader** para la lectura de cada pantalla: una frase en serif con un solo énfasis;
+  - **Geist** para la interfaz;
+  - **JetBrains Mono** para toda cifra (con `tabular-nums`), los rótulos y la pregunta de cada pantalla.
+
+  Vienen de paquetes (`@fontsource-variable`, versión exacta) y se sirven con `next/font/local`: el build no depende de la red.
+- **Ajustes al diseño por contraste (AA, 4,5:1 como texto):** en el oscuro, el texto tenue pasa de #5A5563 a #837D8D, y el negativo y la sangría como texto chico (links, avisos: `--accent-texto`) de #F23A5E a #FF5C7C. El acento de los rellenos (el botón Cargar, la barrita del activo, el énfasis grande de la lectura) sigue en #F23A5E. Así llegan sobre el fondo, las superficies y la pastilla dorada. El claro y la paleta daltónica tienen sus propios valores, también AA.
+- **Anatomía de pantalla** (componentes comunes de `src/components/pantalla/` y `src/components/ui.tsx`):
+  1. la pregunta (eyebrow en mono);
+  2. la lectura: el h1 en serif, armado por funciones puras con test;
+  3. hasta cuatro cifras clave, en pesos y en dólares;
+  4. el gráfico principal;
+  5. el detalle.
+- **La traza** (`src/components/traza.tsx`):
+  - es una placa de vidrio fija abajo a la derecha; en el teléfono, una hoja desde abajo;
+  - trae la fórmula con los valores, los insumos a la vista (ya no hace falta "Ver insumos ▸"), cada uno con su carga y su propio cálculo a un toque, y "¿Qué es esto?";
+  - una cifra con traza lleva un subrayado punteado.
+- **Gráficos (ECharts, D-31):**
+  - los colores del tema se resuelven al dibujar, así el mismo gráfico anda en claro y en oscuro;
+  - grilla hairline, ejes en mono de 10 px y tooltip de vidrio;
+  - sin tortas, y el modo privado sigue tapando los montos.
+- **Tablas: AG Grid Community 36.2.0, versión exacta.** Toda tabla de datos pasa por el componente común Grilla (`src/components/grilla/`). Reemplaza a TanStack Table, que figuraba en `docs/stack.md` pero nunca se instaló. La Grilla resuelve una vez:
+  - las celdas son los componentes de la app, así el modo privado y la traza siguen andando;
+  - orden numérico exacto sobre los montos en texto, con "sin dato" al final;
+  - la fila de totales, fija abajo;
+  - alto automático hasta 25 filas;
+  - nunca scroll horizontal: las columnas son flexibles con un ancho mínimo; las que no entran se ocultan por prioridad, y cada fila suma un botón "⋯" que muestra lo que falta;
+  - tarjetas debajo de 768 px (D-30);
+  - el teclado y el ARIA de AG Grid, con el foco a la vista.
+
+  Solo se registran los módulos que se usan. Las listas cortas de clave–valor, como los insumos de una traza, no son tablas. Registro es el primer uso.
+- **Lo que no cambia:**
+  - "sin dato" nunca es cero;
+  - toda cifra va en pesos y en dólares, y toda cifra calculada abre su traza;
+  - sin tortas y sin ancho máximo en el contenedor principal;
+  - sin scroll horizontal de 360 a 2560 px;
+  - 44 px para tocar con el dedo;
+  - el modo privado tapa los montos y deja los porcentajes;
+  - "reducir movimiento" se respeta.
+- **Cómo se prueba:** el test de layout (D-30) recorre cada pantalla en los dos temas y ahora también falla si una grilla tiene scroll horizontal adentro.
+- **Descartado:**
+  - dejar el claro como tema por defecto: el diseño es oscuro;
+  - `next/font/google`: el build dependería de la red;
+  - AG Grid Enterprise: la licencia es paga y Community alcanza.
 
 ## Propuestas que la 1a implementa en forma provisoria
 

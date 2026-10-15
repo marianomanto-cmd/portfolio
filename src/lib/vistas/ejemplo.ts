@@ -80,14 +80,15 @@ function activo(a: Partial<Activo> & Pick<Activo, 'id' | 'ticker' | 'nombre' | '
   }
 }
 
-// Colores fijos por activo (mismo color en todos los gráficos, spec §UI).
+// Sin color propio: cada activo toma el de su familia por orden de alta, el
+// mismo en todos los gráficos (spec §UI, D-157).
 const ACTIVOS: Activo[] = [
-  activo({ id: 1, ticker: 'SPY', nombre: 'SPDR S&P 500 (CEDEAR)', tipo: 'cedear', moneda_riesgo: 'USD', geografia: 'US', ticker_subyacente: 'SPY', color: '#2a78d6' }),
-  activo({ id: 2, ticker: 'YPFD', nombre: 'YPF', tipo: 'accion_local', moneda_riesgo: 'ARS', color: '#eb6834' }),
-  activo({ id: 3, ticker: 'S13N6', nombre: 'LECAP nov-26', tipo: 'lecap', moneda_riesgo: 'ARS', indexacion: 'fija', fecha_vencimiento: '2026-11-13', color: '#1baf7a' }),
-  activo({ id: 4, ticker: 'T30J7', nombre: 'BONCAP jun-27', tipo: 'bono', moneda_riesgo: 'ARS', indexacion: 'fija', fecha_vencimiento: '2027-06-30', color: '#eda100' }),
-  activo({ id: 5, ticker: 'FIMA', nombre: 'FIMA Premium (FCI)', tipo: 'fci', moneda_riesgo: 'ARS', color: '#e87ba4' }),
-  activo({ id: 6, ticker: 'TXMJ0', nombre: 'Dual CER/TAMAR', tipo: 'bono', moneda_riesgo: 'ARS', indexacion: 'dual_cer_tamar', fecha_vencimiento: '2027-03-31', color: '#4a3aa7' }),
+  activo({ id: 1, ticker: 'SPY', nombre: 'SPDR S&P 500 (CEDEAR)', tipo: 'cedear', moneda_riesgo: 'USD', geografia: 'US', ticker_subyacente: 'SPY', color: null }),
+  activo({ id: 2, ticker: 'YPFD', nombre: 'YPF', tipo: 'accion_local', moneda_riesgo: 'ARS', color: null }),
+  activo({ id: 3, ticker: 'S13N6', nombre: 'LECAP nov-26', tipo: 'lecap', moneda_riesgo: 'ARS', indexacion: 'fija', fecha_vencimiento: '2026-11-13', color: null }),
+  activo({ id: 4, ticker: 'T30J7', nombre: 'BONCAP jun-27', tipo: 'bono', moneda_riesgo: 'ARS', indexacion: 'fija', fecha_vencimiento: '2027-06-30', color: null }),
+  activo({ id: 5, ticker: 'FIMA', nombre: 'FIMA Premium (FCI)', tipo: 'fci', moneda_riesgo: 'ARS', color: null }),
+  activo({ id: 6, ticker: 'TXMJ0', nombre: 'Dual CER/TAMAR', tipo: 'bono', moneda_riesgo: 'ARS', indexacion: 'dual_cer_tamar', fecha_vencimiento: '2027-03-31', color: null }),
 ]
 
 /** Precio en pesos por unidad o por 1 VN, por día (los del 13/10 y 14/10 son los del Apéndice B). */

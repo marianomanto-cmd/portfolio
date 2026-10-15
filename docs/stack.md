@@ -9,9 +9,9 @@ Partió de la propuesta del dueño ("Stack de UI — librerías gratuitas", 2026
 | Framework | Next.js 16 (App Router), React 19, TypeScript `strict` | Runtime Node, no Edge (exceljs y el parser lo necesitan) |
 | Estilos | Tailwind v4 + shadcn/ui (`init -b radix`) | Tokens con `@theme inline`, sin `tailwind.config.js` |
 | Iconos | lucide-react | Botones solo-icono con `aria-label` |
-| Fuentes | Geist + Geist Mono (next/font) | `tabular-nums` en **toda** cifra (celdas, KPIs, ejes, tooltips). No se asume que la fuente alinea sola |
+| Fuentes | Newsreader (la lectura), Geist (la interfaz) y JetBrains Mono (toda cifra), desde el rediseño del 15/10 (D-157) | Newsreader y JetBrains Mono de `@fontsource-variable` (versión exacta) con `next/font/local`; Geist del paquete `geist`. El build no baja nada de la red. `tabular-nums` en **toda** cifra (celdas, KPIs, ejes, tooltips). No se asume que la fuente alinea sola |
 | Gráficos | **Apache ECharts 6**, única librería de gráficos | Imports à la carte desde `echarts/core`. Wrapper propio de ~40 líneas (init, setOption, ResizeObserver, dispose). Se carga solo en las rutas con gráficos |
-| Tablas | TanStack Table | Columna del ticker fijada, orden por cualquier columna. Virtualización solo si el profiling la pide |
+| Tablas | **AG Grid Community 36.2.0** (`ag-grid-community` y `ag-grid-react`, versión exacta), pedido del dueño del 15/10 (D-157) | Siempre a través de `src/components/grilla/` (Grilla): registro modular de lo que se usa, tema de los tokens, celdas con los componentes de la app, orden exacto de montos en texto, totales fijos, sin scroll horizontal (prioridad de columnas) y tarjetas debajo de 768 px. Reemplaza a TanStack Table, que estaba en esta lista y nunca se instaló. Community (MIT), no Enterprise |
 | Plata | decimal.js | Solo en la capa contable: PPC, resultados, conversiones, cuotas, IVA. Redondeo explícito |
 | Monte Carlo | Código propio en float64 | PRNG sfc32 sembrado vía splitmix32; normal y gamma de d3-random con esa fuente; cuantil tipo 7 propio, testeado contra numpy |
 | Inputs numéricos | react-number-format | `NumericFormat` con `.` de miles y `,` decimal, `valueIsNumericString`. Se lee `values.value`, nunca `floatValue` |

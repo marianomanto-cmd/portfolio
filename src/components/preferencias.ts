@@ -6,7 +6,8 @@ import { useSyncExternalStore } from 'react'
 // privado y barra lateral. La fuente de verdad son los atributos de <html> (los
 // aplica el script del layout raíz antes de pintar); localStorage solo las
 // recuerda, y si no está disponible (ventana privada, datos bloqueados) todo
-// sigue andando en esta pestaña.
+// sigue andando en esta pestaña. El tema por defecto es el oscuro (D-157):
+// sin atributo, oscuro; "sistema" es data-theme="system".
 
 export type Tema = 'sistema' | 'claro' | 'oscuro'
 export type Paleta = 'normal' | 'daltonica'
@@ -28,7 +29,7 @@ const CLAVE = {
 
 const EVENTO = 'portfolio:preferencias'
 
-const POR_DEFECTO: Preferencias = { tema: 'sistema', paleta: 'normal', privado: false, nav: 'auto' }
+const POR_DEFECTO: Preferencias = { tema: 'oscuro', paleta: 'normal', privado: false, nav: 'auto' }
 
 function leer(): Preferencias {
   if (typeof document === 'undefined') return POR_DEFECTO
@@ -36,7 +37,7 @@ function leer(): Preferencias {
   const t = d.getAttribute('data-theme')
   const n = d.getAttribute('data-nav')
   return {
-    tema: t === 'light' ? 'claro' : t === 'dark' ? 'oscuro' : 'sistema',
+    tema: t === 'light' ? 'claro' : t === 'system' ? 'sistema' : 'oscuro',
     paleta: d.getAttribute('data-paleta') === 'daltonica' ? 'daltonica' : 'normal',
     privado: d.getAttribute('data-privado') === '1',
     nav: n === 'expandida' || n === 'colapsada' ? n : 'auto',
@@ -62,8 +63,8 @@ export function cambiarPreferencia<K extends keyof Preferencias>(k: K, v: Prefer
   switch (k) {
     case 'tema': {
       const t = v as Tema
-      attr('data-theme', t === 'claro' ? 'light' : t === 'oscuro' ? 'dark' : null)
-      guardar(CLAVE.tema, t === 'sistema' ? null : t)
+      attr('data-theme', t === 'claro' ? 'light' : t === 'oscuro' ? 'dark' : 'system')
+      guardar(CLAVE.tema, t)
       break
     }
     case 'paleta':
@@ -104,11 +105,11 @@ export function usePreferencias(): Preferencias {
   return useSyncExternalStore(suscribir, instantanea, () => POR_DEFECTO)
 }
 
-/** true cuando el tema efectivo es oscuro (elegido o por el sistema). */
+/** true cuando el tema efectivo es oscuro (el de por defecto, elegido o por el sistema). */
 export function temaOscuroEfectivo(p: Preferencias): boolean {
   if (p.tema === 'oscuro') return true
   if (p.tema === 'claro') return false
-  return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
+  return typeof window === 'undefined' || !window.matchMedia('(prefers-color-scheme: light)').matches
 }
 
 const suscripciones = new Map<string, (cb: () => void) => () => void>()

@@ -186,6 +186,50 @@ export async function revisarLayout(page: Page, grueso: boolean): Promise<string
   }, grueso)
 }
 
+/**
+ * Las grillas (AG Grid, D-157) no tienen scroll horizontal adentro, en ningún
+ * ancho: ninguno de sus contenedores desborda a lo ancho, la grilla entra en
+ * su lugar y cada columna a la vista termina antes del borde de la grilla.
+ * Solo las grillas que se ven (debajo de 768 px son tarjetas). Una línea por
+ * problema, con el nombre de la grilla.
+ */
+export async function revisarGrillas(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const out: string[] = []
+    for (const g of Array.from(document.querySelectorAll<HTMLElement>('[data-grilla]'))) {
+      const rg = g.getBoundingClientRect()
+      if (getComputedStyle(g).display === 'none' || rg.width === 0) continue
+      const nombre = `grilla «${g.dataset.grilla}»`
+      const raiz = g.querySelector<HTMLElement>('.ag-root-wrapper')
+      if (!raiz) {
+        // Mientras mide su lugar dibuja un esqueleto; si quedó así, no se dibujó.
+        out.push(`${nombre}: no se dibujó`)
+        continue
+      }
+      const rr = raiz.getBoundingClientRect()
+      if (rr.left < rg.left - 1 || rr.right > rg.right + 1) out.push(`${nombre}: ocupa de ${Math.round(rr.left)} a ${Math.round(rr.right)} y su lugar va de ${Math.round(rg.left)} a ${Math.round(rg.right)}`)
+      // Cualquier contenedor de la grilla que desborde a lo ancho (también la barra de scroll de AG Grid, aunque esté oculta).
+      for (const el of Array.from(g.querySelectorAll<HTMLElement>('*'))) {
+        const cs = getComputedStyle(el)
+        if ((cs.overflowX === 'auto' || cs.overflowX === 'scroll') && el.scrollWidth > el.clientWidth + 1) {
+          out.push(`${nombre}: scroll horizontal interno (${el.scrollWidth} > ${el.clientWidth}) en .${(el.getAttribute('class') ?? '').split(' ')[0]}`)
+          break
+        }
+      }
+      // Cada columna a la vista termina adentro de la grilla.
+      for (const h of Array.from(raiz.querySelectorAll<HTMLElement>('[role="columnheader"]'))) {
+        const r = h.getBoundingClientRect()
+        if (r.width === 0) continue
+        if (r.right > rr.right + 1 || r.left < rr.left - 1) {
+          out.push(`${nombre}: la columna «${(h.querySelector('.ag-header-cell-text')?.textContent ?? '').trim() || h.getAttribute('col-id')}» queda afuera (${Math.round(r.left)} a ${Math.round(r.right)}; la grilla va de ${Math.round(rr.left)} a ${Math.round(rr.right)})`)
+          break
+        }
+      }
+    }
+    return out
+  })
+}
+
 /** axe-core: solo las violaciones serias o críticas (calidad.md §4). */
 export async function revisarAxe(page: Page): Promise<string[]> {
   const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).exclude('nextjs-portal').analyze()

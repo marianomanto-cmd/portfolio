@@ -4,6 +4,79 @@ Todo cambio de la app se registra acá, el más nuevo primero. Cada entrada dice
 
 ## [Sin publicar]
 
+### 2026-10-15 — Rediseño (15/10)
+El diseño nuevo que pediste el 15/10 («nuevo diseño de app, implementalo»), con «usa Apache ECharts y AG Grid Community para tablas». Cambia cómo se ve la app y dónde está cada cosa, no lo que hace. Las decisiones son D-156 (navegación) y D-157 (sistema visual). Cada pantalla con diseño propio suma lo suyo en su subtítulo.
+
+#### Base: navegación, sistema visual y componentes comunes
+- **El menú, por pregunta** (D-156):
+  - **Diario:** Hoy.
+  - **Patrimonio:** Posiciones y Exposición.
+  - **Resultados:** Evolución y PnL.
+  - **Compromisos y futuro:** Pasivos y Flujo y escenarios.
+  - **Al pie:** Registro, Datos, Ajustes y el Mapa de la app.
+
+  **Cartera ahora se llama Posiciones**; la dirección sigue siendo `/cartera`.
+- **El Balance pasa a Exposición:** `/patrimonio` te lleva a `/exposicion` con lo que traía en la dirección, y "Ver el balance", en Hoy, también.
+- **Cargar ya no es una sección:**
+  - es el botón fijo arriba a la derecha (tecla C), con el punto de "todavía no cargaste";
+  - en el teléfono, el botón del centro de la barra de abajo.
+- **Barra superior nueva:**
+  - el nombre de la pantalla y para qué es;
+  - el chip de los datos: "CARGA DE HOY · 09:41" o "ÚLTIMA CARGA · 14/10", con el CCL y el cripto, y un punto verde, o en oro si algo está para revisar. Tocalo y te muestra cada fuente, como antes;
+  - el ojo del modo privado y Cargar.
+
+  El tema ya no está en la barra: está en Ajustes.
+- **En el teléfono, abajo: Hoy · Patrimonio · [Cargar] · Resultados · Más** (reemplaza D-151).
+  - Patrimonio abre Posiciones, con la pestaña de Exposición arriba.
+  - Más tiene Pasivos, Flujo y escenarios, Registro, Datos, Ajustes y el Mapa.
+- **Mapa de la app** (`/mapa`): dónde está cada cosa, cómo se lee cada pantalla y qué quiere decir cada color.
+- **El oscuro es el tema de la app** (D-157). El claro sigue, con las mismas reglas de color y contraste AA. En Ajustes › Tema: Oscuro, Claro o Sistema.
+- **Colores con significado fijo:**
+  - tinta para los pesos;
+  - la pastilla dorada para los dólares, siempre;
+  - sangría para la deuda, la pérdida y Cargar, siempre con signo;
+  - verde para la ganancia, solo en resultados.
+
+  Cada activo tiene su color, el mismo en todos los gráficos: dorados los que arriesgan dólares, piedra los de pesos, lavanda la liquidez. Las barras por moneda de riesgo de Exposición y del Balance van en oro (dólares) y piedra (pesos); antes eran azul y gris.
+- **Tres fuentes:** Newsreader para la lectura de cada pantalla, Geist para la interfaz y JetBrains Mono para toda cifra. Vienen con la app, sin bajarse de la red.
+- **La traza es una placa de vidrio** abajo a la derecha; en el teléfono, una hoja desde abajo.
+  - Los insumos están a la vista: ya no hay que tocar "Ver insumos ▸".
+  - Una cifra con traza tiene un subrayado punteado.
+- **Gráficos** con el tema nuevo: grilla fina, ejes en mono, tooltip de vidrio y el color de cada activo.
+- **Registro es una tabla** (la primera con AG Grid): un lote por fila, con su fecha, sus cargas, el tiempo activo y Revertir.
+  - Se ordena por fecha o por tiempo activo y se recorre con el teclado: Enter entra a la celda y Escape vuelve.
+  - Si una columna no entra en el ancho, el botón "⋯" de la fila la muestra.
+  - Con el dedo (una tablet), el encabezado y cada fila miden 44 px.
+  - En el teléfono sigue en tarjetas.
+- **Registro, Datos, Ajustes, Cargar, la entrada, "No encontré esa página" y la pantalla de error** toman los colores y las fuentes nuevos, sin otros cambios. En Datos › Catálogo, el punto de cada activo es su color en los gráficos: el que elegiste o, si no elegiste, el de su familia (antes quedaba vacío).
+- **Para quien construye pantallas:**
+  - componentes comunes con su uso escrito arriba de cada uno: `Encabezado` (la pregunta y la lectura), `CifraClave`, `Tarjeta`, `Rotulo`, `Boton`, `Badge` y la `Grilla` (AG Grid Community 36.2.0, la única forma de dibujar una tabla);
+  - las funciones puras de la lectura, la paleta y el chip, con test.
+- **Pruebas:**
+  - el test de layout elige el tema como lo elegís vos, desde Ajustes;
+  - también falla si una grilla tiene scroll horizontal adentro;
+  - recorre `/mapa`;
+  - las de interacción prueban la barra de abajo, la hoja "Más", Cargar y su tecla, el Mapa, la redirección de `/patrimonio` y la grilla del Registro con la CSP de producción.
+- **Dependencias** (versiones exactas): `ag-grid-community` y `ag-grid-react` 36.2.0, `@fontsource-variable/newsreader` y `@fontsource-variable/jetbrains-mono` 5.3.0.
+
+#### Hoy
+_Lo suma quien rediseña Hoy._
+
+#### Posiciones
+_Lo suma quien rediseña Posiciones._
+
+#### Exposición
+_Lo suma quien rediseña Exposición, que recibe el Balance (D-156)._
+
+#### Evolución y PnL
+_Lo suma quien rediseña Evolución y PnL._
+
+#### Pasivos
+_Lo suma quien rediseña Pasivos._
+
+#### Flujo y escenarios
+_Lo suma quien rediseña Flujo y escenarios._
+
 ### 2026-10-15 — Entrega 4: Balance, Evolución y PnL, Pasivos, Flujo y escenarios
 Lo que pediste el 14/10: tu estado de situación patrimonial con la casa, el resultado del período, el leasing cuota por cuota y el flujo de fondos proyectado con escenarios, conectados entre sí y con Hoy. Las decisiones de esta entrega son la revisión de D-131 y D-132 a D-155, todas provisorias (`docs/decisiones.md`).
 

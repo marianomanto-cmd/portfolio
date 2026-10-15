@@ -18,7 +18,8 @@ function bloque(selector: string): Record<string, string> {
   for (const m of cuerpo.matchAll(/--([\w-]+):\s*(#[0-9a-fA-F]{6})/g)) out[m[1]] = m[2]
   return out
 }
-const TEMAS = { claro: bloque(':root {'), oscuro: bloque(':root[data-theme="dark"] {') }
+// El oscuro es el de por defecto (el primer :root de globals.css, D-157); el claro, data-theme="light".
+const TEMAS = { oscuro: bloque(':root {'), claro: bloque(':root[data-theme="light"] {') }
 
 // La utilidad de Tailwind → el token (el mapa @theme inline de globals.css).
 const TOKEN: Record<string, string> = {

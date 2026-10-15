@@ -7,7 +7,7 @@ import { CLAVE_E2E } from './clave'
 // Cada test usa su propia IP (x-real-ip, como la informa Vercel) para que el
 // freno a los intentos de uno no frene al otro.
 
-const PAGINAS = ['/', '/cartera', '/exposicion', '/registro', '/carga', '/datos', '/datos/catalogo', '/ajustes', '/no-existe']
+const PAGINAS = ['/', '/cartera', '/exposicion', '/registro', '/carga', '/datos', '/datos/catalogo', '/ajustes', '/mapa', '/no-existe']
 
 // Al azar: los workers de Playwright no comparten un contador.
 const nuevaIp = () => `198.18.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`
@@ -42,6 +42,16 @@ test.describe('sin sesión', () => {
     }
     const conBusqueda = await request.get('/datos/bienes?x=1', { maxRedirects: 0 })
     expect(conBusqueda.headers()['location']).toBe('/login?desde=%2Fdatos%2Fbienes%3Fx%3D1')
+  })
+
+  test('/patrimonio ahora es Exposición (D-156): redirige con lo que traía y después pide la clave', async ({ request }) => {
+    const r = await request.get('/patrimonio?agrupar=clase', { maxRedirects: 0 })
+    expect(r.status()).toBe(307)
+    expect(r.headers()['location']).toBe('/exposicion?agrupar=clase')
+    const sub = await request.get('/patrimonio/algo', { maxRedirects: 0 })
+    expect(sub.headers()['location']).toBe('/exposicion')
+    const despues = await request.get('/exposicion?agrupar=clase', { maxRedirects: 0 })
+    expect(despues.headers()['location']).toBe('/login?desde=%2Fexposicion%3Fagrupar%3Dclase')
   })
 
   test('POST /carga/leer y las Server Actions: 401 sin cookie, 403 desde otro sitio', async ({ request, baseURL }) => {
@@ -166,9 +176,11 @@ test.describe('entrar', () => {
     await entrar(page, '/ajustes')
     await expect(page).toHaveURL(/\/ajustes$/)
     expect(await esperarHidratacion(page)).toBe(true)
-    await page.evaluate(() => localStorage.setItem('portfolio:tema', 'oscuro'))
+    // El oscuro es el de siempre (sin data-theme); el claro lo pone el script del tema, antes de pintar.
+    await expect(page.locator('html')).not.toHaveAttribute('data-theme', /.+/)
+    await page.evaluate(() => localStorage.setItem('portfolio:tema', 'claro'))
     await page.reload()
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
 
     await page.getByRole('button', { name: 'Salir' }).click()
     await expect(page).toHaveURL(/\/login$/)

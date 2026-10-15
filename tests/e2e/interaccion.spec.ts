@@ -1,9 +1,11 @@
 import { devices, expect, test } from '@playwright/test'
-import { esperarHidratacion, montosALaVista, sinIndicadorDev } from './ayudas'
+import { esperarHidratacion, montosALaVista, revisarGrillas, sinIndicadorDev } from './ayudas'
 
 // Interacciones que el layout no ve: Hoy arriba del pliegue en el teléfono,
 // la traza al tocar un número (hoja inferior en el teléfono, panel en
-// desktop), la hoja "Más", el modo privado, el tema y revertir un lote.
+// desktop), la navegación (D-156: la barra de abajo, la hoja "Más", Cargar y
+// su atajo, el Mapa, /patrimonio → /exposicion), el modo privado, el tema, la
+// grilla (D-157) y revertir un lote.
 
 // El descriptor de iPhone 13 trae WebKit por defecto: acá se usa su viewport,
 // su densidad y el puntero táctil, con Chromium.
@@ -63,7 +65,8 @@ test.describe('teléfono (iPhone 13, 390 × 664)', () => {
     expect(Math.round(b.y + b.height)).toBe(664) // pegada abajo
     await expect(hoja).toContainText('=')
     await expect(hoja).toContainText('¿Qué es esto?')
-    await hoja.getByRole('button', { name: 'Ver insumos ▸' }).tap()
+    // Los insumos están a la vista (D-157: la placa los lista, cada uno con su valor).
+    await expect(hoja).toContainText('De dónde sale')
     await expect(hoja).toContainText('Pesos en Mercado Pago')
     await hoja.getByRole('button', { name: 'Cerrar' }).tap()
     await expect(hoja).toBeHidden()
@@ -80,14 +83,31 @@ test.describe('teléfono (iPhone 13, 390 × 664)', () => {
     await expect(page.getByRole('dialog', { name: 'El CCL, en pesos' })).toBeVisible()
   })
 
-  test('"Más" abre la hoja con Registro, Datos y Ajustes', async ({ page }) => {
+  test('la barra de abajo: Hoy · Patrimonio · Cargar · Resultados · Más (D-156)', async ({ page }) => {
+    await page.goto('/')
+    expect(await esperarHidratacion(page)).toBe(true)
+    const barra = page.getByRole('navigation', { name: 'Secciones' })
+    await expect(barra.getByRole('link')).toHaveText(['Hoy', 'Patrimonio', 'Cargar', 'Resultados'])
+    await expect(barra.getByRole('link', { name: 'Hoy', exact: true })).toHaveAttribute('aria-current', 'page')
+    // Patrimonio abre Posiciones, con la pestaña de Exposición arriba.
+    await barra.getByRole('link', { name: 'Patrimonio' }).tap()
+    await expect(page).toHaveURL(/\/cartera$/)
+    const pestanas = page.getByRole('navigation', { name: 'Patrimonio' })
+    await expect(pestanas.getByRole('link', { name: 'Posiciones' })).toHaveAttribute('aria-current', 'page')
+    await pestanas.getByRole('link', { name: 'Exposición' }).tap()
+    await expect(page).toHaveURL(/\/exposicion$/)
+    await expect(barra.getByRole('link', { name: 'Patrimonio' })).toHaveAttribute('aria-current', 'page')
+    await barra.getByRole('link', { name: 'Resultados' }).tap()
+    await expect(page).toHaveURL(/\/evolucion$/)
+  })
+
+  test('"Más" abre la hoja con Pasivos, Flujo, Registro, Datos, Ajustes y el Mapa', async ({ page }) => {
     await page.goto('/')
     expect(await esperarHidratacion(page)).toBe(true)
     await page.getByRole('button', { name: 'Más' }).tap()
     const hoja = page.getByRole('dialog', { name: 'Más secciones' })
     await expect(hoja).toBeVisible()
-    await expect(hoja.getByRole('link', { name: /Registro/ })).toBeVisible()
-    await expect(hoja.getByRole('link', { name: /Datos/ })).toBeVisible()
+    for (const nombre of ['Pasivos', 'Flujo y escenarios', 'Registro', 'Datos', 'Ajustes', 'Mapa de la app']) await expect(hoja.getByRole('link', { name: new RegExp(nombre) })).toBeVisible()
     await hoja.getByRole('link', { name: /Ajustes/ }).tap()
     await expect(page).toHaveURL(/\/ajustes$/)
   })
@@ -190,21 +210,27 @@ test.describe('desktop (1280 × 900)', () => {
     await expect(page.locator('tbody tr[data-fila]')).toHaveCount(6)
   })
 
-  test('el ojo oculta montos y deja porcentajes; el tema se recuerda', async ({ page }) => {
+  test('el ojo oculta montos y deja porcentajes; el tema (oscuro por defecto) se elige en Ajustes y se recuerda', async ({ page }) => {
     await page.goto('/')
     expect(await esperarHidratacion(page)).toBe(true)
+    // Sin preferencia, el oscuro (D-157): ningún data-theme y el fondo del sistema.
+    await expect(page.locator('html')).not.toHaveAttribute('data-theme', /.+/)
+    expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(10, 8, 16)')
     await page.getByRole('button', { name: /Ocultar los montos/ }).click()
     await expect(page.locator('html')).toHaveAttribute('data-privado', '1')
     const filtro = await page.locator('.monto').first().evaluate((el) => getComputedStyle(el).filter)
     expect(filtro).toContain('blur')
     const pct = page.getByRole('region', { name: 'Patrimonio financiero' }).getByRole('button', { name: '+0,57%' }).last()
     expect(await pct.evaluate((el) => getComputedStyle(el.querySelector('span')!).filter)).toBe('none')
-    await page.getByRole('button', { name: /^Tema:/ }).click() // sistema → claro
-    await page.getByRole('button', { name: /^Tema:/ }).click() // claro → oscuro
+    await page.goto('/ajustes')
+    expect(await esperarHidratacion(page)).toBe(true)
+    await page.getByRole('radiogroup', { name: 'Tema' }).getByRole('radio', { name: 'Claro' }).click()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
     await page.reload()
     expect(await esperarHidratacion(page)).toBe(true)
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
     await expect(page.locator('html')).toHaveAttribute('data-privado', '1')
+    expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(250, 248, 244)')
   })
 
   test('con el modo privado no se lee ningún monto, en ninguna pantalla', async ({ page }) => {
@@ -273,6 +299,106 @@ test.describe('desktop (1280 × 900)', () => {
     await expect(page.getByRole('status').first()).toContainText('Modo demo')
   })
 
+  test('Registro es una grilla: se pinta con la CSP, se recorre con el teclado y ordena por columna (D-157)', async ({ page }) => {
+    const csp: string[] = []
+    page.on('console', (m) => {
+      if (/Content Security Policy|Refused to (execute|load|apply|connect)/i.test(m.text())) csp.push(m.text())
+    })
+    await page.goto('/registro')
+    expect(await esperarHidratacion(page)).toBe(true)
+    const grilla = page.getByRole('grid', { name: 'Registro de cargas: un lote por fila' })
+    await expect(grilla).toBeVisible()
+    // El tema de AG Grid (CSS que la grilla inyecta; la CSP lo deja con style-src 'unsafe-inline'):
+    // las filas en surface y el encabezado en mono de 10 px, en mayúsculas.
+    const estilo = await grilla.evaluate((g) => {
+      const sonda = document.createElement('span')
+      sonda.className = 'bg-surface'
+      document.body.appendChild(sonda)
+      const surface = getComputedStyle(sonda).backgroundColor
+      sonda.remove()
+      const enc = getComputedStyle(g.querySelector('.ag-header-cell-text')!)
+      return { fila: getComputedStyle(g.querySelector('.ag-row')!).backgroundColor, surface, fuente: enc.fontFamily, tam: enc.fontSize, mayus: enc.textTransform }
+    })
+    expect(estilo.fila).toBe(estilo.surface)
+    expect(estilo).toMatchObject({ tam: '10px', mayus: 'uppercase' })
+    expect(estilo.fuente).toMatch(/jetbrains/i)
+    const fecha = grilla.getByRole('columnheader', { name: /Datos del/ })
+    const tiempo = grilla.getByRole('columnheader', { name: 'Tiempo activo' })
+    await expect(fecha).toHaveAttribute('aria-sort', 'descending')
+
+    // Teclado: las flechas recorren las celdas; Enter entra a lo de adentro y Escape vuelve a la celda.
+    const fila = grilla.locator('.ag-row[row-index="0"]')
+    await fila.locator('[col-id="tiempo"]').click()
+    await expect(fila.locator('[col-id="tiempo"]')).toBeFocused()
+    await page.keyboard.press('ArrowRight')
+    const lote = fila.locator('[col-id="lote"]')
+    await expect(lote).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(lote.getByRole('button', { name: 'Revertir el lote' })).toBeFocused()
+    await page.keyboard.press('Escape')
+    await expect(lote).toBeFocused()
+
+    // Orden: los números, de mayor a menor al primer clic, con "sin dato" al final.
+    await tiempo.click()
+    await expect(tiempo).toHaveAttribute('aria-sort', 'descending')
+    await expect(fecha).toHaveAttribute('aria-sort', 'none')
+    const textos = await grilla.locator('.ag-row [col-id="tiempo"]').allInnerTexts()
+    const segundos = textos.map((t) => {
+      const m = /(?:(\d+) min)?\s*(?:(\d+) s)?/.exec(t.trim())
+      return t.includes('sin dato') ? null : Number(m?.[1] ?? 0) * 60 + Number(m?.[2] ?? 0)
+    })
+    expect(segundos.length).toBeGreaterThan(2)
+    const conDato = segundos.filter((x): x is number => x !== null)
+    expect(conDato, textos.join(' | ')).toEqual([...conDato].sort((a, b) => b - a))
+    expect(segundos.slice(conDato.length).every((x) => x === null), textos.join(' | ')).toBe(true)
+    expect(csp).toEqual([])
+  })
+
+  test('en un ancho medio, la grilla deja afuera columnas sin scroll horizontal y las muestra en la ficha de la fila', async ({ page }) => {
+    await page.setViewportSize({ width: 900, height: 900 })
+    await page.goto('/registro')
+    expect(await esperarHidratacion(page)).toBe(true)
+    const grilla = page.getByRole('grid', { name: 'Registro de cargas: un lote por fila' })
+    await expect(grilla).toBeVisible()
+    await expect(grilla.getByRole('columnheader', { name: 'Tiempo activo' })).toHaveCount(0)
+    expect(await revisarGrillas(page)).toEqual([])
+    await grilla.getByRole('button', { name: /ver lo que no entra en la tabla/ }).first().click()
+    const ficha = page.getByRole('dialog').filter({ hasText: 'Lo que no entra en la tabla' })
+    await expect(ficha).toBeVisible()
+    await expect(ficha).toContainText('Tiempo activo')
+    await ficha.getByRole('button', { name: 'Cerrar' }).click()
+    await expect(ficha).toBeHidden()
+  })
+
+  test('la barra superior dice dónde estás; Cargar está siempre (tecla C) y el Mapa, al pie de la barra lateral (D-156)', async ({ page }) => {
+    await page.goto('/')
+    expect(await esperarHidratacion(page)).toBe(true)
+    const barra = page.getByRole('banner')
+    await expect(barra).toContainText('Hoy')
+    await expect(barra).toContainText('Cuánto tenés y qué pasó')
+    const cargar = barra.getByRole('link', { name: 'Cargar los datos de hoy' })
+    await expect(cargar).toHaveAttribute('href', '/carga')
+    // Cargar es una acción, no una sección del menú; Balance vive en Exposición.
+    const lateral = page.getByRole('navigation', { name: 'Secciones' })
+    for (const nombre of ['Hoy', 'Posiciones', 'Exposición', 'Evolución y PnL', 'Pasivos', 'Flujo y escenarios', 'Registro', 'Datos', 'Ajustes', 'Mapa de la app'])
+      await expect(lateral.getByRole('link', { name: nombre, exact: true })).toBeVisible()
+    await expect(lateral.getByRole('link', { name: /Cargar|Balance|Cartera/ })).toHaveCount(0)
+    await page.keyboard.press('c')
+    await expect(page).toHaveURL(/\/carga$/)
+    await expect(cargar).toHaveAttribute('aria-current', 'page')
+    await lateral.getByRole('link', { name: 'Mapa de la app' }).click()
+    await expect(page).toHaveURL(/\/mapa$/)
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('una pregunta')
+    await expect(page.getByRole('region', { name: 'Las pantallas, por pregunta' }).getByRole('link', { name: /^Posiciones/ })).toHaveAttribute('href', '/cartera')
+  })
+
+  test('/patrimonio lleva a Exposición, con lo que traía en la dirección (D-156)', async ({ page }) => {
+    await page.goto('/patrimonio?agrupar=clase')
+    await expect(page).toHaveURL(/\/exposicion\?agrupar=clase$/)
+    expect(await esperarHidratacion(page)).toBe(true)
+    await expect(page.getByRole('navigation', { name: 'Secciones' }).getByRole('link', { name: 'Exposición', exact: true })).toHaveAttribute('aria-current', 'page')
+  })
+
   test('una dirección que no existe: 404 en español, dentro del marco de la app y con salida', async ({ page }) => {
     for (const ruta of ['/no-existe', '/cartera/no-existe']) {
       const r = await page.goto(ruta)
@@ -282,7 +408,7 @@ test.describe('desktop (1280 × 900)', () => {
       await expect(page.getByRole('heading', { level: 1, name: 'No encontré esa página' })).toBeVisible()
       await expect(page.getByText(/could not be found/i)).toHaveCount(0)
       // El marco: la barra lateral con sus secciones y la barra superior.
-      await expect(page.getByRole('link', { name: 'Cartera', exact: true }).first()).toBeVisible()
+      await expect(page.getByRole('link', { name: 'Posiciones', exact: true }).first()).toBeVisible()
       await expect(page.getByRole('button', { name: /Ocultar los montos/ })).toBeVisible()
       await expect(page.getByRole('link', { name: 'Ir a Hoy' })).toHaveAttribute('href', '/')
     }

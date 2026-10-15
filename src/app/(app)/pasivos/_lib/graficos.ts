@@ -6,17 +6,23 @@
 import type { CalcVista } from '@/lib/domain/calc'
 import { compacto, numero } from '@/lib/domain/dinero'
 import type { TablaGrafico } from '@/components/graficos/grafico'
+import { colorTema } from '@/components/graficos/tema'
 import type { FilaCuota, VistaLeasing } from '@/lib/vistas/contratos-pasivos'
 
-/** Colores de cada parte de la cuota: los mismos en el gráfico, la leyenda y las tarjetas. */
+/**
+ * Colores de cada parte de la cuota: los mismos en el gráfico, la leyenda y las
+ * tarjetas (sistema visual, D-157). Lo que baja la deuda en piedra; lo que es
+ * costo (interés, cargos) en la familia sangría; impuestos y seguro en lavanda.
+ * Son colores fijos (no colorTema) porque también pintan los puntos de las tarjetas.
+ */
 export const COLOR_PARTE = {
-  amortizacion: '#2f5bd3',
-  interes: '#c2621f',
-  canon: '#2f5bd3',
-  iva: '#7a4fc9',
-  seguro: '#0f8b8d',
-  percepcion: '#b8336a',
-  cargos: '#6b7a90',
+  amortizacion: '#C7BDAB',
+  interes: '#F23A5E',
+  canon: '#C7BDAB',
+  iva: '#9D8FB0',
+  seguro: '#8C8696',
+  percepcion: '#7F7194',
+  cargos: '#FF7D9B',
 } as const
 
 export type Parte = keyof typeof COLOR_PARTE
@@ -152,8 +158,8 @@ export function graficoIndexado(filas: VistaLeasing['indexado']): Grafico {
     xAxis: { type: 'category', data: cats },
     yAxis: { type: 'value', scale: true, axisLabel: { formatter: (v: number) => numero(String(v), 0) } },
     series: [
-      { type: 'line', name: 'Cuota en pesos', data: filas.map((f) => Number(f.ars)), color: COLOR_PARTE.iva, symbolSize: 6 },
-      { type: 'line', name: 'Cuota en dólares', data: filas.map((f) => Number(f.usd)), color: COLOR_PARTE.amortizacion, lineStyle: { type: 'dashed' }, symbolSize: 6 },
+      { type: 'line', name: 'Cuota en pesos', data: filas.map((f) => Number(f.ars)), color: colorTema('texto'), symbolSize: 6 },
+      { type: 'line', name: 'Cuota en dólares', data: filas.map((f) => Number(f.usd)), color: colorTema('viz'), lineStyle: { type: 'dashed' }, symbolSize: 6 },
     ],
   }
   const tabla: TablaGrafico = {
