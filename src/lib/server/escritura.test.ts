@@ -13,6 +13,9 @@ const fake = vi.hoisted(() => {
     respuestaUpdate: { data: [{ id: 3 }] as unknown, error: null as unknown },
     uploads: [] as { bucket: string; path: string; opciones: unknown }[],
     respuestaUpload: { data: null as unknown, error: null as unknown },
+    // Lecturas de cargas antes de revertir (el orden del cuadro de marcha): las del lote y las posteriores.
+    cargasDelLote: [] as unknown[],
+    cargasDespues: [] as unknown[],
   }
   const cliente = {
     rpc: (fn: string, args: Record<string, unknown>) => {
@@ -20,6 +23,10 @@ const fake = vi.hoisted(() => {
       return Promise.resolve(estado.respuestasRpc.shift() ?? { data: null, error: { code: 'XX000', message: 'sin respuesta' } })
     },
     from: (tabla: string) => ({
+      select: () => ({
+        eq: () => Promise.resolve({ data: estado.cargasDelLote, error: null }),
+        neq: () => ({ gt: () => Promise.resolve({ data: estado.cargasDespues, error: null }) }),
+      }),
       insert: (fila: unknown) => {
         estado.inserts.push({ tabla, fila })
         return { select: () => ({ single: () => Promise.resolve(estado.respuestaInsert) }) }
@@ -662,6 +669,24 @@ describe('llamadas a la base (cliente falso)', () => {
     fake.estado.respuestasRpc.push({ data: { lote: LOTE, cargas: [4, 5], borradas: 1, restauradas: 3 }, error: null })
     expect(await revertirLote(LOTE, ' lectura equivocada ')).toEqual({ lote: LOTE, cargas: [4, 5], borradas: 1, restauradas: 3 })
     expect(fake.estado.rpc[1]).toEqual({ fn: 'revertir_lote', args: { p_lote: LOTE, p_motivo: 'lectura equivocada' } })
+  })
+
+  it('el cuadro de marcha se revierte de la carga más nueva a la más vieja: con una posterior del mismo leasing, frena antes de tocar la base', async () => {
+    fake.estado.cargasDelLote = [{ id: 9, fecha: '2026-10-15', pasivo: 1 }]
+    fake.estado.cargasDespues = [
+      { id: 10, fecha: '2026-10-16', pasivo: null },
+      { id: 11, fecha: '2026-11-02', pasivo: 1 },
+    ]
+    expect(await mensajeAsync(() => revertirLote(LOTE, 'planilla equivocada'))).toMatch(/después se guardó otra carga del mismo leasing \(la #11, del lun 02\/11\)/)
+    // Un pago mal cargado se corrige completándolo de nuevo, sin revertir la planilla.
+    expect(await mensajeAsync(() => revertirLote(LOTE, 'planilla equivocada'))).toMatch(/completalo de nuevo en Datos › Leasing/)
+    expect(fake.estado.rpc).toHaveLength(0)
+    // Otro leasing, o nada posterior: revierte.
+    fake.estado.cargasDespues = [{ id: 11, fecha: '2026-11-02', pasivo: 2 }]
+    fake.estado.respuestasRpc.push({ data: { lote: LOTE, cargas: [9], borradas: 35, restauradas: 0 }, error: null })
+    expect((await revertirLote(LOTE, 'planilla equivocada')).cargas).toEqual([9])
+    fake.estado.cargasDelLote = []
+    fake.estado.cargasDespues = []
   })
 
   it('el lote del formulario viaja tal cual: el mismo envío reintentado no se duplica (guardar_manual es idempotente por lote)', async () => {

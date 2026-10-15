@@ -17,5 +17,15 @@ for f in ../migrations/*.sql; do
 done
 out=$(psql -X -q -d "$DB" -tA -f schema_tests.sql 2>&1)
 echo "$out"
+# Los casos de cada pantalla (entrega 4: casos/<pantalla>.sql), en orden, sobre
+# la misma base: cada archivo deja la base como la encontró (o revierte lo suyo).
+shopt -s nullglob
+for c in casos/*.sql; do
+  echo "── caso: $(basename "$c")"
+  co=$(psql -X -q -d "$DB" -tA -f "$c" 2>&1)
+  echo "$co"
+  out+=$'\n'"$co"
+done
 if grep -q "FALLA" <<<"$out"; then echo "SCHEMA: HAY FALLAS"; exit 1; fi
+if grep -q "^ERROR\|psql:.*ERROR" <<<"$out"; then echo "SCHEMA: UN ARCHIVO DE PRUEBAS TIENE UN ERROR DE SQL"; exit 1; fi
 echo "SCHEMA: OK ($(grep -c '^ok' <<<"$out") controles)"

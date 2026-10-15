@@ -4,26 +4,26 @@ import 'server-only'
 // armadores puros de ./armar. En modo demo devuelve datos de ejemplo.
 
 import { hoyCordoba } from '@/lib/domain/fechas'
-import { leerHechos } from '@/lib/server/hechos'
 import { modoDemo } from '@/lib/server/sesion'
 import { leerTodo } from '@/lib/server/supabase'
 import { armarCartera, armarExposicion, armarHoy, armarRegistro } from './armar'
 import type { VistaCartera, VistaExposicion, VistaHoy, VistaRegistro } from './contratos'
 import { ejemploCartera, ejemploExposicion, ejemploHoy, ejemploRegistro } from './ejemplo'
+import { leerHechosVista } from './hechos-vista'
 
 export async function vistaHoy(): Promise<VistaHoy> {
   if (modoDemo()) return ejemploHoy()
-  return armarHoy(await leerHechos(), hoyCordoba())
+  return armarHoy(await leerHechosVista(), hoyCordoba())
 }
 
 export async function vistaCartera(): Promise<VistaCartera> {
   if (modoDemo()) return ejemploCartera()
-  return armarCartera(await leerHechos(), hoyCordoba())
+  return armarCartera(await leerHechosVista(), hoyCordoba())
 }
 
 export async function vistaExposicion(modo: 'financiero' | 'total'): Promise<VistaExposicion> {
   if (modoDemo()) return ejemploExposicion(modo)
-  return armarExposicion(await leerHechos(), hoyCordoba(), modo)
+  return armarExposicion(await leerHechosVista(), hoyCordoba(), modo)
 }
 
 type Fila = Record<string, string | number | boolean | null>
@@ -47,5 +47,11 @@ export async function vistaRegistro(): Promise<VistaRegistro> {
     leerTodo<Fila>('bienes', 'id,nombre', ['id']),
     leerTodo<Fila>('pasivos', 'id,nombre', ['id']),
   ])
-  return armarRegistro({ cargas, cuentas, cotizaciones, saldos, operaciones, valuaciones, capitales, movimientos, bienes, pasivos })
+  // Lo que graban el cuadro de marcha y "Cargar ingreso" (entrega 4).
+  const [cuotas, cargos, flujos] = await Promise.all([
+    leerTodo<Fila>('pasivo_cuotas', 'carga_id,pasivo_id,nro', ['pasivo_id', 'nro']),
+    leerTodo<Fila>('pasivo_cargos', 'carga_id,id', ['id']),
+    leerTodo<Fila>('flujos_reales', 'carga_id,id,sentido,concepto', ['id']),
+  ])
+  return armarRegistro({ cargas, cuentas, cotizaciones, saldos, operaciones, valuaciones, capitales, movimientos, bienes, pasivos, cuotas, cargos, flujos })
 }

@@ -2,6 +2,7 @@
 // 'YYYY-MM-DD' en America/Argentina/Cordoba). Reflejan las tablas de
 // supabase/migrations; ver docs/datos.md. No guardan nada derivado.
 
+import type { Calc } from './calc'
 import type { Decimal, Moneda } from './dinero'
 
 export type { Moneda }
@@ -211,4 +212,12 @@ export interface Hechos {
   cargas: CargaResumen[]
   /** Tenencias declaradas ausentes y sin resolver (ver Ausente). Opcional: vacío si falta. */
   ausentes?: Ausente[]
+  /**
+   * La deuda según el cuadro de marcha de un pasivo a una fecha (el capital, en
+   * la moneda del pasivo), o null si ese pasivo no tiene cuadro. No es un hecho
+   * de la base: lo calcula la capa de vistas con los hechos de Pasivos
+   * (conDeudaSegunCuadro) y el motor lo usa en lugar de una deuda estimada
+   * (D-131, revisión de la entrega 4). Sin él, la deuda es la cargada.
+   */
+  deuda_segun_cuadro?: (pasivo_id: number, fecha: Fecha) => Calc | null
 }

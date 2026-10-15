@@ -552,7 +552,7 @@ function calcularIntervalo(ctx: Contexto, d0: Fecha, d1: Fecha): Variacion {
       const d = usd ? v1.usd.minus(v0.usd) : v1.ars.minus(v0.ars)
       flujos = d.isZero()
         ? []
-        : [{ fecha: d1, descripcion: 'cambio del capital informado', ars: usd ? d.times(ccl1) : d, usd: usd ? d : d.div(ccl1), ccl: ccl1, inferido: false, carga_id: i1?.carga_dato ?? 0, externo: true }]
+        : [{ fecha: d1, descripcion: CAMBIO_DE_DEUDA, ars: usd ? d.times(ccl1) : d, usd: usd ? d : d.div(ccl1), ccl: ccl1, inferido: false, carga_id: i1?.carga_dato ?? 0, externo: true }]
     }
     if (flujos === 'falta') {
       out.faltantes.push({ clave: k, nombre, motivo: 'Falta un precio o un importe para valuar una operación del intervalo.' })
@@ -1030,6 +1030,9 @@ const EXPLICACION: Record<Parte, Record<Moneda, string>> = {
     USD: 'Cambio de partidas sin precio o saldo nuevo: no hay con qué separar activo de tipo de cambio hasta su próxima observación fresca. Cuando llega, vuelve con el signo opuesto y se atribuye (D-35).',
   },
 }
+
+/** La descripción del flujo de una deuda que cambia entre dos cargas (la usa el puente de Evolución para reconocerlo). */
+export const CAMBIO_DE_DEUDA = 'cambio de la deuda (informada, según el cuadro de marcha o estimada)'
 
 export const EXPLICACION_INFERIDO = 'precio pendiente: se usó el precio del día hasta que llegue el PPP (D-19)'
 

@@ -1,4 +1,4 @@
-import { ArrowRight, CircleAlert, Database, Info, Upload } from 'lucide-react'
+import { ArrowRight, CircleAlert, Database, HandCoins, Info, Upload } from 'lucide-react'
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import type { CalcVista } from '@/lib/domain/calc'
@@ -6,6 +6,8 @@ import { fechaCorta, fechaLarga } from '@/lib/domain/fechas'
 import { modoDemo } from '@/lib/server/sesion'
 import { ejemploHoyVariante, varianteDemo } from '@/lib/vistas/ejemplo'
 import type { FraseDelDia, Pendiente, TarjetaPatrimonio, VistaHoy } from '@/lib/vistas/contratos'
+import { porGravedad } from '@/lib/vistas/armar'
+import { contextoHoy, type ContextoHoy } from '@/lib/vistas/contexto-hoy'
 import { ErrorVista } from '@/components/error-vista'
 import { Frase, type FilaDetalle, type ParteMostrada } from '@/components/hoy/frase'
 import { Mostrar } from '@/components/hoy/redondeo-frase'
@@ -13,7 +15,7 @@ import { cargaPendiente, parcialDeTotal } from '@/components/calculos'
 import { Monto, MontoTrazado, Porcentaje, SinDato } from '@/components/monto'
 import { hoyDelPedido } from '@/components/shell/datos'
 import { Traza } from '@/components/traza'
-import { Aviso, Chip, ChipEtiqueta, Rotulo, Tarjeta } from '@/components/ui'
+import { Aviso, Chip, ChipEtiqueta, ParMonto, Rotulo, Tarjeta } from '@/components/ui'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Hoy' }
@@ -34,6 +36,8 @@ export default async function PaginaHoy({ searchParams }: { searchParams: Promis
   }
   if (!v.hay_datos) return <DiaCero v={v} />
 
+  const ctx = await contextoHoy()
+  const atencion = porGravedad([...v.atencion, ...ctx.atencion])
   const m = new Mostrar(v.frase, [v.financiero, v.total])
   // Después del cierre de BYMA (el ejemplo del modo demo no tiene hora: vale siempre).
   const pendienteCarga = modoDemo() ? v.es_habil_hoy && !v.cargo_hoy : cargaPendiente(v, new Date())
@@ -67,8 +71,8 @@ export default async function PaginaHoy({ searchParams }: { searchParams: Promis
             )}
           </Tarjeta>
           <div className="grid gap-2 md:grid-cols-2 md:gap-4">
-            <TarjetaKpi t={v.financiero} m={m} corto="Financiero" desglose />
-            <TarjetaKpi t={v.total} m={m} corto="Total" />
+            <TarjetaKpi t={v.financiero} m={m} corto="Financiero" desglose ver={{ href: '/evolucion', texto: 'Ver la evolución y el PnL' }} />
+            <TarjetaKpi t={v.total} m={m} corto="Total" ver={{ href: '/patrimonio', texto: 'Ver el balance' }} />
           </div>
         </div>
 
@@ -77,13 +81,13 @@ export default async function PaginaHoy({ searchParams }: { searchParams: Promis
           aria-label="Atención"
           className="order-2 hidden md:block xl:col-start-2 xl:row-span-2 xl:row-start-1 min-[112.5rem]:col-start-3 min-[112.5rem]:row-span-1"
         >
-          <Atencion pendientes={v.atencion} />
+          <Atencion pendientes={atencion} />
         </aside>
 
         {/* Columna 2: exposición, carga, excedente, quién movió, cuadre */}
         <div className="order-3 flex flex-col gap-2 md:gap-4 xl:col-start-1 xl:row-start-2 min-[112.5rem]:col-start-2 min-[112.5rem]:row-start-1">
           <LineaExposicion v={v} />
-          <AtencionRenglon pendientes={v.atencion} />
+          <AtencionRenglon pendientes={atencion} />
           {pendienteCarga ? (
             <Link
               href="/carga"
@@ -98,7 +102,7 @@ export default async function PaginaHoy({ searchParams }: { searchParams: Promis
               </span>
             </Link>
           ) : null}
-          <Excedente hoy={v.hoy} />
+          <Excedente ctx={ctx.excedente} />
           {v.movimientos.length ? <QuienMovio v={v} /> : null}
           <Cuadre v={v} />
         </div>
@@ -247,7 +251,20 @@ function SumaParcial({ t, className = '' }: { t: TarjetaPatrimonio; className?: 
   )
 }
 
-function TarjetaKpi({ t, m, corto, desglose = false }: { t: TarjetaPatrimonio; m: Mostrar; corto: string; desglose?: boolean }) {
+function TarjetaKpi({
+  t,
+  m,
+  corto,
+  desglose = false,
+  ver,
+}: {
+  t: TarjetaPatrimonio
+  m: Mostrar
+  corto: string
+  desglose?: boolean
+  /** La pantalla que abre el detalle (en escritorio; en el teléfono, la barra de abajo). */
+  ver?: { href: string; texto: string }
+}) {
   const titulo = t.titulo
   return (
     <Tarjeta aria-label={titulo} className="px-3 py-1.5 md:p-5">
@@ -327,6 +344,11 @@ function TarjetaKpi({ t, m, corto, desglose = false }: { t: TarjetaPatrimonio; m
             ))}
           </ul>
         ) : null}
+        {ver ? (
+          <Link href={ver.href} className="tocable mt-3 inline-flex min-h-9 items-center gap-1 text-sm font-medium text-accent hover:underline">
+            {ver.texto} <ArrowRight aria-hidden className="size-4" />
+          </Link>
+        ) : null}
       </div>
     </Tarjeta>
   )
@@ -363,7 +385,7 @@ function LineaExposicion({ v }: { v: VistaHoy }) {
         <MontoTrazado calc={e.neto_ars} moneda="ARS" titulo="Pesos financieros − deuda del leasing" />
         <span className="text-muted">
           (<MontoTrazado calc={e.pesos_financieros.ars} moneda="ARS" titulo="Pesos financieros" compacta /> −{' '}
-          <MontoTrazado calc={e.deuda_pesos.ars} moneda="ARS" titulo="Deuda del leasing (capital pendiente)" compacta />)
+          <MontoTrazado calc={e.deuda_pesos.ars} moneda="ARS" titulo="Deuda del leasing" compacta />)
         </span>
         <MontoTrazado calc={e.neto_usd} moneda="USD" titulo="El neto en dólares" decimales={0} />
         {verbo ? (
@@ -461,14 +483,46 @@ function AtencionRenglon({ pendientes }: { pendientes: Pendiente[] }) {
 
 // ───────────── Lo que llega en otra fase, el cuadre y quién movió ─────────────
 
-const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 
-function Excedente({ hoy }: { hoy: string }) {
-  const mes = MESES[Number(hoy.slice(5, 7)) - 1]
+/**
+ * El excedente del mes con lo que declaraste (Flujo, entrega 4), y "Cargar
+ * ingreso" a la vista: así lo proyectado se va volviendo real (pedido del
+ * dueño del 14/10).
+ */
+function Excedente({ ctx }: { ctx: ContextoHoy['excedente'] }) {
   return (
-    <p className="px-1 text-sm text-muted">
-      Excedente de {mes}: <span className="italic">sin dato</span> · llega con Flujo (fase 2)
-    </p>
+    <Tarjeta as="div" className="flex flex-col gap-3 px-3 py-3 md:flex-row md:items-center md:justify-between md:px-5">
+      <div className="min-w-0">
+        {ctx ? (
+          <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[15px]">
+            <span className="text-muted">Excedente de {ctx.mes}:</span>
+            <ParMonto par={ctx.valor} titulo={`Excedente de ${ctx.mes}`} signo />
+            <ChipEtiqueta calc={ctx.valor.ars} omitir={['parcial']} />
+          </p>
+        ) : (
+          <p className="text-[15px] text-muted">
+            Excedente del mes: <SinDato motivo="Todavía no hay cargas." />
+          </p>
+        )}
+        <Link href={ctx?.href ?? '/flujo'} className="tocable mt-1 inline-flex min-h-9 items-center gap-1 text-sm font-medium text-accent hover:underline">
+          Ver el flujo y los escenarios <ArrowRight aria-hidden className="size-4" />
+        </Link>
+      </div>
+      <div className="flex flex-wrap gap-2 [&>*]:max-md:flex-1">
+        <Link
+          href="/flujo/cargar?sentido=ingreso"
+          className="tocable inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-medium text-on-accent hover:bg-accent-strong"
+        >
+          <HandCoins aria-hidden className="size-4" /> Cargar ingreso
+        </Link>
+        <Link
+          href="/flujo/cargar?sentido=gasto"
+          className="tocable inline-flex min-h-11 items-center justify-center rounded-lg border border-border px-4 text-sm font-medium hover:bg-surface-2"
+        >
+          Cargar gasto
+        </Link>
+      </div>
+    </Tarjeta>
   )
 }
 

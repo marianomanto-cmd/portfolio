@@ -20,7 +20,7 @@ export function BarraLateral({ puntoCarga }: { puntoCarga?: ReactNode }) {
   const expandida = prefs.nav === 'auto' ? ancha : prefs.nav === 'expandida'
   const cargar = SECCIONES.find((s) => s.href === '/carga')!
   const resto = SECCIONES.filter((s) => s.href !== '/carga')
-  const grupos = ['Diario', 'Patrimonio', 'Al pie'] as const
+  const grupos = ['Diario', 'Patrimonio', 'Contexto', 'Al pie'] as const
 
   return (
     <nav
@@ -104,7 +104,9 @@ export function BarraLateral({ puntoCarga }: { puntoCarga?: ReactNode }) {
 
 // ───────────── Teléfono: barra inferior con Cargar al centro ─────────────
 
-const INFERIOR = ['/', '/cartera', '/carga', '/exposicion'] as const
+// D-151 (provisoria): Hoy · Balance · Cargar · Evolución · Más. Cartera y
+// Exposición pasan a Más (el dueño preguntó "¿dónde está mi balance?").
+const INFERIOR = ['/', '/patrimonio', '/carga', '/evolucion'] as const
 
 export function BarraInferior({ puntoCarga }: { puntoCarga?: ReactNode }) {
   const activa = useActiva()
@@ -141,7 +143,7 @@ export function BarraInferior({ puntoCarga }: { puntoCarga?: ReactNode }) {
           }`}
         >
           <s.icono aria-hidden className="size-[22px]" strokeWidth={actual ? 2.25 : 1.75} />
-          <span>{s.nombre}</span>
+          <span>{s.corto ?? s.nombre}</span>
         </Link>
       </li>
     )

@@ -66,6 +66,19 @@ describe('Registro: un guardado de Datos', () => {
   })
 })
 
+describe('Registro: el origen de las cargas sin cuenta (entrega 4)', () => {
+  it('el cuadro de marcha importado es una "planilla CSV" y lo de "Cargar ingreso" es "manual", no "tipeado"', async () => {
+    filas = [
+      fila({ carga_id: 50, lote: 'lote-c', cuenta: 'Leasing', origen: 'manual', lector: 'cuadro-marcha-csv@1', detalle: 'cuadro de marcha de Leasing de prueba · 3 cuotas' }),
+      fila({ carga_id: 51, lote: 'lote-d', cuenta: 'Flujo', origen: 'manual', lector: 'flujo_real', detalle: 'ingreso mensual · aporte a IEB' }),
+    ]
+    const t = texto(await pagina())
+    expect(t).toContain('Leasing · planilla CSV')
+    expect(t).toContain('Flujo · manual')
+    expect(t).not.toContain('tipeado')
+  })
+})
+
 describe('Registro: cuándo se guardó', () => {
   it('guardado otro día que el de los datos: lo dice ("guardado el jue 15/10 a las 08:00")', async () => {
     filas = [fila({ carga_id: 40, creado_en: '2026-10-15T11:00:00Z', cotizaciones: 3 })]
