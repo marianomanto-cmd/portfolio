@@ -17,8 +17,13 @@ Base: Supabase, proyecto **Portfolio** (`zcgynhzddfjzwswekcvl`). Schema `public`
 | `20261014193836_auditoria_search_path` | `registrar_auditoria` fija `search_path = public, pg_temp`: la auditoría va siempre a `public.auditoria`, aunque la sesión tenga una tabla temporal con ese nombre (D-17) |
 | `20261014203031_feriados_2026_2027` | 49 feriados de 2026 y 2027: días sin rueda en BYMA (`AR`) y cierres de la NYSE (`US`), con las fuentes oficiales en el encabezado. Solo agrega filas (`on conflict do nothing`) (D-129) |
 | `20261014212152_pasivo_saldos_naturaleza` | `pasivo_saldos.naturaleza` (`informado` o `estimado`) y `fuente`, obligatoria para un estimado. Marca como estimado el saldo que ya había (el estimado provisorio del leasing, D-131) y copia su fuente de lo grabado de su carga. `guardar_manual` exige la naturaleza de cada saldo (D-154) |
+| `20261015124724_pasivos_cuadro_marcha` (entrega 4) | El cuadro de marcha del leasing: columnas nuevas de `pasivo_cuotas` (estado, período, fuente de cada monto, pagada, pagador, notas) y de `pasivos` (`pagador_habitual`, `reintegra_iva`, `fecha_desembolso`), la tabla `pasivo_cargos` y `guardar_cuadro_marcha`. Su guarda exige `pasivo_cuotas` vacía (D-139 a D-143, D-152, D-153) |
+| `20261015125017_flujo_recurrentes` | Columnas nuevas de `ingresos_fijos` y `gastos_fijos` (naturaleza, cuenta de destino, frecuencia, primer mes, pagador, anulado, notas) y `guardar_recurrente`. Sin guarda: lo nuevo es opcional o vale para las filas que ya había (D-147) |
+| `20261015125037_flujos_bono_fuente` | `flujos_bono.fuente` y `guardar_flujos_bono` (D-146) |
+| `20261015125057_escenarios` | `escenarios.archivado_en`, el check de la versión de los supuestos, la tabla `valores_recordados` y `guardar_escenario`. Su guarda exige `escenarios` vacía (D-148) |
+| `20261015125140_flujos_reales` | La tabla `flujos_reales` (Cargar ingreso / Cargar gasto), su trigger `carga_valida` y `guardar_flujo_real` (D-149) |
 
-Las cuatro del 14/10 se aplicaron con el conector (ninguna tiene `DELETE`) y se renombraron a la versión que registró Supabase. Cada función aplicada coincide con su archivo (md5 del cuerpo), y las firmas no cambiaron, así que `database.types.ts` tampoco. Una segunda versión de una función se escribe en una migración nueva con `create or replace`: la de la fase 1a no se edita.
+Las cuatro del 14/10 y las cinco de la entrega 4 (15/10) se aplicaron con el conector (ninguna tiene `DELETE`: desde la entrega 4 lo controla `tests/unit/migraciones.test.ts`, también en los comentarios) y se renombraron a la versión que registró Supabase. Cada función aplicada coincide con su archivo (md5 del cuerpo). Las del 14/10 no cambiaron firmas, así que `database.types.ts` tampoco; las cinco de la entrega 4 agregan tablas (`pasivo_cargos`, `flujos_reales`, `valores_recordados`), columnas y funciones, y los tipos se regeneraron desde producción. Una segunda versión de una función se escribe en una migración nueva con `create or replace`: la de la fase 1a no se edita.
 
 La carga transaccional se aplicó en cinco partes y no en una porque el conector de Supabase cortaba a los 60 s con el archivo entero. Cada parte revoca y otorga los permisos de sus propias funciones. El schema final es el mismo: los tests del schema dan los mismos 143 controles y cada función, check e índice aplicados coinciden byte a byte con los archivos (md5 contra una base local armada desde el repo).
 
@@ -44,7 +49,7 @@ Los archivos originales (Excel y capturas) viven en el bucket privado `cargas` d
 | `activos` | Especies | `moneda_riesgo` (a qué moneda expone, no en cuál cotiza), `geografia`, `indexacion` para bonos, `color` fijo para todos los gráficos |
 | `condiciones_bono` | Datos de emisión de bonos indexados o duales | Base CER, rezago, spread TAMAR, regla dual. Sin ellos, el valor técnico es "sin dato" |
 | `ratios_cedear` | Ratio de cada CEDEAR con vigencia | El historial permite cambios de ratio |
-| `flujos_bono` | Cronograma de pagos por 1 VN original | `interes` NULL = a determinar (TAMAR, duales) |
+| `flujos_bono` | Cronograma de pagos por 1 VN original | `interes` NULL = a determinar (TAMAR, duales). `fuente` (entrega 4): de dónde salió el pago (el aviso de licitación, el prospecto). Lo que cobrás = flujo por 1 VN × VN en tenencia: se calcula |
 | `feriados` | Días de semana sin rueda: `AR` en BYMA, `US` en la NYSE | Para "precio viejo", "Todavía no cargaste hoy" y liquidaciones. Se siembra por migración, con su fuente oficial (D-16, D-129). Cargados: 2026 y 2027 |
 
 ### Origen y auditoría
@@ -70,9 +75,10 @@ Los archivos originales (Excel y capturas) viven en el bucket privado `cargas` d
 ### Pasivos y bienes
 | Tabla | Qué guarda |
 |---|---|
-| `pasivos` | Contrato: montos **netos de IVA**, opción de compra, valor del bien, alícuota de Ganancias de quien deduce el canon |
-| `pasivo_cuotas` | Cuadro de marcha: canon neto, IVA, seguro, otros, total (calculado), pago real, cuenta y CCL del día de pago |
-| `pasivo_saldos` | Deuda pendiente de un pasivo a una fecha. `naturaleza`: `informado` (lo informó el acreedor; en un leasing, el valor de cancelación sin penalidad, D-130) o `estimado` (un cálculo que aprobó el dueño, con su `fuente` obligatoria, D-154). Es lo que netea Exposición y resta en el patrimonio total; un estimado lleva la etiqueta `estimado` en toda cifra que lo incluya |
+| `pasivos` | Contrato: montos **netos de IVA**, opción de compra, valor del bien, alícuota de Ganancias de quien deduce el canon. Desde la entrega 4: `pagador_habitual` (`titular` o `empresa`; null = sin declarar), `reintegra_iva` (null = sin declarar: nunca se supone un reintegro) y `fecha_desembolso` (la entrega del bien: con `monto_financiado_neto` da la tasa del contrato, D-143) |
+| `pasivo_cuotas` | El cuadro de marcha, una fila por cuota: canon neto, `seguro` **neto de IVA**, `iva_canon` (el IVA facturado sobre canon y seguro), `otros_conceptos` (percepción RG 3337), total (calculado). `estado` `facturada` (con comprobante) o `proyectada` (nunca un hecho); la fuente de cada monto (`fuente_canon`, `fuente_seguro`, `fuente_otros`: comprobante, contrato, a_confirmar, supuesto, no_aplica); `pagada` (puede estar pagada sin fecha: débito automático, D-140); fecha, monto, cuenta y CCL del pago con su `ccl_fuente`; `pagador`; `periodo` (mes del canon). Upsert por (pasivo, nro): lo facturado pisa lo proyectado (D-153) |
+| `pasivo_cargos` | (entrega 4) Cargos fuera de la cuota (multa, comisión, reserva de fondos, interés, otro), con fecha, importe en pesos, su cuota y su fuente. Son gasto, nunca amortizan. Se anulan (`anulado_en`), no se borran. `carga_id` sin FK a propósito (un trigger, `carga_existe`, controla que exista): si su carga está revertida, no cuenta. Cuentan los de la última planilla vigente de cada pasivo y los cargados a mano |
+| `pasivo_saldos` | Deuda pendiente de un pasivo a una fecha. `naturaleza`: `informado` (lo informó el acreedor; en un leasing, el valor de cancelación sin penalidad, D-130) o `estimado` (un cálculo que aprobó el dueño, con su `fuente` obligatoria, D-154). La deuda que resta es una sola en toda la app: la informada › la **según el cuadro de marcha** (se calcula, no se guarda) › la estimada (D-131, revisión de la entrega 4); la estimada o la según cuadro llevan la etiqueta `estimado` en toda cifra que las incluya |
 | `bienes` | Casa, auto. El auto se vincula a su pasivo (D-03) |
 | `bienes_valuaciones` | Valuaciones fechadas con su fuente (D-04) |
 
@@ -81,8 +87,19 @@ Los archivos originales (Excel y capturas) viven en el bucket privado `cargas` d
 |---|---|
 | `eventos` | Desde la 1a, la **nota del día** (tipo `nota`): una línea opcional del dueño, ligada a la primera carga del lote (`carga_id`). Una nota exige carga y texto. Los demás tipos (`balance`, `macro`, `otro`) son del calendario (fase 2) |
 
+### Flujo (entrega 4)
+| Tabla | Qué guarda |
+|---|---|
+| `ingresos_fijos` | Los ingresos que declaraste, con su vigencia (`vigente_desde`, `vigente_hasta`): un cambio de monto cierra la fila vigente y abre otra. Desde la entrega 4: `naturaleza` (`sueldo`, `honorarios`, `dividendo`, `retiro_a_cuenta`, `otro`; null = sin declarar), `cuenta_destino_id`, `anulado_en` (un error se anula, no se borra) y `notas` |
+| `gastos_fijos` | Los gastos fijos que declaraste, con su vigencia. Desde la entrega 4: `frecuencia` (`mensual` por defecto, `bimestral`, `trimestral`, `semestral`, `anual`), `primer_mes` (día 1; obligatorio si no es mensual), `pagador` (`titular` o `empresa`), `anulado_en` y `notas`; `categoria` pasa a opcional. Son declarados, no gastos reales |
+| `escenarios` | Los escenarios guardados: **supuestos**, nunca resultados (la proyección se recalcula). Desde la entrega 4: `archivado_en` (un escenario no se borra: se archiva) y un check: `supuestos` es un objeto con su versión `v`. Los supuestos guardan `base_mes`, el mes de la carga desde el que cuentan sus meses (D-148) |
+| `valores_recordados` | (nueva) El último número de cada deslizante, por variable (`devaluacion`, `retorno.cedear`…), para tus próximos escenarios (D-08). `service_role` puede leer, insertar y actualizar, no borrar |
+| `flujos_reales` | (nueva) Lo cargado con "Cargar ingreso" / "Cargar gasto": fecha, `sentido`, `concepto` (`mensual` o `extraordinario`), moneda, monto, `cuenta_id` (null = afuera), `cripto_usado` y `pesos_recibidos` (los dos o ninguno), `anulado_en`, `carga_id` (sin FK a `cargas`, a propósito: ver D-149; lo valida el trigger `carga_valida`) y `notas`. Una fila de una carga revertida no se lee. Con esto un mes proyectado se vuelve real |
+
+**Lo que se calcula y no se guarda:** el Balance (activo, pasivo, patrimonio neto, porcentajes, indicadores, comparativo y serie), Evolución y PnL (puente, realizado y no realizado, PnL por mes, estado de resultados), la apertura de cada cuota del leasing (amortización, interés implícito, IVA, seguro, percepción), la deuda según el cuadro de marcha, el excedente del mes y la proyección. El período de Evolución vive en la dirección y lo último que elegiste, en el navegador (`localStorage`, `portfolio:evolucion:periodo`), nunca en la base; los supuestos de un escenario sin guardar, en la dirección (`?s=`), y el escenario guardado que elegís para el Futuro de Evolución, por su número (`?e=`).
+
 ### Fases siguientes (el schema ya está)
-`niveles` y `nivel_operaciones` (disciplina), `ingresos_fijos`, `gastos_fijos` y `flujo_mensual` (flujo de caja), `escenarios` (proyecciones) y `vencimientos` (destino decidido).
+`niveles` y `nivel_operaciones` (disciplina), `flujo_mensual` (el cierre mensual por diferencia de saldos, D-79) y `vencimientos` (destino decidido).
 
 ### Vistas
 Solo agregación trivial. **Devuelven montos como texto.**
@@ -104,6 +121,11 @@ Toda escritura de más de una fila pasa por una función de Postgres, en una sol
 | `guardar_manual(p jsonb) → bigint` | Una carga `manual` con valuaciones de bienes (reemplaza la del mismo bien y día), deuda pendiente de pasivos (ídem por pasivo y día; cada una con su `naturaleza`, `informado` o `estimado`, y la `fuente`, obligatoria para un estimado, D-154) y movimientos de capital (impuesto 0 si no se informa). Cada hecho usa su fecha o la de la carga. Idempotente por lote; devuelve el id de la carga |
 | `alta_activo(p jsonb) → integer` | Un activo y, si es CEDEAR, su ratio, juntos: nunca queda un CEDEAR sin ratio (desde `catalogo_cedear_ratio`, un CEDEAR sin ratio se rechaza). El ratio rige desde hoy (Córdoba) si no se indica otra vigencia. Un ratio solo se acepta en un CEDEAR |
 | `editar_activo(id, p jsonb)` | Cambia solo las claves presentes (una clave con null borra el valor) y agrega o corrige un ratio con su vigencia. Desde `catalogo_cedear_ratio`, rechaza dejar un CEDEAR sin ningún ratio (también al cambiarle el tipo a CEDEAR) y la transacción se deshace |
+| `guardar_cuadro_marcha(p jsonb) → bigint` | (entrega 4) Graba el cuadro de marcha (o una cuota, o un cargo) con una carga `manual` (lector `cuadro-marcha-csv@1`, con el CSV entero en la lectura cruda, o `manual`), en una transacción e idempotente por lote. Upsert por (pasivo, nro); lo que la entrada no dice del pago queda como estaba. Rechaza una cuota fuera del contrato, bajar una facturada a proyectada y una pagada a impaga. `grabado = {pasivo_id, pasivo_cuotas, pasivo_cargos}`. Revertible con `revertir_lote` |
+| `guardar_recurrente(p jsonb) → jsonb` | (entrega 4) Ingresos y gastos declarados: `alta`, `cambiar_desde` (cierra la fila vigente el día anterior y abre otra con el monto nuevo, en una transacción; rechaza un "desde" anterior a la vigencia), `cerrar` y `anular`. Devuelve `{id, cerrada}` |
+| `guardar_flujos_bono(p jsonb) → integer` | (entrega 4) El cronograma de un bono o una letra por 1 VN, con `fuente` obligatoria; upsert por `(activo_id, fecha)`; rechaza un activo que no sea bono ni letra y una fecha posterior a su vencimiento |
+| `guardar_escenario(p jsonb) → smallint` | (entrega 4) Alta o cambio por id, archivar y desarchivar, y el upsert de `valores_recordados`, en una transacción; valida la versión de los supuestos |
+| `guardar_flujo_real(p jsonb) → jsonb` | (entrega 4) En una transacción: la carga manual (lote idempotente, mismo candado que las cargas), la fila de `flujos_reales` y, si la plata entró a una cuenta seguida, el **aporte** en `movimientos_capital` (si salió, el **retiro**), con el cripto como tipo de cambio. Devuelve `{carga_id, flujo_id, movimiento, repetido}`. Deshacer = `revertir_lote` |
 | `leer_monto`, `leer_fecha`, `leer_id` | Leen la entrada JSON. `leer_monto` acepta solo texto decimal (`"-1234.56"`): falla con un número JSON, `NaN`, `Infinity`, exponentes o formato es-AR. Vacío o null = sin dato |
 
 **`confirmar_carga`, en detalle:**

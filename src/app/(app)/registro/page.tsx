@@ -7,6 +7,7 @@ import { ErrorVista } from '@/components/error-vista'
 import { RevertirLote } from '@/components/registro/revertir'
 import { Chip, Rotulo, Tarjeta } from '@/components/ui'
 import { revertirLoteAccion } from './acciones'
+import { nombreOrigen, type Origen } from './_lib/origen'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Registro' }
@@ -24,14 +25,13 @@ function duracion(ms: number): string {
   return `${m}\u202Fmin${s % 60 ? ` ${s % 60}\u202Fs` : ''}`
 }
 
-const ORIGEN: Record<FilaRegistro['origen'], { nombre: string; Icono: typeof Keyboard }> = {
-  excel: { nombre: 'Excel', Icono: FileSpreadsheet },
-  captura: { nombre: 'captura', Icono: ImagenIcono },
-  manual: { nombre: 'tipeado', Icono: Keyboard },
+const ICONO: Record<Origen, typeof Keyboard> = {
+  Excel: FileSpreadsheet,
+  'planilla CSV': FileSpreadsheet,
+  captura: ImagenIcono,
+  manual: Keyboard,
+  tipeado: Keyboard,
 }
-
-/** El origen a la vista (manual §4.5: Excel, captura, manual): un guardado de Datos es "manual"; el CCL y el cripto, "tipeado". */
-const nombreOrigen = (f: FilaRegistro) => (f.origen === 'manual' && f.cuenta === 'Datos' ? 'manual' : ORIGEN[f.origen].nombre)
 
 /** Cómo se nombra una carga en el resumen del lote y en el diálogo de Revertir. */
 const nombreFuente = (f: FilaRegistro) => (f.cuenta === 'Tipo de cambio' ? 'CCL y cripto' : f.cuenta === 'Datos' && f.detalle ? `Datos: ${f.detalle}` : f.cuenta)
@@ -117,16 +117,17 @@ function ListaCargas({ filas }: { filas: FilaRegistro[] }) {
   return (
     <ul className="divide-y divide-border border-y border-border">
       {filas.map((f) => {
-        const o = ORIGEN[f.origen]
+        const origen = nombreOrigen(f)
+        const Icono = ICONO[origen]
         return (
           <li
             key={f.carga_id}
             className={`grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 py-2 md:grid-cols-[auto_minmax(0,12rem)_minmax(0,1fr)_auto] md:items-center ${f.estado !== 'vigente' ? 'text-muted' : ''}`}
           >
-            <o.Icono aria-hidden className="mt-0.5 size-4 shrink-0 text-muted md:mt-0" />
+            <Icono aria-hidden className="mt-0.5 size-4 shrink-0 text-muted md:mt-0" />
             <span className="text-sm">
               <span className={`font-medium ${f.estado === 'revertida' ? 'line-through decoration-1' : ''}`}>{f.cuenta}</span>
-              <span className="text-muted"> · {nombreOrigen(f)}</span>
+              <span className="text-muted"> · {origen}</span>
             </span>
             <span className="col-start-2 text-[13px] text-muted md:col-start-auto">
               {conteo(f)}

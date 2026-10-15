@@ -1,43 +1,20 @@
 import { expect, test, type Browser, type Page } from '@playwright/test'
 import path from 'node:path'
 import { carpetaCapturas, esperarHidratacion, revisarAxe, revisarLayout, sinIndicadorDev } from './ayudas'
+import { pantallas, type Pantalla } from './pantallas'
 
 // Test de layout (D-30, docs/calidad.md §4): cada pantalla, en cada ancho, en
 // claro y en oscuro. Falla si hay scroll horizontal, algo fuera de la
 // pantalla, texto cortado o controles superpuestos, o (con puntero grueso) un
 // tocable de menos de 44 px; y si axe-core encuentra violaciones serias.
-// Todas las pantallas frenan el test, también Cargar y Datos.
+// Todas las pantallas frenan el test, también Cargar y Datos. La lista está en
+// tests/e2e/pantallas/ (un archivo por pantalla nueva; E2E_PANTALLAS elige grupos).
 //
 // El puntero grueso no es solo el teléfono: una tablet, o el teléfono
 // acostado, pasa los 768 px con el dedo (D-100). Por eso 768 y 1024 px se
 // recorren también con puntero táctil.
 
-interface Pantalla {
-  ruta: string
-  nombre: string
-  /** El código que tiene que responder, si no es 200 (la página de "no encontrada"). */
-  estado?: number
-}
-
-const PANTALLAS: Pantalla[] = [
-  { ruta: '/', nombre: 'hoy' },
-  { ruta: '/?demo=vacio', nombre: 'hoy-dia-cero' },
-  { ruta: '/?demo=express', nombre: 'hoy-carga-express' },
-  { ruta: '/?demo=viejo', nombre: 'hoy-datos-viejos' },
-  { ruta: '/cartera', nombre: 'cartera' },
-  { ruta: '/cartera?demo=viejo', nombre: 'cartera-precios-viejos' },
-  { ruta: '/exposicion', nombre: 'exposicion' },
-  { ruta: '/exposicion?vista=total', nombre: 'exposicion-total' },
-  { ruta: '/registro', nombre: 'registro' },
-  { ruta: '/ajustes', nombre: 'ajustes' },
-  { ruta: '/carga', nombre: 'carga' },
-  { ruta: '/datos/catalogo', nombre: 'datos-catalogo' },
-  { ruta: '/datos/cuentas', nombre: 'datos-cuentas' },
-  { ruta: '/datos/bienes', nombre: 'datos-bienes' },
-  { ruta: '/datos/leasing', nombre: 'datos-leasing' },
-  { ruta: '/datos/movimientos', nombre: 'datos-movimientos' },
-  { ruta: '/no-existe', nombre: 'no-encontrada', estado: 404 },
-]
+const PANTALLAS: Pantalla[] = pantallas()
 
 const ANCHOS = [360, 390, 412, 768, 1024, 1279, 1280, 1600, 2560]
 const TEMAS = ['light', 'dark'] as const
@@ -125,6 +102,9 @@ async function recorrer(browser: Browser, ancho: number, tema: 'light' | 'dark',
 for (const ancho of ANCHOS) {
   for (const tema of TEMAS) {
     test(`layout · ${ancho} px · ${tema === 'light' ? 'claro' : 'oscuro'}`, async ({ browser }) => {
+      // Cada ancho recorre todas las pantallas y sus estados (con las cuatro de la entrega 4, ~5 min con la
+      // máquina tranquila): el doble del timeout general, para que la carga de la máquina no lo corte a la mitad.
+      test.setTimeout(600_000)
       const problemas = await recorrer(browser, ancho, tema, ancho < 768)
       expect(problemas, `Problemas de layout a ${ancho} px (${tema}):\n${problemas.join('\n')}`).toEqual([])
     })

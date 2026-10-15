@@ -104,8 +104,10 @@ export interface SaldoPasivo {
   carga_id: number | null
 }
 
+/** La deuda cargada que cuenta: la última informada por el acreedor, aunque haya un estimado posterior (D-131); si no hay, el último estimado. */
 export function ultimoSaldoPasivo(ss: readonly SaldoPasivo[], pasivoId: number): SaldoPasivo | null {
-  return ss.filter((s) => s.pasivo_id === pasivoId).sort((a, b) => (a.fecha < b.fecha ? -1 : 1)).at(-1) ?? null
+  const propios = ss.filter((s) => s.pasivo_id === pasivoId).sort((a, b) => (a.fecha < b.fecha ? -1 : 1))
+  return propios.filter((s) => s.naturaleza === 'informado').at(-1) ?? propios.at(-1) ?? null
 }
 
 /** El CCL cargado para una fecha: el de ese día o el último anterior. null si no hay ninguno. */

@@ -1,0 +1,75 @@
+/*
+ * Balance impreso en A4 (D-133): para mandárselo al contador. Solo vale
+ * mientras la página del balance está en pantalla (:has), así no toca la
+ * impresión de otras pantallas. Fuerza el tema claro, saca la navegación,
+ * los botones y el gráfico, y deja la tabla del estado de situación con la
+ * fecha, el CCL y su fuente, las dos monedas y los chips como texto.
+ */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 10mm;
+  }
+
+  :root:has([data-imprimible='balance']) {
+    color-scheme: light !important;
+    --bg: #ffffff !important;
+    --surface: #ffffff !important;
+    --surface-2: #f2f3f5 !important;
+    --surface-3: #e6e8ec !important;
+    --border: #c4c9d1 !important;
+    --border-strong: #8f97a3 !important;
+    --text: #000000 !important;
+    --text-muted: #3a414c !important;
+    --text-faint: #3a414c !important;
+    --accent: #1d3a8a !important;
+    --usd-bg: #ffffff !important;
+    --usd-border: #8f97a3 !important;
+    --usd-text: #000000 !important;
+    --shadow: none !important;
+    --nav-w: 0px !important;
+    --barra-sup: 0px !important;
+    --barra-inf: 0px !important;
+  }
+
+  :root:has([data-imprimible='balance']) body {
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* El marco de la app no se imprime: barra lateral, barra de arriba, barra de abajo. */
+  :root:has([data-imprimible='balance']) nav[aria-label='Secciones'],
+  :root:has([data-imprimible='balance']) body header:not(#contenido *),
+  :root:has([data-imprimible='balance']) a[href='#contenido'],
+  :root:has([data-imprimible='balance']) nextjs-portal,
+  :root:has([data-imprimible='balance']) [role='dialog'] {
+    display: none !important;
+  }
+
+  :root:has([data-imprimible='balance']) #contenido {
+    padding: 0 !important;
+  }
+
+  [data-imprimible='balance'] {
+    font-size: 11px;
+    gap: 8px !important;
+  }
+
+  /* Una fila, una barra o una tarjeta corta no se parten; la tabla sí, entre filas (con su encabezado repetido). */
+  [data-imprimible='balance'] .sin-corte,
+  [data-imprimible='balance'] figure {
+    break-inside: avoid;
+  }
+
+  [data-imprimible='balance'] thead {
+    display: table-header-group;
+  }
+
+  /* Una cifra impresa es texto: sin subrayado ni alto mínimo de tocable. */
+  [data-imprimible='balance'] button {
+    min-height: 0 !important;
+    min-width: 0 !important;
+    text-decoration: none !important;
+  }
+}

@@ -586,6 +586,15 @@ export function PantallaCarga({ contexto }: { contexto: ContextoCarga }) {
         <Aviso tono="aviso">Falta configurar la base (SUPABASE_SECRET_KEY): podés leer y revisar, pero no se guarda nada.</Aviso>
       ) : null}
       {contexto.aviso ? <Aviso tono="error">{contexto.aviso}</Aviso> : null}
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
+        <span>¿Te entró plata o pagaste algo grande?</span>
+        <Link href="/flujo/cargar?sentido=ingreso" className="tocable inline-flex min-h-11 items-center font-medium text-accent hover:underline lg:min-h-9">
+          Cargar ingreso
+        </Link>
+        <Link href="/flujo/cargar?sentido=gasto" className="tocable inline-flex min-h-11 items-center font-medium text-accent hover:underline lg:min-h-9">
+          Cargar gasto
+        </Link>
+      </p>
 
       <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(15rem,20rem)_minmax(0,1fr)] lg:items-start">
         <form

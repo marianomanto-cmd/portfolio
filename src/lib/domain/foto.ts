@@ -336,10 +336,16 @@ function armarFoto(h: Hechos, fecha: Fecha, opciones: { hoy?: Fecha; ix?: Indice
     items.push(itemBien(b, v, ccl, insCcl))
   }
 
-  // Pasivos (capital pendiente informado o estimado), con signo negativo
+  // Pasivos, con signo negativo. Una sola deuda en toda la app (D-131, revisión
+  // de la entrega 4): la informada por el acreedor › la según el cuadro de marcha
+  // (a la tasa del contrato: baja con cada cuota pagada) › la estimada a mano.
   for (const p of h.pasivos) {
-    const s = ultimoA(ix.pasivoSaldos.get(String(p.id)) ?? [], fecha)
-    items.push(itemPasivo(p, s, ccl, insCcl, hoy, ix))
+    const saldos = ix.pasivoSaldos.get(String(p.id)) ?? []
+    const s = ultimoA(saldos, fecha)
+    // La informada les gana a las otras dos aunque haya un estimado posterior (como en Pasivos).
+    const informado = s?.naturaleza === 'informado' ? s : ultimoA(saldos.filter((x) => x.naturaleza === 'informado'), fecha)
+    const cuadro = informado ? null : (h.deuda_segun_cuadro?.(p.id, fecha) ?? null)
+    items.push(cuadro && cuadro.valor !== null ? itemPasivoSegunCuadro(p, cuadro, fecha, ccl, insCcl) : itemPasivo(p, informado ?? s, ccl, insCcl, hoy, ix))
   }
 
   return { fecha, ccl, fecha_ccl: fechaCcl, items }
@@ -395,6 +401,45 @@ function itemBien(b: Bien, v: BienValuacion | null, ccl: Calc, insCcl: Insumo): 
     precio: base,
     fecha_dato: v?.fecha ?? null,
     carga_dato: v?.carga_id ?? null,
+    viejo: false,
+    valor_ars: par.ars,
+    valor_usd: par.usd,
+  }
+}
+
+/** La deuda según el cuadro de marcha (un estimado que sale del contrato), en lugar de una estimada a mano. */
+function itemPasivoSegunCuadro(p: Pasivo, cuadro: Calc, fecha: Fecha, ccl: Calc, insCcl: Insumo): ItemFoto {
+  const capital = cuadro.valor as Decimal
+  const base = calc(
+    capital.negated(),
+    `− deuda según el cuadro de marcha al ${fechaCorta(fecha)} = ${monto(capital.negated(), p.moneda, { decimales: 2 })}`,
+    [deCalc(`Deuda de ${p.nombre} según el cuadro de marcha`, cuadro, p.moneda)],
+    {
+      etiquetas: ['estimado'],
+      explicacion:
+        'Lo que falta pagar de capital según el cuadro de marcha, a la tasa del contrato: el valor presente de los cánones que faltan y de la opción de compra. Baja con cada cuota que pagás. Es un estimado (no lo informó el acreedor): resta en el patrimonio total con la etiqueta "estimado" hasta que cargues el valor de cancelación que te informe.',
+    },
+  )
+  const par =
+    p.moneda === 'ARS'
+      ? { ars: base, usd: aUsd(base, ccl, insCcl, 'La deuda en dólares al CCL de la foto.') }
+      : { ars: aArs(base, ccl, insCcl, 'La deuda en pesos al CCL de la foto.'), usd: base }
+  return {
+    clave: `d:${p.id}`,
+    clase: 'pasivo',
+    nombre: p.nombre,
+    ticker: p.nombre,
+    cuenta: null,
+    activo: null,
+    tipo: 'deuda',
+    moneda_riesgo: p.moneda,
+    geografia: 'AR',
+    color: '#9a5b5b',
+    tenencia: null,
+    cantidad: null,
+    precio: base,
+    fecha_dato: fecha,
+    carga_dato: null,
     viejo: false,
     valor_ars: par.ars,
     valor_usd: par.usd,

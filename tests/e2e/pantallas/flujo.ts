@@ -1,0 +1,28 @@
+import type { Pantalla } from './tipos'
+
+// Flujo y escenarios (entrega 4, plan §6 D.8): cada ruta y cada estado demo de
+// la pantalla, más dos escenarios armados en la URL (?s=) para que el test de
+// layout recorra también la proyección, sus gráficos y la tabla mes a mes. Los
+// ?s= los verifica tests/unit/flujo-pantallas.test.ts (si el esquema de los
+// supuestos cambia, ese test avisa que hay que regenerarlos).
+
+/** Todo Igual ("Completar lo que falta con Igual") y 12 meses. */
+export const S_IGUAL_12 =
+  'eyJ2IjoxLCJob3Jpem9udGVfbWVzZXMiOjEyLCJkZXZhbHVhY2lvbiI6W3siZGlyIjoiaWd1YWwiLCJ2YWxvciI6bnVsbCwiaGFzdGFfbWVzIjpudWxsfV0sImluZmxhY2lvbiI6W3siZGlyIjoiaWd1YWwiLCJ2YWxvciI6bnVsbCwiaGFzdGFfbWVzIjpudWxsfV0sImJyZWNoYV9jcmlwdG8iOnsiZGlyIjoiaWd1YWwiLCJ2YWxvciI6bnVsbH0sImluZ3Jlc29fdXNkIjpbeyJkaXIiOiJpZ3VhbCIsInZhbG9yIjpudWxsLCJkZXNkZV9tZXMiOjEsImNyZWNpbWllbnRvX2FudWFsIjpudWxsLCJhanVzdGVfbWVuc3VhbCI6bnVsbH0seyJkaXIiOiJpZ3VhbCIsInZhbG9yIjpudWxsLCJkZXNkZV9tZXMiOjQsImNyZWNpbWllbnRvX2FudWFsIjpudWxsLCJhanVzdGVfbWVuc3VhbCI6bnVsbH1dLCJpbmdyZXNvX3Blc29zIjpbeyJkaXIiOiJpZ3VhbCIsInZhbG9yIjpudWxsLCJkZXNkZV9tZXMiOjEsImNyZWNpbWllbnRvX2FudWFsIjpudWxsLCJhanVzdGVfbWVuc3VhbCI6bnVsbH0seyJkaXIiOiJpZ3VhbCIsInZhbG9yIjpudWxsLCJkZXNkZV9tZXMiOjQsImNyZWNpbWllbnRvX2FudWFsIjpudWxsLCJhanVzdGVfbWVuc3VhbCI6bnVsbH1dLCJ0ZW1fcmVub3ZhY2lvbiI6eyJkaXIiOiJpZ3VhbCIsInZhbG9yIjpudWxsfSwicmVpbnRlZ3JvX2l2YSI6bnVsbCwiZ2FzdG9zIjp7ImRpciI6ImlndWFsIiwidmFsb3IiOm51bGwsImF0YWRvX2luZmxhY2lvbiI6ZmFsc2V9LCJyZXRvcm5vIjp7ImNlZGVhciI6eyJkaXIiOiJpZ3VhbCIsInZhbG9yIjpudWxsfSwiYWNjaW9uX2xvY2FsIjp7ImRpciI6ImlndWFsIiwidmFsb3IiOm51bGx9LCJsaXF1aWRlel9wZXNvcyI6eyJkaXIiOiJpZ3VhbCIsInZhbG9yIjpudWxsfX0sImR1YWwiOnsiVFhNSjAiOnsiZGlyIjoiaWd1YWwiLCJ2YWxvciI6bnVsbH19LCJkZXN0aW5vX3ZlbmNpbWllbnRvcyI6InJlZ2xhIiwiY2FzYSI6eyJkaXIiOiJpZ3VhbCIsInZhbG9yIjpudWxsfSwiY2FtaW9uZXRhIjp7ImRpciI6ImlndWFsIiwidmFsb3IiOm51bGx9LCJzaG9ja19pbmdyZXNvIjpudWxsLCJwYWdhZG9yX2N1b3RhIjp7InF1aWVuIjoidGl0dWxhciIsImRlc2RlX21lcyI6bnVsbH0sIm9wY2lvbl9jb21wcmEiOm51bGwsInBvbGl0aWNhIjp7InJlZ2xhIjoicHJvcG9yY2lvbmFsX3VsdGltYV9jYXJnYSIsInBjdCI6IjEwMCIsImNsYXNlIjpudWxsLCJvcmlnZW4iOiJkZWNsYXJhZGFfMTRfMTAiLCJpbmNsdXllX2xpcXVpZGV6Ijp0cnVlfX0'
+
+/** Devaluación Sube 2%/mes, CEDEARs Sube 8%/año, ingreso en dólares desde feb-27 Baja 20%, y 36 meses. */
+export const S_MIXTO_36 =
+  'eyJ2IjoxLCJob3Jpem9udGVfbWVzZXMiOjM2LCJkZXZhbHVhY2lvbiI6W3siZGlyIjoic3ViZSIsInZhbG9yIjoiMi4wIiwiaGFzdGFfbWVzIjpudWxsfV0sImluZmxhY2lvbiI6W3siZGlyIjoiaWd1YWwiLCJ2YWxvciI6bnVsbCwiaGFzdGFfbWVzIjpudWxsfV0sImJyZWNoYV9jcmlwdG8iOnsiZGlyIjoiaWd1YWwiLCJ2YWxvciI6bnVsbH0sImluZ3Jlc29fdXNkIjpbeyJkaXIiOiJpZ3VhbCIsInZhbG9yIjpudWxsLCJkZXNkZV9tZXMiOjEsImNyZWNpbWllbnRvX2FudWFsIjpudWxsLCJhanVzdGVfbWVuc3VhbCI6bnVsbH0seyJkaXIiOiJiYWphIiwidmFsb3IiOiIyMC4wIiwiZGVzZGVfbWVzIjo0LCJjcmVjaW1pZW50b19hbnVhbCI6bnVsbCwiYWp1c3RlX21lbnN1YWwiOm51bGx9XSwiaW5ncmVzb19wZXNvcyI6W3siZGlyIjoiaWd1YWwiLCJ2YWxvciI6bnVsbCwiZGVzZGVfbWVzIjoxLCJjcmVjaW1pZW50b19hbnVhbCI6bnVsbCwiYWp1c3RlX21lbnN1YWwiOm51bGx9LHsiZGlyIjoiaWd1YWwiLCJ2YWxvciI6bnVsbCwiZGVzZGVfbWVzIjo0LCJjcmVjaW1pZW50b19hbnVhbCI6bnVsbCwiYWp1c3RlX21lbnN1YWwiOm51bGx9XSwidGVtX3Jlbm92YWNpb24iOnsiZGlyIjoiaWd1YWwiLCJ2YWxvciI6bnVsbH0sInJlaW50ZWdyb19pdmEiOm51bGwsImdhc3RvcyI6eyJkaXIiOiJpZ3VhbCIsInZhbG9yIjpudWxsLCJhdGFkb19pbmZsYWNpb24iOmZhbHNlfSwicmV0b3JubyI6eyJjZWRlYXIiOnsiZGlyIjoic3ViZSIsInZhbG9yIjoiOC4wIn0sImFjY2lvbl9sb2NhbCI6eyJkaXIiOiJpZ3VhbCIsInZhbG9yIjpudWxsfSwibGlxdWlkZXpfcGVzb3MiOnsiZGlyIjoiaWd1YWwiLCJ2YWxvciI6bnVsbH19LCJkdWFsIjp7IlRYTUowIjp7ImRpciI6ImlndWFsIiwidmFsb3IiOm51bGx9fSwiZGVzdGlub192ZW5jaW1pZW50b3MiOiJyZWdsYSIsImNhc2EiOnsiZGlyIjoiaWd1YWwiLCJ2YWxvciI6bnVsbH0sImNhbWlvbmV0YSI6eyJkaXIiOiJpZ3VhbCIsInZhbG9yIjpudWxsfSwic2hvY2tfaW5ncmVzbyI6bnVsbCwicGFnYWRvcl9jdW90YSI6eyJxdWllbiI6InRpdHVsYXIiLCJkZXNkZV9tZXMiOm51bGx9LCJvcGNpb25fY29tcHJhIjpudWxsLCJwb2xpdGljYSI6eyJyZWdsYSI6InByb3BvcmNpb25hbF91bHRpbWFfY2FyZ2EiLCJwY3QiOiIxMDAiLCJjbGFzZSI6bnVsbCwib3JpZ2VuIjoiZGVjbGFyYWRhXzE0XzEwIiwiaW5jbHV5ZV9saXF1aWRleiI6dHJ1ZX19'
+
+export const PANTALLAS_FLUJO: Pantalla[] = [
+  { ruta: '/flujo', nombre: 'flujo' },
+  { ruta: '/flujo?demo=vacio', nombre: 'flujo-vacio' },
+  { ruta: '/flujo?demo=sin-ingresos', nombre: 'flujo-sin-ingresos' },
+  { ruta: '/flujo?demo=parcial', nombre: 'flujo-parcial' },
+  { ruta: '/flujo?demo=comparar', nombre: 'flujo-comparar' },
+  { ruta: `/flujo?s=${S_IGUAL_12}`, nombre: 'flujo-proyeccion' },
+  { ruta: `/flujo?s=${S_MIXTO_36}`, nombre: 'flujo-escenario' },
+  { ruta: '/flujo/cargar?sentido=ingreso', nombre: 'flujo-cargar-ingreso' },
+  { ruta: '/flujo/cargar?sentido=gasto', nombre: 'flujo-cargar-gasto' },
+  { ruta: '/flujo/cargar?sentido=ingreso&demo=parcial', nombre: 'flujo-cargar-sin-cripto' },
+]

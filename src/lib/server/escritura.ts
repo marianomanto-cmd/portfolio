@@ -28,7 +28,7 @@ import type {
 } from '@/lib/carga/contratos'
 import type { Database } from '@/lib/database.types'
 import { dec } from '@/lib/domain/dinero'
-import { hoyCordoba } from '@/lib/domain/fechas'
+import { fechaCorta, hoyCordoba } from '@/lib/domain/fechas'
 import type { Fecha, Geografia, Indexacion, Moneda, TipoActivo, TipoOperacion } from '@/lib/domain/tipos'
 import { supabase } from './supabase'
 
@@ -156,8 +156,53 @@ export async function revertirLote(lote: string, motivo: string): Promise<Resume
   const l = loteValido(lote)
   const m = typeof motivo === 'string' ? motivo.trim() : ''
   if (m === '') throw new ErrorEscritura('Falta el motivo de la reversión.')
+  const bloqueo = await bloqueoDelLeasing(l)
+  if (bloqueo) throw new ErrorEscritura(bloqueo)
   const data = await llamar('revertir_lote', { p_lote: l, p_motivo: m }, 'revertir el lote')
   return leerResumenReversion(data, l)
+}
+
+export interface CargaDeLeasing {
+  id: number
+  fecha: string
+  /** grabado->pasivo_id: las cargas del cuadro de marcha (la planilla, un pago, un cargo). */
+  pasivo: unknown
+}
+
+/**
+ * El cuadro de marcha de un pasivo se revierte de la carga más nueva a la más
+ * vieja, como las cargas de una cuenta en revertir_lote: una planilla o un pago
+ * posterior pisó las mismas cuotas (y conserva lo del pago), así que revertir
+ * el anterior dejaría el cuadro a medias. Devuelve el motivo si en `despues`
+ * hay una carga sin revertir del mismo pasivo que alguna de `propias`.
+ */
+export function posteriorDelLeasing(propias: readonly CargaDeLeasing[], despues: readonly CargaDeLeasing[]): string | null {
+  const pasivo = (c: CargaDeLeasing) => (typeof c.pasivo === 'number' && Number.isInteger(c.pasivo) ? c.pasivo : null)
+  const pasivos = new Set(propias.map(pasivo).filter((x): x is number => x !== null))
+  if (!pasivos.size) return null
+  const desde = Math.max(...propias.map((c) => c.id))
+  const otra = despues.filter((c) => c.id > desde && pasivos.has(pasivo(c) ?? -1)).sort((a, b) => b.id - a.id)[0]
+  if (!otra) return null
+  return `No se puede revertir: después se guardó otra carga del mismo leasing (la #${otra.id}, del ${fechaCorta(otra.fecha)}). Revertí primero esa, de la más nueva a la más vieja. Si lo que querés corregir es el pago de una cuota (la fecha, el CCL o quién la pagó), completalo de nuevo en Datos › Leasing: pisa lo anterior sin revertir la planilla.`
+}
+
+async function bloqueoDelLeasing(lote: string): Promise<string | null> {
+  const db = supabase() as unknown as {
+    from: (t: 'cargas') => {
+      select: (c: string) => {
+        eq: (c: string, v: string) => PromiseLike<{ data: CargaDeLeasing[] | null; error: ErrorBase | null }>
+        neq: (c: string, v: string) => { gt: (c: string, v: number) => PromiseLike<{ data: CargaDeLeasing[] | null; error: ErrorBase | null }> }
+      }
+    }
+  }
+  const propias = await db.from('cargas').select('id,fecha,pasivo:grabado->pasivo_id').eq('lote', lote)
+  if (propias.error) throw traducirErrorBase(propias.error, 'revertir el lote')
+  const filas = propias.data ?? []
+  if (!filas.some((c) => typeof c.pasivo === 'number')) return null
+  const desde = Math.max(...filas.map((c) => c.id))
+  const despues = await db.from('cargas').select('id,fecha,pasivo:grabado->pasivo_id').neq('estado', 'revertida').gt('id', desde)
+  if (despues.error) throw traducirErrorBase(despues.error, 'revertir el lote')
+  return posteriorDelLeasing(filas, despues.data ?? [])
 }
 
 /**

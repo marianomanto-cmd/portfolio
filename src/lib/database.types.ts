@@ -358,6 +358,7 @@ export type Database = {
       escenarios: {
         Row: {
           actualizado_en: string
+          archivado_en: string | null
           creado_en: string
           id: number
           nombre: string
@@ -366,6 +367,7 @@ export type Database = {
         }
         Insert: {
           actualizado_en?: string
+          archivado_en?: string | null
           creado_en?: string
           id?: never
           nombre: string
@@ -374,6 +376,7 @@ export type Database = {
         }
         Update: {
           actualizado_en?: string
+          archivado_en?: string | null
           creado_en?: string
           id?: never
           nombre?: string
@@ -477,18 +480,21 @@ export type Database = {
           activo_id: number
           amortizacion: number
           fecha: string
+          fuente: string | null
           interes: number | null
         }
         Insert: {
           activo_id: number
           amortizacion?: number
           fecha: string
+          fuente?: string | null
           interes?: number | null
         }
         Update: {
           activo_id?: number
           amortizacion?: number
           fecha?: string
+          fuente?: string | null
           interes?: number | null
         }
         Relationships: [
@@ -501,31 +507,99 @@ export type Database = {
           },
         ]
       }
-      gastos_fijos: {
+      flujos_reales: {
         Row: {
-          categoria: string
+          anulado_en: string | null
+          carga_id: number
           concepto: string
+          cripto_usado: number | null
+          cuenta_id: number | null
+          fecha: string
           id: number
           moneda: string
           monto: number
+          notas: string | null
+          pesos_recibidos: number | null
+          sentido: string
+        }
+        Insert: {
+          anulado_en?: string | null
+          carga_id: number
+          concepto: string
+          cripto_usado?: number | null
+          cuenta_id?: number | null
+          fecha: string
+          id?: never
+          moneda: string
+          monto: number
+          notas?: string | null
+          pesos_recibidos?: number | null
+          sentido: string
+        }
+        Update: {
+          anulado_en?: string | null
+          carga_id?: number
+          concepto?: string
+          cripto_usado?: number | null
+          cuenta_id?: number | null
+          fecha?: string
+          id?: never
+          moneda?: string
+          monto?: number
+          notas?: string | null
+          pesos_recibidos?: number | null
+          sentido?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flujos_reales_cuenta_id_fkey"
+            columns: ["cuenta_id"]
+            isOneToOne: false
+            referencedRelation: "cuentas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gastos_fijos: {
+        Row: {
+          anulado_en: string | null
+          categoria: string | null
+          concepto: string
+          frecuencia: string
+          id: number
+          moneda: string
+          monto: number
+          notas: string | null
+          pagador: string | null
+          primer_mes: string | null
           vigente_desde: string
           vigente_hasta: string | null
         }
         Insert: {
-          categoria: string
+          anulado_en?: string | null
+          categoria?: string | null
           concepto: string
+          frecuencia?: string
           id?: never
           moneda?: string
           monto: number
+          notas?: string | null
+          pagador?: string | null
+          primer_mes?: string | null
           vigente_desde: string
           vigente_hasta?: string | null
         }
         Update: {
-          categoria?: string
+          anulado_en?: string | null
+          categoria?: string | null
           concepto?: string
+          frecuencia?: string
           id?: never
           moneda?: string
           monto?: number
+          notas?: string | null
+          pagador?: string | null
+          primer_mes?: string | null
           vigente_desde?: string
           vigente_hasta?: string | null
         }
@@ -562,30 +636,50 @@ export type Database = {
       }
       ingresos_fijos: {
         Row: {
+          anulado_en: string | null
           concepto: string
+          cuenta_destino_id: number | null
           id: number
           moneda: string
           monto: number
+          naturaleza: string | null
+          notas: string | null
           vigente_desde: string
           vigente_hasta: string | null
         }
         Insert: {
+          anulado_en?: string | null
           concepto: string
+          cuenta_destino_id?: number | null
           id?: never
           moneda: string
           monto: number
+          naturaleza?: string | null
+          notas?: string | null
           vigente_desde: string
           vigente_hasta?: string | null
         }
         Update: {
+          anulado_en?: string | null
           concepto?: string
+          cuenta_destino_id?: number | null
           id?: never
           moneda?: string
           monto?: number
+          naturaleza?: string | null
+          notas?: string | null
           vigente_desde?: string
           vigente_hasta?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ingresos_fijos_cuenta_destino_id_fkey"
+            columns: ["cuenta_destino_id"]
+            isOneToOne: false
+            referencedRelation: "cuentas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       movimientos_capital: {
         Row: {
@@ -826,20 +920,79 @@ export type Database = {
           },
         ]
       }
+      pasivo_cargos: {
+        Row: {
+          anulado_en: string | null
+          carga_id: number
+          concepto: string
+          cuota_nro: number | null
+          detalle: string | null
+          fecha: string
+          fuente: string
+          id: number
+          importe: number
+          notas: string | null
+          pasivo_id: number
+        }
+        Insert: {
+          anulado_en?: string | null
+          carga_id: number
+          concepto: string
+          cuota_nro?: number | null
+          detalle?: string | null
+          fecha: string
+          fuente: string
+          id?: never
+          importe: number
+          notas?: string | null
+          pasivo_id: number
+        }
+        Update: {
+          anulado_en?: string | null
+          carga_id?: number
+          concepto?: string
+          cuota_nro?: number | null
+          detalle?: string | null
+          fecha?: string
+          fuente?: string
+          id?: never
+          importe?: number
+          notas?: string | null
+          pasivo_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pasivo_cargos_pasivo_id_fkey"
+            columns: ["pasivo_id"]
+            isOneToOne: false
+            referencedRelation: "pasivos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pasivo_cuotas: {
         Row: {
           base_ganancias: number | null
           canon_neto: number
           carga_id: number
           ccl_del_dia_pago: number | null
+          ccl_fuente: string | null
           cuenta_pago_id: number | null
+          estado: string
           fecha_pago: string | null
           fecha_vencimiento: string
+          fuente_canon: string
+          fuente_otros: string
+          fuente_seguro: string
           iva_canon: number
           monto_pagado: number | null
+          notas: string | null
           nro: number
           otros_conceptos: number
+          pagada: boolean
+          pagador: string | null
           pasivo_id: number
+          periodo: string | null
           seguro: number
           total_pesos: number | null
         }
@@ -848,14 +1001,23 @@ export type Database = {
           canon_neto: number
           carga_id: number
           ccl_del_dia_pago?: number | null
+          ccl_fuente?: string | null
           cuenta_pago_id?: number | null
+          estado?: string
           fecha_pago?: string | null
           fecha_vencimiento: string
+          fuente_canon?: string
+          fuente_otros?: string
+          fuente_seguro?: string
           iva_canon?: number
           monto_pagado?: number | null
+          notas?: string | null
           nro: number
           otros_conceptos?: number
+          pagada?: boolean
+          pagador?: string | null
           pasivo_id: number
+          periodo?: string | null
           seguro?: number
           total_pesos?: number | null
         }
@@ -864,14 +1026,23 @@ export type Database = {
           canon_neto?: number
           carga_id?: number
           ccl_del_dia_pago?: number | null
+          ccl_fuente?: string | null
           cuenta_pago_id?: number | null
+          estado?: string
           fecha_pago?: string | null
           fecha_vencimiento?: string
+          fuente_canon?: string
+          fuente_otros?: string
+          fuente_seguro?: string
           iva_canon?: number
           monto_pagado?: number | null
+          notas?: string | null
           nro?: number
           otros_conceptos?: number
+          pagada?: boolean
+          pagador?: string | null
           pasivo_id?: number
+          periodo?: string | null
           seguro?: number
           total_pesos?: number | null
         }
@@ -946,6 +1117,7 @@ export type Database = {
           alicuota_ganancias: number | null
           anticipo_neto: number | null
           cuotas_totales: number
+          fecha_desembolso: string | null
           fecha_inicio: string
           id: number
           moneda: string
@@ -954,6 +1126,8 @@ export type Database = {
           notas: string | null
           opcion_compra_fecha: string | null
           opcion_compra_neto: number | null
+          pagador_habitual: string | null
+          reintegra_iva: boolean | null
           tipo: string
           valor_bien: number | null
         }
@@ -961,6 +1135,7 @@ export type Database = {
           alicuota_ganancias?: number | null
           anticipo_neto?: number | null
           cuotas_totales: number
+          fecha_desembolso?: string | null
           fecha_inicio: string
           id?: never
           moneda: string
@@ -969,6 +1144,8 @@ export type Database = {
           notas?: string | null
           opcion_compra_fecha?: string | null
           opcion_compra_neto?: number | null
+          pagador_habitual?: string | null
+          reintegra_iva?: boolean | null
           tipo: string
           valor_bien?: number | null
         }
@@ -976,6 +1153,7 @@ export type Database = {
           alicuota_ganancias?: number | null
           anticipo_neto?: number | null
           cuotas_totales?: number
+          fecha_desembolso?: string | null
           fecha_inicio?: string
           id?: never
           moneda?: string
@@ -984,6 +1162,8 @@ export type Database = {
           notas?: string | null
           opcion_compra_fecha?: string | null
           opcion_compra_neto?: number | null
+          pagador_habitual?: string | null
+          reintegra_iva?: boolean | null
           tipo?: string
           valor_bien?: number | null
         }
@@ -1091,6 +1271,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      valores_recordados: {
+        Row: {
+          actualizado_en: string
+          valor: number
+          variable: string
+        }
+        Insert: {
+          actualizado_en?: string
+          valor: number
+          variable: string
+        }
+        Update: {
+          actualizado_en?: string
+          valor?: number
+          variable?: string
+        }
+        Relationships: []
       }
       vencimientos: {
         Row: {
@@ -1201,7 +1399,12 @@ export type Database = {
       alta_activo: { Args: { p: Json }; Returns: number }
       confirmar_carga: { Args: { p: Json }; Returns: Json }
       editar_activo: { Args: { p: Json; p_id: number }; Returns: undefined }
+      guardar_cuadro_marcha: { Args: { p: Json }; Returns: number }
+      guardar_escenario: { Args: { p: Json }; Returns: number }
+      guardar_flujo_real: { Args: { p: Json }; Returns: Json }
+      guardar_flujos_bono: { Args: { p: Json }; Returns: number }
       guardar_manual: { Args: { p: Json }; Returns: number }
+      guardar_recurrente: { Args: { p: Json }; Returns: Json }
       leer_fecha: { Args: { campo: string; j: Json }; Returns: string }
       leer_id: { Args: { campo: string; j: Json }; Returns: number }
       leer_monto: { Args: { campo: string; j: Json }; Returns: number }

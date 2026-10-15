@@ -11,14 +11,14 @@ Numeración: D-01 a D-34 están acá. D-35 a D-53 son propuestas de `docs/invest
 ## Producto
 
 ### D-01 · Empezar de cero, no iterar sobre Corte — D
-La app anterior (Corte: libro líquido mobile-first con memo de IA) no resolvía el problema. Se reescribe desde cero contra `docs/spec.md`. El código de Corte sigue en el repo hasta que la fase 1 lo reemplace en producción; su base (schema `corte` en el proyecto Supabase `plasmart-reports`) no se toca.
+La app anterior (Corte: libro líquido mobile-first con memo de IA) no resolvía el problema. Se reescribe desde cero contra `docs/spec.md`. El código de Corte sigue en el repo hasta que la fase 1 lo reemplace en producción; su base (schema `corte`, en otro proyecto de Supabase de la empresa) no se toca.
 
 *Actualización 2026-10-08 (fase 1a):* el código de Corte ya salió del repo, y el despliegue de la 1a lo reemplaza en el proyecto `portfolio` de Vercel. El schema `corte` sigue sin tocarse.
 
 *Actualización 2026-10-14 (revisión de la 1a):* también salió `supabase/schema.sql`, el schema de Corte que había quedado junto a las migraciones (con un MEP fijo y columnas de precios externos). Nada lo usaba. El schema `corte` de la base de Corte sigue sin tocarse.
 
 ### D-02 · Proyecto Supabase dedicado — D
-Proyecto **Portfolio** (`zcgynhzddfjzwswekcvl`, sa-east-1), schema `public`. Queda separado de las bases de Plasmart: datos personales y de negocio no comparten proyecto ni credenciales. Vercel: proyecto `portfolio` existente (equipo `marianomanto-cmds-projects`).
+Proyecto **Portfolio** (`zcgynhzddfjzwswekcvl`, sa-east-1), schema `public`. Queda separado de las bases de la empresa: datos personales y de negocio no comparten proyecto ni credenciales. Vercel: proyecto `portfolio` existente (equipo `marianomanto-cmds-projects`).
 
 ### D-03 · Patrimonio total y patrimonio financiero — D
 El dueño tiene una casa de ~US$200K, totalmente paga, y un auto en leasing. Si todo se suma en un solo número, la casa domina (≈80% del total) y aplasta lo que importa para invertir.
@@ -407,6 +407,7 @@ Detalla D-66.
 Aplica D-65 y "sin dato, nunca cero".
 - **Sin bienes o sin leasing cargados,** el patrimonio total y su variación son "sin dato · parcial", con la suma de lo cargado. Antes repetían el financiero. Un bien dado de baja no cuenta como faltante.
 - **Sin ningún pasivo cargado,** la deuda en pesos es "sin dato" (antes, $ 0), y el neto de Exposición, su sensibilidad y su porcentaje, "sin dato · parcial". Con pasivos cargados y ninguno en pesos, la deuda en pesos es $ 0, porque se sabe.
+- **Un leasing sin capital pendiente cargado pero con su cuadro de marcha** resta la deuda según el cuadro, con la etiqueta `estimado` (revisión de D-131 en la entrega 4). Si al contrato le falta lo que necesita su tasa (el monto financiado neto o la fecha de desembolso), la según cuadro es "sin dato" con ese motivo, y cuenta la deuda cargada, si hay; si no, sigue siendo "sin dato".
 - **Una suma sin ninguna parte conocida** es "sin dato", sin la etiqueta `parcial` ni "suma parcial (0 de 1): $ 0,00": dice qué falta (el motivo de la parte, si todas faltan por lo mismo, o "Faltan N partes"). Vale para toda suma del motor; por ejemplo, la deuda de un leasing sin capital pendiente.
 - **Si el resultado de una fila de Cartera es "sin dato"** (una compra con precio pendiente, una tenencia ausente), las tres partes de su desglose también, con el mismo motivo. Excepción: con una apertura sin CCL de compra, el desglose en dólares no se arma y la pantalla dice por qué.
 
@@ -452,7 +453,21 @@ Detalla D-16. Migración `20261014203031_feriados_2026_2027` (49 días). Encaja 
 - **Qué es:** el valor presente de las cuotas que faltan (el canon, neto de IVA) más la opción de compra, descontado a la tasa implícita del contrato. Lo calculó el dueño fuera de la app y el 14/10 aprobó usarlo como deuda provisoria.
 - **Cómo se cargó:** como capital pendiente del leasing, con la fecha del cálculo, en una carga manual. Su fuente ("estimado, provisorio", la fórmula y la tasa) queda en lo grabado de esa carga.
 - **Es una excepción que decidió el dueño, no una regla:** la app no calcula ni propone estimados, y sin este dato la deuda volvería a ser "sin dato" (D-126). Se reemplaza por el valor de cancelación anticipada que informe la leasera, sin la penalidad.
-- **Falta:** que la app lo calcule sola desde el cuadro de marcha, con su fórmula (entrega 4). Que diga "estimado" en el número y en su traza ya está: D-154.
+- **Hecho en la entrega 4:** la app calcula la deuda sola desde el cuadro de marcha, con su fórmula (la según el cuadro, abajo), y esa reemplaza al estimado apenas el contrato tiene su tasa. Que diga "estimado" en el número y en su traza: D-154.
+- **Revisión del 15/10/2026 (entrega 4, Balance) — P (provisoria, a confirmar): el perímetro del patrimonio con un bien financiado.**
+  - **La deuda de un bien financiado se toma en este orden:** la **informada** por el acreedor (en un leasing, el valor de cancelación sin la penalidad, D-130) › la **según el cuadro de marcha** (el valor presente de los cánones netos que faltan y de la opción de compra, a la tasa del contrato; la calcula Pasivos) › la **estimada** que aprobaste. Las dos últimas llevan `estimado` en la cifra, en todo lo que la incluye y en su traza, que dice de dónde sale (D-134).
+  - **La cifra grande del Balance:** con la deuda informada, "Patrimonio neto" a secas. Con la según cuadro o la estimada, "Patrimonio neto · deuda del leasing estimada", con el chip `estimado`, y justo debajo, firme, "Sin la camioneta: financiero + casa", que no usa ningún estimado. Sin ninguna de las tres, la cifra grande es "Patrimonio neto sin la camioneta", con el chip `parcial`; el patrimonio completo queda "sin dato", con la suma parcial en su traza y la camioneta y su valor escritos al lado.
+  - **Un bien financiado y su deuda entran o salen juntos:** se suma tu parte, valor − deuda (D-03); nunca el bien sin su deuda. Un leasing sin su bien cargado tampoco se resta solo: queda en el pasivo como "no se resta" y pide cargar el bien.
+  - **Lo firme** es lo financiero más los bienes sin deuda que tienen valuación, menos las deudas que no financian un bien (una tarjeta, un préstamo). Un bien sin valuación sale de lo firme y se nombra ("sin la casa, que no tiene valuación").
+  - **Por qué:** el estimado lo aprobaste vos y la casa tiene que verse como número; con la versión firme al lado, nadie confunde un estimado con un dato. El plan anterior suponía la deuda en "sin dato" y producción ya tenía un estimado.
+  - **Una sola deuda en toda la app (integración, 15/10):** el mismo orden vale para el motor (Hoy, Exposición, Evolución), Pasivos y Flujo, no solo para el Balance. Las pantallas leen los hechos con la deuda según el cuadro de cada pasivo (`conDeudaSegunCuadro`, en `src/lib/vistas/integracion-pasivos.ts`), y el motor la usa en lugar de una estimada; a una fecha pasada, con las cuotas que estaban pagadas a esa fecha. Cargar y Datos siguen leyendo la deuda cargada.
+    - **Por qué:** con el cuadro de marcha importado, Pasivos decía la según cuadro y el resto de la app la estimada del 08/10, que no baja con las cuotas. Eran dos deudas distintas, y la amortización no movía el patrimonio, contra lo que pidió el dueño el 14/10 ("solo la amortización afecta el patrimonio"). La según cuadro es la misma cuenta que el estimado, con la tasa del contrato y al día.
+    - **Descartado:** informada › estimada › según cuadro (la primera versión de la integración): la estimada es de un día y queda congelada, y Evolución leía la cuota pagada entera como "no explicado".
+    - **La informada gana aunque haya un estimado posterior** (la última informada hasta esa fecha), en el motor, Pasivos y Flujo: es el dato del acreedor.
+    - **Entre cuotas, la según el cuadro sube un poco cada día** (es un valor presente a la fecha: corre el interés hasta la próxima cuota) y baja con cada cuota. En Evolución ese aumento va en la línea de la deuda del puente ("cambio de la deuda") y, como el estado de resultados cuenta el interés con la cuota, queda en "no explicado" hasta que vence (revisión de los arreglos, 15/10). **Para decidir:** tomar el saldo del cuadro después de la última cuota pagada (la deuda cambia solo con la amortización de cada cuota, como pidió el dueño, y el puente cierra sin "no explicado"); cambia la cifra entre cuotas (sin el interés que corre desde la última).
+    - **Una sola fecha de corte: la de tu última carga** (revisión de pantallas, 15/10). El Balance, Hoy y Flujo están al cierre de tu última carga, y Pasivos toma la deuda que cuenta a esa misma fecha (la según cuadro, con las cuotas pagadas hasta ese día). Un valor que cargues con una fecha posterior (el formulario propone la de hoy) entra con tu próxima carga. Mientras tanto, Pasivos lo muestra aparte ("cuenta desde tu próxima carga"), y el Balance, en vez de pedirte que cargues el valor de la leasera, dice "Ya cargaste el valor de cancelación del …: entra con tu próxima carga". En un balance de una fecha pasada dice desde qué balance cuenta.
+      - **Por qué:** el valor cargado hoy aparecía en Pasivos como la deuda que cuenta, y el Balance seguía con la estimada y te pedía cargar lo que acababas de cargar: dos deudas a la vez. Pasivos, además, calculaba la según cuadro a hoy y el resto a la última carga, y por eso daban cifras distintas de un día al otro.
+      - **Descartado:** que la foto de la última carga tome los saldos y las valuaciones hasta hoy. Mezcla fechas en una misma foto: precios de ayer con la deuda de hoy, y el cambio "desde la última carga" de Hoy con un dato de otro día. Un saldo tampoco se guarda con la fecha de la última carga: la fecha es la del acreedor.
 
 ### D-154 · Un saldo de deuda dice si lo informó el acreedor o es un estimado — P (provisoria, a confirmar)
 - **Qué pasaba:** `pasivo_saldos` no distinguía un valor informado de un estimado. El estimado que el dueño aprobó el 14/10 (D-131) se restaba en el patrimonio total y en Exposición sin ninguna marca, y su traza decía "capital pendiente informado" y "según el acreedor". Era un estimado presentado como dato.
@@ -469,6 +484,186 @@ Detalla D-16. Migración `20261014203031_feriados_2026_2027` (49 días). Encaja 
 - **El chip:** `estimado` es una de las cuatro etiquetas nuevas del motor, junto con `supuesto`, `a_confirmar` y `proyectado`, que llegan con los escenarios y el cuadro de marcha. Su gravedad va entre `supuesto` y `a confirmar`.
 - **Rotular de más:** se trata como estimado todo lo que no diga "informado". Es el error conservador.
 
+## Entrega 4 · Balance, resultados, pasivos y flujo (15/10/2026)
+
+Las cuatro pantallas que pidió el dueño el 14/10: el estado de situación patrimonial, el resultado del período (profit and loss), el cuadro de marcha del leasing y el flujo de fondos proyectado con escenarios. Todas las decisiones de esta sección son **P (provisorias, a confirmar)**. Los números reservados: Balance D-132 a D-134 (y la revisión de D-131), Evolución y PnL D-135 a D-138, Pasivos D-139 a D-143, D-152 y D-153, Flujo D-144 a D-149 y D-155, lead D-150 y D-151 (D-154 ya está arriba).
+
+### Balance
+La revisión del perímetro está en D-131 (revisión del 15/10).
+
+### D-132 · Liquidez por regla, escrita en la traza — P (provisoria, a confirmar)
+- **Tres grupos, por el tipo de partida, no por opinión:** **disponible hoy** (los saldos de tus cuentas, en pesos o en dólares), **con venta en el mercado** (CEDEARs, acciones, bonos, letras y FCI con cotización: para usar esa plata hay que venderlos) e **ilíquido** (los bienes: se hacen plata solo vendiéndolos, sin un precio de todos los días).
+- **La regla va escrita** debajo de la barra "Por liquidez" del Balance, en la traza de cada tramo y en la del porcentaje de cada partida (`liquidezDe`), así se puede discutir la regla y no el número.
+- **Qué no hace:** no mira plazos de liquidación (T+1, rescate en 48 h), ni el volumen de un título, ni si un bono tiene poca rueda. Eso sería una opinión sobre el mercado; si hace falta, se suma como un grupo más con su regla.
+- **Por qué:** la liquidez es lo que separa "lo invertible" de "lo que tenés"; con una regla fija el número se reproduce y se audita.
+
+### D-133 · Balance a cualquier fecha de carga, imprimible en A4 — P (provisoria, a confirmar)
+- **Cualquier fecha con carga:** el balance de una fecha se arma con la foto de esa fecha (`foto(h, fecha)`), con los datos que tenías ese día: "al 14/10" y "al 31/12" salen del mismo cálculo. Por defecto, la última. La fecha y el agrupamiento (cuenta, instrumento o clase) viven en la dirección, así que un balance se puede guardar como favorito o mandar.
+- **"Viejo" se mide contra el día del balance:** el de una fecha pasada, contra esa fecha; el último, contra hoy. Un dato de otro año dice el año ("tasación del lun 15/09/2025").
+- **Porcentajes que suman:** cada renglón dice qué parte del activo es, con el número exacto en su traza; lo que se ve se redondea a un decimal por resto mayor, en dos niveles (financiero y cada bien suman 100,0%; las partidas de lo financiero suman lo que se ve del financiero). Del otro lado, igual: pasivo + patrimonio neto = 100,0%, lo firme + tu parte de cada bien financiado = el patrimonio neto, y las deudas suman el pasivo. En la frase de arriba, a enteros que suman 100%.
+- **La evolución:** un punto por fecha de carga, nunca uno inventado entre cargas; un dato que falta deja un hueco. Pesos o dólares, con un control (dos monedas no comparten un eje). El activo por clase, apilado; la línea del patrimonio neto (rayada si la deuda es un estimado) y la de lo firme (punteada).
+- **Comparativo, como lo presenta un contador:** el balance de la fecha elegida al lado del de otra fecha de carga anterior (por defecto, la primera; se elige otra y queda en la dirección, `?comparar=`), con los renglones principales (financiero, bienes, activo, pasivo, patrimonio neto y lo firme) en pesos y en dólares, y la diferencia de cada uno con su fórmula. La diferencia **no es una ganancia**: incluye lo que pusiste o sacaste de tus cuentas, y lo dice; el resultado separado es de Evolución y PnL (D-135 a D-138). Una diferencia que da exactamente cero dice "sin cambios", para no confundirla con un "sin dato". El chip de cada renglón es el más grave de las dos fechas: si la anterior usaba la deuda estimada, la diferencia es un estimado y lo dice. Con una sola fecha de carga no hay comparativo.
+- **Indicadores del balance:** solvencia (activo ÷ pasivo, en veces), endeudamiento (pasivo ÷ patrimonio neto) e inmovilización (bienes ÷ activo), cada uno con su fórmula. Son cocientes: dan lo mismo en pesos que en dólares. Describen, no juzgan (no hay umbral, D-42); con la deuda estimada llevan `estimado`, y sin la deuda son "sin dato". Sin deudas no hay solvencia ni endeudamiento; sin bienes, no hay inmovilización.
+- **Impresión en A4 para tu contador:** el botón "Imprimir" (o imprimir desde el navegador) deja la frase, el estado de situación, los indicadores, el comparativo y la composición, en tema claro, con la fecha, el CCL usado y su fuente, las dos monedas, los porcentajes y los chips como texto, y al pie de dónde sale la deuda y qué quiere decir cada etiqueta. Sin la navegación, los botones, las tarjetas de arriba (lo mismo está en la tabla) ni el gráfico; la tabla se parte entre filas, con su encabezado en cada hoja.
+- **Por qué:** el estado de situación patrimonial es un documento a una fecha; el contador lo pide así, y con la traza a mano cada número se puede explicar.
+
+### D-134 · El Balance dice de dónde sale la deuda, en la cifra, la traza y la impresión — P (provisoria, a confirmar)
+- **El origen no depende del CCL:** una deuda cargada es la deuda aunque falte el CCL; lo que queda "sin dato" es la otra moneda, con su motivo (falta el CCL), nunca "falta el valor de cancelación". La cifra grande sigue siendo el patrimonio neto con esa deuda.
+- **El origen se escribe al lado de la deuda:** "valor de cancelación informado el mar 13/10", "según el cuadro de marcha, a la tasa del contrato · estimada" o "estimada por vos el jue 08/10 · provisoria", con quién la informó o cómo se estimó, y el chip que corresponde (`estimado`, `provisoria`). Sin ninguna: "sin dato · falta el valor de cancelación que te pase la leasera", con el botón a Datos › Leasing.
+- **La traza de la deuda** dice su origen y qué es ("es lo que se resta" o "es un cálculo, no un dato del acreedor"), y la de tu parte de la camioneta escribe la resta: valor − deuda, con el nombre del origen.
+- **"Lo que falta pagar según contrato" es una referencia, nunca la deuda:** son las cuotas nominales que faltan, con intereses, IVA, seguro y percepción. Se muestra al lado de la deuda, con su rótulo fijo ("no es la deuda: incluye intereses, IVA y seguro"), y nunca se resta. Hasta que importes el cuadro de marcha, dice que aparece cuando lo importes.
+- **Por qué:** es la misma deuda que usa Exposición y que va a usar Hoy; si cambia de origen (cuando la leasera informe el valor), tiene que notarse en todos lados y en el papel que le llega al contador.
+
+
+### Evolución y PnL
+### D-135 · Realizado y no realizado del período, exactos y sin residuo — P (provisoria, a confirmar)
+- **Qué es:** por posición, en el período (d0, d1], con el mismo PPC promedio de Cartera. **Realizado** = lo que cobraste por ventas, vencimientos y rentas − lo que te había costado lo vendido (cada venta lleva costo × cantidad vendida ÷ tenencia). **No realizado** = valor al final − valor al inicio − aperturas a su valor del día − compras + costo de lo vendido + amortizaciones.
+- **Por qué cierra:** realizado + no realizado = valor al final − valor al inicio − flujos = el resultado del período, exacto (lo verifican propiedades con fast-check y un cruce contra una referencia en Python escrita aparte). Un vencimiento que cierra la posición cuenta como venta. Una amortización baja el costo y no es realizado (D-114). Lo que traías al abrir una tenencia no es resultado del período: la apertura entra a su valor del día.
+- **En dólares:** cada flujo a su CCL y el costo en dólares (al CCL de cada compra). Solo hace falta el costo cuando hay una venta: si falta (por ejemplo, el CCL de compra de una apertura), realizado y no realizado son "sin dato" en esa moneda, con lo que falta, y el resultado sigue conocido.
+- **La liquidez "no aplica":** no tiene costo; su resultado es rendimiento o tipo de cambio. Los bienes y las deudas tampoco: su resultado es revaluación o licuación.
+
+### D-136 · Con un solo día de historia, Evolución muestra el punto de partida — P (provisoria, a confirmar)
+- **Qué se ve:** tu patrimonio del día cero; lo que ya traías desde la compra según el PPP de tus brókers (valor − costo, lo mismo que Cartera), en dólares solo donde declaraste el CCL de compra (si no, "sin dato" con la suma parcial); qué pasa si mañana el CCL sube 1% (en pesos, lo que arriesga dólares × 1%; en dólares, − lo que arriesga pesos ÷ CCL × (1 − 1 ÷ 1,01)); el puente con cada línea en "sin dato · necesita una segunda carga"; y el estado de resultados del mes en curso, con lo de flujo a la vista y lo patrimonial en "sin dato".
+- **Por qué:** con una sola carga no hay período, pero sí hay cosas verdaderas para mostrar. Nunca una pantalla en blanco y nunca un $ 0 en lugar de un dato que falta.
+
+### D-137 · El puente suma las cuotas pagadas desde tus cuentas y, en Total, la deuda — P (provisoria, a confirmar)
+- **Las cuotas:** una cuota del leasing pagada desde una cuenta que la app sigue (con saldo en pesos cargado) baja ese saldo. Sin más, el motor la leería como una pérdida de tus pesos. En el puente es una **salida de plata, no una pérdida** (visión 4.7): un renglón propio, cada cuota a su CCL del día. Una cuota pagada sin fecha de pago, sin cuenta, o desde una cuenta que la app no sigue no entra, y el puente dice por qué, pero solo de las de su período: la fecha de pago o, sin ella, el vencimiento cae entre las dos cargas (una cuota de antes del día cero no tiene nada que ver con ningún período).
+- **En la vista Total:** la amortización de la deuda (lo que bajó la deuda entre las dos cargas) es su renglón; "de lo cual: revaluación de bienes" es la parte de tus activos que viene de una valuación nueva; "de lo cual: el dólar sobre tus bienes" es la parte del tipo de cambio que viene de tus bienes (en dólares, la camioneta valuada en pesos vale menos si el CCL sube; en pesos, la casa valuada en dólares vale más: visión 4.7), y "de lo cual: el dólar sobre la deuda en pesos" es la licuación en dólares.
+- **La deuda estimada (D-154):** el motor rotula "estimado" el valor de la deuda; todo lo que sale de ella lo hereda: la amortización (siempre: sin saldo nuevo, su 0 es el del estimado), el dólar sobre la deuda, el resultado por el tipo de cambio y la fila del leasing donde la deuda pone algo, la licuación del estado de resultados y la curva del patrimonio total.
+- **El cuadre se calcula:** patrimonio al final − al inicio − cada línea = 0, en las dos monedas. No es un residuo: si no da 0, es un bug.
+- **Capital aportado:** arranca en el patrimonio del día cero y suma lo que entró y salió (aportes, retiros, altas y cuotas), **cada flujo a su CCL del día**, como el puente, y no al tipo de cambio de la operación: así, patrimonio − capital aportado es exactamente lo ganado o perdido desde el día cero.
+
+### D-138 · Estado de resultados del período — P (provisoria, a confirmar)
+- **Qué es:** el "profit and loss" que pediste, sobre tu patrimonio total. Ingresos (el mensual y el extraordinario, aparte) − gastos fijos − gastos que cargaste − costo del leasing devengado = **ahorro del período**; + resultado de inversiones (realizado, no realizado y liquidez) + revaluación de bienes + licuación de la deuda = **variación explicada**; contra la variación real de tu patrimonio, la diferencia se llama **"no explicado"** (consumo que no cargaste, plata que entró o quedó afuera de tus cuentas, una deuda que todavía no se actualizó). Es una diferencia, nunca un cuadre.
+- **Ingresos y gastos fijos:** un mes con lo cargado ("Cargar ingreso", "Cargar gasto") usa lo cargado; un mes sin nada cargado usa lo que declaraste en Flujo, prorrateado por los días del período, con el chip "declarado". Lo extraordinario es solo lo cargado. Un ingreso cargado en dólares usa los pesos que recibiste (si los cargaste).
+  - **Revisión de la integración (15/10), como Flujo y Hoy:** lo cargado reemplaza a lo declarado **por moneda** en los ingresos (cargar los dólares no borra el ingreso en pesos declarado) y todo junto en los gastos. Un ingreso **declarado** en dólares pasa a pesos **al dólar cripto** de esa fecha, al que el dueño dijo que los vende (es un tipo de cambio observado en su carga, no un supuesto); sin el cripto, "sin dato". Antes iba al CCL y el mismo mes daba otro ingreso que en Flujo. Si no dijiste quién paga la cuota del leasing, la pagás vos (D-155); si la paga la empresa, su costo en tu resultado es $ 0 y lo dice.
+- **El leasing:** de cada cuota que vence en el período, solo lo que no es amortización: el interés implícito (chip "estimado"), el IVA y la percepción (crédito fiscal de la sociedad que toma el leasing: gasto tuyo mientras no te lo reintegre; sin declararlo, chip "a confirmar"; si declarás que te lo reintegra, no se suma), el seguro y los cargos extra. Sin el cuadro de marcha, el costo del leasing es "sin dato" y el ahorro, la suma parcial.
+- **Cuadro incompleto (revisión de los arreglos, 15/10):** si el período toca un mes del plazo cuya cuota no está en el cuadro (una planilla corta, un Deshacer), el costo del leasing es "sin dato" con su motivo, como en Flujo y Hoy; nunca $ 0. Con la cuota de la empresa y el cuadro importado, $ 0 con la nota "la cuota la paga la empresa".
+- **En dólares, el ingreso declarado va tal cual (pendiente de unificar):** Evolución suma los dólares como dólares y Flujo pasa todo el ingreso a pesos y lo divide por el CCL de la última carga. En pesos dan lo mismo; en dólares, el mismo mes puede diferir en dólares × (1 − cripto/CCL). Queda para la próxima entrega elegir una sola convención.
+- **Con un solo día:** el período es el mes en curso; lo patrimonial es "sin dato · necesita una segunda carga".
+
+### Pasivos
+### D-139 · Cada cuota es facturada o proyectada, con la fuente de cada monto; una proyectada nunca es un hecho — P (provisoria, a confirmar)
+- **Qué es:** `pasivo_cuotas.estado` dice si la cuota tiene comprobante de la leasera (`facturada`) o sale del cuadro de marcha sin factura todavía (`proyectada`). Cada monto lleva su fuente: `fuente_canon`, `fuente_seguro` y `fuente_otros` (la percepción), con `comprobante`, `contrato`, `a_confirmar`, `supuesto` o `no_aplica`.
+- **Reglas de la base:** una facturada tiene todo de comprobante (o n/a); una proyectada no tiene nada de comprobante; una pagada es facturada. `no_aplica` va solo con monto cero.
+- **Cómo se ve:** en el motor, una proyectada lleva `proyectado` y cada monto, `supuesto` o `a confirmar` según su fuente; las etiquetas se propagan a toda suma (lo que falta pagar, el costo total, la próxima cuota) y se ven como chip.
+- **Por qué:** el cuadro de marcha mezcla lo facturado con lo que todavía es una proyección del dueño (el seguro a confirmar, la percepción supuesta). Sin la marca, una proyección se leería como un hecho.
+
+### D-140 · `pagada` explícita: una cuota puede estar pagada sin fecha de pago (ajusta D-23) — P (provisoria, a confirmar)
+- **Qué pasa:** la planilla dice "pagado SI" pero no la fecha (débito automático). `fecha_pago` null ya no quiere decir impaga: lo dice `pagada`.
+- **Cómo se ve:** "pagada · fecha sin dato". Nunca se toma el vencimiento como fecha de pago.
+- **En dólares:** una cuota pagada va al CCL del día de su pago. Sin ese CCL, sin dato, y lo pagado en dólares es suma parcial. El CCL va siempre con su fuente, y con la fecha del pago (lo exige el check que ya tenía la tabla).
+- **Cómo se completa:** desde Datos › Leasing, "Completar el pago de una cuota": la fecha (opcional), el CCL de ese día con su fuente y quién la pagó. Recargar la planilla no lo pisa: `guardar_cuadro_marcha` deja como estaba lo que la entrada no dice del pago.
+
+### D-141 · Lector `cuadro-marcha-csv@1`; el CSV va entero en la lectura cruda de su carga manual — P (provisoria, a confirmar)
+- **El formato real:** `nro_cuota, fecha_vencimiento, mes_del_canon, canon_neto, seguro_neto, subtotal_neto, iva_21, percepcion_iva_rg3337, total_cuota, pagado, origen_seguro, origen_percepcion`, con coma, punto decimal y fechas ISO; la fila `OC` es la opción de compra. También lee punto y coma, números es-AR, BOM y CRLF, y encabezados con sinónimos.
+- **La fuente es por campo:** `origen_seguro` → `fuente_seguro`, `origen_percepcion` → `fuente_otros` (CONFIRMAR → a confirmar, SUPUESTO → supuesto, n/a → no aplica); el canon es comprobante si está pagada y contrato si no.
+- **Controles por fila** (frenan el Enter con fila y columna): subtotal = canon + seguro, total = subtotal + IVA + percepción, números 1..N sin huecos, vencimientos crecientes, una pagada tiene comprobante. Una percepción de $ 0 con comprobante es un cero real (esa factura no la tuvo): se acepta como advertencia, de a una.
+- **Cargos extra:** una fila que no es cuota ni OC es un cargo si dice qué es (multa, comisión, reserva de fondos, interés u otro, con su cuota: "multa 13"); si no se reconoce, error con fila y columna.
+- **Dónde queda el archivo:** en la lectura cruda de su carga (`origen manual`, nombre, sha256 y texto), sin bucket, como D-130. El servidor vuelve a leer el texto al guardar: nunca graba lo que armó el navegador.
+
+### D-142 · Se guarda lo facturado: seguro neto, IVA sobre canon y seguro; el IVA de la opción va a la alícuota observada — P (provisoria, a confirmar)
+- **Qué se guarda:** `seguro` = seguro neto (el comentario de la columna decía "bruto"; la tabla estaba vacía), `iva_canon` = el IVA facturado sobre canon y seguro, `otros_conceptos` = la percepción RG 3337. El total es canon + seguro + IVA + percepción, y cierra al centavo con la columna total de la planilla (la revisión lo controla).
+- **Descartado:** el mapeo derivado (IVA = canon × 21 %, seguro × 1,21): deriva montos y no cierra al centavo con la factura, y con el seguro bruto el IVA del seguro se contaba dos veces.
+- **La opción de compra:** su IVA es su neto por la alícuota observada en las cuotas facturadas (IVA ÷ subtotal), nunca una constante. Si las facturas no coinciden entre sí, sin dato.
+
+### D-143 · La tasa implícita del contrato se calcula del contrato y se muestra rotulada; no es la deuda — P (provisoria, a confirmar)
+- **Flujos:** − el monto financiado neto en la fecha de desembolso (la entrega del bien, `pasivos.fecha_desembolso`), + el canon neto de cada cuota en su vencimiento, + la opción de compra neta en su fecha. El IVA, el seguro y la percepción no entran: no son financiación.
+- **Cálculo:** TIR en Decimal (bisección para acercarse y Newton hasta que el VPN da menos de $ 0,01), en días/365; la TEA y su TEM, (1 + TEA)^(1/12) − 1. Contrastada con una implementación independiente en Python sobre casos inventados (`tests/referencia/tir_referencia.py`).
+- **Sin el monto financiado o sin la fecha de desembolso:** sin dato, "Completar el contrato" con lo que falta. Nunca se toma `fecha_inicio` en su lugar.
+- **El contrato real:** la tasa que dice el contrato del dueño se reproduce con financiado = valor del bien − canon inicial y desembolso = fecha de entrega. Esos datos los carga el lead en producción; el repo solo tiene casos inventados.
+- **No es la deuda:** lo que netea el patrimonio sigue siendo el valor de cancelación informado (D-130). De la tasa salen la deuda según el cuadro y la apertura de cada cuota, las dos `estimado` (D-152).
+
+### D-152 · De cada cuota, solo la amortización baja la deuda; la deuda "según cuadro de marcha" es el valor presente a la tasa del contrato — P (provisoria, a confirmar)
+- **Pedido del dueño (14/10):** "una parte del leasing todos los meses es IVA u otros cargos. Esas cosas no deberían ir al patrimonio y deben estar diferenciadas".
+- **La apertura:** cada cuota se abre en amortización, interés implícito, IVA, seguro, percepción RG 3337 y cargos. Interés de la cuota k = saldo × ((1 + TEA)^(días/365) − 1), al centavo; amortización = canon neto − interés; la opción paga el saldo que queda. Así, Σ amortizaciones + opción = monto financiado neto, al centavo (test).
+- **Qué es qué:** solo la amortización baja la deuda y cuenta para el patrimonio. El interés, el IVA, el seguro, la percepción y los cargos son gasto: van a Resultados y a Flujo. El IVA y la percepción son crédito fiscal de la sociedad que toma el leasing; para el dueño son gasto mientras no se los reintegre (`pasivos.reintegra_iva`, null = sin declarar, nunca se supone un reintegro).
+- **Rótulos:** la amortización y el interés salen de la tasa: llevan `estimado`.
+- **La deuda según el cuadro:** valor presente, a la TEA del contrato y a hoy, de los cánones netos impagos más la opción neta (sin IVA, seguro ni percepción: no son deuda). Lleva `estimado` y se muestra al lado de la informada y de la estimada aprobada, nunca en su lugar. Lo que falta pagar (nominal) va al lado y nunca se resta.
+
+### D-153 · Cuadro de marcha recargable y cargos extra en su propia tabla — P (provisoria, a confirmar)
+- **Recargable:** el dueño manda la planilla actualizada cada vez que paga. `guardar_cuadro_marcha` hace upsert por (pasivo, número de cuota): lo facturado pisa lo proyectado, y rechaza bajar una facturada a proyectada o una pagada a impaga ("corregila desde su fila"). Cada importación es una carga con su lote: idempotente, auditada y revertible con `revertir_lote`, que restaura desde la auditoría lo que pisó.
+- **La revisión:** antes del Enter dice cuántas cuotas son nuevas, cuántas se actualizan (y qué cambia en cada una) y cuántas quedan iguales.
+- **Cargos extra:** multas, comisiones, reservas de fondos e intereses van a `pasivo_cargos`, con fecha, concepto, importe en pesos (con IVA si lo lleva), su cuota y su fuente. Son gasto, nunca amortizan.
+- **Qué cuenta:** los cargos de la última planilla vigente de cada pasivo y los cargados a mano, sin anular. Uno puntual se anula (`anulado_en`), no se borra.
+- **Sin FK a cargas, a propósito:** `revertir_lote` se niega a revertir un lote con filas en una tabla que no sabe deshacer, y sumarle una tabla pide un DELETE (D-116). Un trigger controla que la carga exista, y el lector ignora los cargos de una carga revertida.
+- **Se revierte de lo más nuevo a lo más viejo (integración, 15/10):** una planilla o un pago posterior pisa las mismas cuotas y conserva lo del pago, así que revertir una carga anterior del mismo leasing dejaba el cuadro a medias. La app (`revertirLote`, antes de llamar a `revertir_lote`) se niega y dice cuál revertir primero, como `revertir_lote` con las cargas de una cuenta. Va en la app y no en la función porque cambiar `revertir_lote` pide aplicarla a mano (D-116).
+- **A qué cuota va un cargo (integración, 15/10; revisada el 15/10):** al de su número y, uno sin cuota (o con una que no está en el cuadro), a la primera que vence en el mes de su fecha o después: se debita con la cuota siguiente. Solo uno posterior a la última cuota no va a ninguna (cuenta en el costo total). La misma regla en Pasivos, Evolución y Flujo (`src/lib/domain/pasivos/cargos.ts`). Un cargo de la planilla que dice una cuota que el contrato no tiene es un error con su fila.
+
+### Flujo y escenarios
+### D-144 · Proyección determinística: un camino por escenario, sin Monte Carlo — P (provisoria, a confirmar)
+Detalla D-31 y la visión 4.15. Pantalla `/flujo`.
+- **Un escenario es un solo camino**, con todos sus supuestos a la vista. Monte Carlo y el abanico siguen en la fase 3; la pantalla lo dice.
+- **Corre en el navegador** (`proyectar()`, pura e isomórfica) sobre una base serializada que arma el servidor: la última carga real, lo declarado, las cuotas del leasing, los pagos de bonos y letras y lo cargado con "Cargar ingreso". **Siempre arranca de la última carga**, nunca de un supuesto viejo, y no se guarda nada proyectado.
+- **Las trazas se arman a pedido** (`trazaMes()` al tocar una cifra): el cálculo masivo no las arma. Meta: menos de 200 ms entre mover el deslizante y ver la proyección, con la CPU × 4 (e2e).
+- **Con un faltante no se inventa ningún mes:** la proyección dice qué variable falta. La casa y la camioneta sin elegir dejan sin dato solo el patrimonio neto. Sin el pago al vencimiento de una letra (sin TEM de hoy para la renovación) la proyección corre con la caja y deja sin dato el financiero, con el nombre de la letra: lo que falta frena solo lo que depende de eso (revisión del 15/10).
+- **Sin cuadro de marcha, la cuota no es $ 0:** mientras un leasing vigente no tenga ninguna cuota cargada, su cuota de cada mes del plazo (del mes de inicio al de inicio + cuotas totales, de más y nunca de menos) es sin dato en el mes en curso, el calendario y proyectado contra real, y la proyección lo pide como dato que falta, salvo que la cuota la pague la empresa (revisión del 15/10).
+- **Dos salidas más, determinísticas:** el mes en que la mediana de 12 meses del resultado sin aportes (en USD) alcanza la cuota, y "¿terminás debajo de lo que pusiste?" (financiero al horizonte contra lo aportado). "No cruza antes del horizonte" es un resultado válido. Con un mes sin dato en esos 12, la cobertura es sin dato con su motivo; con menos de 13 meses de horizonte no se mide (y se dice), y sin cuota que pagues vos no se muestra.
+- **El patrimonio neto completo proyectado** usa la deuda según el cuadro de marcha; mientras falte la apertura de la cuota (amortización), es sin dato con su motivo. La caja del mes no depende de eso: usa la cuota entera.
+
+### D-145 · "Completar lo que falta con Igual": un toque del dueño, nunca un default — P (provisoria, a confirmar)
+Detalla D-08 y D-88.
+- **Ninguna variable de mercado arranca elegida** (devaluación, inflación, brecha, retornos, TEM de renovación, casa, camioneta) y el horizonte tampoco. Baja o Sube sin número es "falta".
+- **El botón pone Igual solo en lo que no elegiste** y no toca nada más. El horizonte se elige con atajos (6, 12, 24 meses, fin del leasing) o con − y +.
+- **Cada variable dice qué es Igual** con los datos de tu última carga ("el CCL queda en el de tu última carga ($ 1.500,00)"), y el número elegido va también en el botón ("Sube +2,0%/mes").
+- **Ningún texto valora escenarios:** sin "mejor", "conviene" ni "deberías" (test).
+
+### D-146 · Letras y BONCAP: a vencimiento a su TEM implícita; lo que se reinvierte rinde la TEM de renovación — P (provisoria, a confirmar)
+Detalla el spec §7 ("TEM por bono") y ajusta D-88.
+- **Lo que ya tenés va a vencimiento** a la TEM implícita entre el valor de hoy y el pago de `flujos_bono`: al vencimiento vale exactamente el pago contractual (test al centavo). Con un solo camino y tenencia a vencimiento, mover esa TEM no cambia lo que cobrás: vuelve como variable con Monte Carlo.
+- **Lo que se reinvierte en letras después de un vencimiento** rinde la **TEM de renovación**, que sí es variable; su Igual es la TEM implícita de hoy de tus letras, ponderada por valor.
+- **Sin el pago al vencimiento, sin dato:** el calendario lo dice y ofrece "Cargar el pago al vencimiento" con su fuente (`guardar_flujos_bono`). Un pago único se guarda como devolución del VN más lo que capitalizó.
+- **Un bono con pago "a determinar"** (dual, CER, TAMAR) es su propia variable del escenario, sobre el precio de hoy.
+
+### D-147 · (Revisada) Ingresos y gastos se editan en Flujo; el cambio de feb-2027 es una variable por tramos — P (provisoria, a confirmar)
+Lo pidió el dueño el 14/10: "a eso lo dejes como una variable".
+- **El ingreso en dólares y en pesos va por tramos "desde el mes N".** Igual = lo declarado vigente en ese tramo; Baja y Sube lo mueven en %. El tramo de feb-2027 ya viene armado, sin elegir. Se pueden sumar y sacar tramos. El de pesos puede ajustarse por mes (0 a 15 %/mes, `ajuste_mensual`); sin tocarlo, es nominal.
+- **Cuando sepas el monto nuevo, se declara** con "Cambia desde…": cierra la fila vigente el día anterior y abre otra, en una transacción (`guardar_recurrente`). Desde ahí, el Igual de ese tramo es lo declarado.
+- **Un error se anula, no se borra** (`anulado_en`, D-116); lo que dejó de valer se termina ("Termina…").
+- **Una fila cuenta en un mes si está vigente el último día de ese mes;** un gasto no mensual cuenta en su primer mes y cada tantos meses.
+- Los ingresos y gastos se editan en Flujo, donde se usan; Datos no cambia.
+
+### D-148 · Los escenarios se archivan, no se borran; el último valor de cada deslizante queda recordado — P (provisoria, a confirmar)
+Detalla D-08.
+- **Un escenario guarda supuestos, nunca resultados:** cada vez se proyecta desde la última carga. Guardar, guardar como, duplicar, abrir, archivar y volver a la lista. No hay borrar.
+- **Mientras tanteás, los supuestos viven en la dirección** (`?s=`, base64url del JSON validado con zod): recargar no pierde nada y Atrás recorre lo probado. Una dirección de otra versión o fuera de rango no se lee a medias: se arranca de cero y se avisa.
+- **`valores_recordados`:** al guardar, el número de cada deslizante movido, por variable y dirección (`devaluacion.sube`). Al tocar Baja o Sube otra vez, arranca en ese número. No es un supuesto activo.
+- **Comparar:** hasta tres guardados, con trazo sólido, rayado y punteado (no solo color), tres cajas por escenario y solo los supuestos que difieren.
+- **Los meses de un escenario siguen en su mes del calendario (integración, 15/10):** "desde el mes N" y "hasta el mes N" se cuentan desde la carga con que se armó, y el escenario guarda ese mes (`base_mes`). Abierto con una carga de otro mes (guardado, en la dirección o en Evolución), `rebasar` los corre: el cambio de ingreso de feb-2027 sigue en feb-2027. Un tramo que ya empezó rige desde el mes 1; uno que ya terminó sale. Antes, cada carga de un mes nuevo corría un mes todos los cambios de un escenario guardado.
+- **El mes 0 lo rige el tramo vigente (revisión de los arreglos, 15/10):** el primer tramo de ingreso rige desde ahora; otro, desde su mes, también uno "desde el mes 1" (el mes que viene). Un escenario armado en octubre y abierto en enero sigue con el ingreso de antes en enero y cambia en febrero (antes, el mes de la carga ya tomaba el tramo siguiente). Lo mismo al revés: un tramo "hasta el mes N" que termina en el mes de la carga todavía rige ese mes ("este mes"), y "la empresa paga desde el mes 1" deja el mes de la carga al otro.
+
+### D-149 · Cargar ingreso / Cargar gasto: un hecho por evento, con su aporte, y proyectado contra real sin guardar proyecciones — P (provisoria, a confirmar)
+Lo pidió el dueño el 14/10 ("agregar un botón que sea 'cargar ingreso'", con concepto "ingreso mensual o ingreso extraordinario").
+- **`flujos_reales`, una fila por evento:** fecha, ingreso o gasto, concepto obligatorio (mensual o extraordinario), moneda, monto, cuenta (o afuera) y, si vendiste dólares al cripto, el cripto y los pesos recibidos (los dos o ninguno; los pesos tienen que cerrar con US$ × cripto dentro de la precisión tipeada, D-37).
+- **`guardar_flujo_real`, una transacción:** la carga manual (lote idempotente, mismo candado que las cargas), la fila y, si la plata entró a una cuenta seguida, el **aporte** en `movimientos_capital` (con la moneda y el monto de origen y el cripto como tipo de cambio); si salió de una, el **retiro**. Así la carga siguiente no lee ese ingreso como ganancia ni ese gasto como pérdida.
+- **Aviso de doble carga:** si el mismo día ya hay en Datos › Movimientos un aporte (o un retiro) igual en la misma cuenta, el formulario lo avisa antes de guardar; no frena, porque puede ser otro movimiento.
+- **Deshacer = revertir el lote,** con las reglas de Registro: se va el aporte, la carga queda revertida y la fila deja de leerse. `flujos_reales.carga_id` no lleva clave foránea a `cargas` (con ella, `revertir_lote` rechazaba el lote, y sumarla a su lista pide un borrado, D-116); la integridad la cuida un trigger. **Anular** es para lo que fue afuera.
+- **Proyectado contra real:** cada mes nace proyectado con lo declarado vigente ese mes, las cuotas y los vencimientos, y se vuelve real con lo cargado (ingresos, cuotas pagadas, cargas), con el desvío por línea. Los gastos reales son sin dato salvo los cargados. **Lo extraordinario va aparte** y no cambia la proyección recurrente. No se guarda ninguna proyección.
+
+### D-155 · La regla de reinversión que declaró el dueño arranca precargada y rotulada — P (provisoria, a confirmar)
+Lo pidió el dueño el 14/10: "cada vez que entra guita se reparte en partes proporcionales a la última carga de la cartera todo el ingreso disponible (luego de restar gastos fijos y cuota de leasing)".
+- **Cada mes proyectado:** excedente invertible = ingresos (US$ × cripto del escenario + pesos) − gastos fijos − la **cuota entera** del leasing de ese mes (lo que se debita). El 100% se invierte repartido según el peso de cada posición en la **última carga** (su participación en el patrimonio financiero; con la liquidez, por la lectura literal de "la última carga", y se puede sacar).
+- **Un excedente negativo sale de tus pesos** y el mes lo dice; si no alcanzan, "no se cubre" con lo que falta.
+- **Lo que vence** (letras, bonos) se reinvierte con la misma regla, salvo que el escenario diga otra clase.
+- **Es su política, no una recomendación:** va rotulada "tu regla · 14/10", es lo único precargado (junto con "la cuota la pagás vos", que también dijo el 14/10) y se puede cambiar (otro %, todo a una clase). Cambiada, dice "elegida por vos" y ofrece volver a la del 14/10.
+- **El reintegro del IVA y la percepción** entra como ingreso solo si está declarado en Pasivos o elegido en el escenario. Sin eso, la salida de caja es la cuota entera y no se cuenta ningún reintegro; la pantalla lo dice. Declarado en Pasivos, suma también al excedente del mes en curso (Hoy, "Este mes" y el calendario), como en la proyección (integración, 15/10).
+
+### Lead
+
+### D-150 · Se adelantan piezas de las fases 1b, 2 y 3 porque las pidió el dueño — P (provisoria, a confirmar)
+- **Qué:** el balance, el resultado del período, el cuadro de marcha del leasing y el flujo proyectado con escenarios estaban repartidos entre la 1b y la fase 3 (spec §9). El dueño los pidió el 14/10, y llegan juntos en esta entrega.
+- **Qué queda afuera, y lo dice cada pantalla:**
+  - Monte Carlo y el abanico (D-31): la proyección es determinística, un camino por escenario (D-144);
+  - el cierre mensual por diferencia de saldos (D-79);
+  - el calendario con alertas (visión 4.13);
+  - las recomendaciones, que no van en ninguna fase (D-07).
+- **El costo, a la vista (como pide D-99):** cuatro pantallas nuevas sobre una sola fecha de carga. Hasta la segunda carga, Evolución no tiene período, y el Flujo proyecta desde un único punto de partida.
+
+### D-151 · La barra inferior del teléfono: Hoy · Balance · Cargar · Evolución · Más — P (provisoria, a confirmar)
+- **Qué:** Balance toma el segundo lugar, que era de Cartera (visión §3.2), y Evolución toma el cuarto, que era de Exposición. Cartera, Exposición, Pasivos y Flujo quedan en Más. En la barra lateral, Balance y Evolución y PnL van en el grupo Patrimonio, y el grupo nuevo **Contexto** tiene Pasivos y Flujo y escenarios.
+- **Por qué:** el dueño preguntó "¿dónde está mi balance?". Mientras haya poca historia, Evolución muestra el día cero y la sensibilidad al CCL, no una pantalla vacía (D-136).
+- **Falta:** que el dueño confirme el orden, o elija Flujo en lugar de Evolución para el cuarto lugar.
+
 ## Propuestas que la 1a implementa en forma provisoria
 
 Estas propuestas de `docs/investigacion-mercado.md` (D-35 a D-53) y de `docs/vision.md` §6 (D-54 a D-103) siguen esperando tu aprobación. La 1a ya las usa porque el código las necesitaba. Estado de todas: **P (provisoria, a confirmar)**. Si rechazás una, se cambia el código y se anota acá.
@@ -481,7 +676,7 @@ Estas propuestas de `docs/investigacion-mercado.md` (D-35 a D-53) y de `docs/vis
 | D-38 | B2, los Subtotales de IEB y el total de Galicia son controles | Se calculan en cada lectura y la bandeja los muestra: ✓, ≠ o no verificable | Guardarlos y volver a evaluarlos cuando cambia un hecho anterior |
 | D-46 | FIMA es un FCI: cuotapartes × valor de cuotaparte | La captura lee cuotapartes y valor de cuotaparte (precio cada 1.000 si así cierra) y sugiere el tipo `fci` | Validarlo con una captura real |
 | D-47 | Filas diferidas: lo pendiente no se graba ni cuenta como venta | Ver D-106. Una tenencia que la fuente ya no lista y queda pendiente vale "sin dato" (D-117), y una carga con algo pendiente deja su cuenta en ≠ "parcial" (D-118) | Pendientes como pantalla (1b); en la 1a viven en Atención |
-| D-53 | Jerarquía de Hoy | Arriba, el estado de los datos; Atención a la derecha desde 1280 px y en un renglón en el teléfono; "Excedente: sin dato · llega con Flujo (fase 2)" | La línea de veredicto (fase 4) |
+| D-53 | Jerarquía de Hoy | Arriba, el estado de los datos; Atención a la derecha desde 1280 px y en un renglón en el teléfono (con la cuota del leasing que vence y lo que vence de tus bonos y letras); el excedente del mes, con Cargar ingreso y Cargar gasto (entrega 4) | La línea de veredicto (fase 4) |
 | D-54 | Clave `sb_secret_…` de Supabase | La app lee `SUPABASE_SECRET_KEY`, y `SUPABASE_SERVICE_ROLE_KEY` como alternativa | — |
 | D-57 | `proxy` de Next 16 y sesión verificada en cada acción | Ver D-112. Dependencias en versiones exactas | Lint y CI |
 | D-61 | La fecha de los datos la da la fuente | La carga toma la fecha del B1 del Excel; sin Excel, la que muestra una captura; sin ninguna, hoy en Córdoba. Si una fuente es de otro día, la bandeja avisa. La fecha se puede cambiar a mano | — |
