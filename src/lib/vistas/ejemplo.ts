@@ -291,6 +291,17 @@ export function ejemploHoyVariante(v: VarianteDemo): VistaHoy {
   return armarHoy(hechosEjemplo(), '2026-10-21')
 }
 
+/**
+ * Los hechos y el "hoy" de cada variante del demo (sin variante, el set
+ * base): Hoy los usa para lo que arma aparte de su vista (la serie de 12 meses).
+ */
+export function hechosDeVariante(v: VarianteDemo | null): { hechos: Hechos; hoy: Fecha } {
+  if (v === 'vacio') return { hechos: hechosVacios(), hoy: HOY_EJEMPLO }
+  if (v === 'express') return { hechos: hechosExpress(), hoy: '2026-10-16' }
+  if (v === 'viejo') return { hechos: hechosEjemplo(), hoy: '2026-10-21' }
+  return { hechos: hechosEjemplo(), hoy: HOY_EJEMPLO }
+}
+
 export function ejemploCarteraVariante(v: VarianteDemo): VistaCartera {
   if (v === 'vacio') return armarCartera(hechosVacios(), HOY_EJEMPLO)
   if (v === 'express') return armarCartera(hechosExpress(), '2026-10-16')

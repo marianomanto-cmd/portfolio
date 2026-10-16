@@ -86,7 +86,7 @@ Una cifra que no es un dato verificado lleva un chip gris chico, con una palabra
 
 | Etiqueta | Qué quiere decir | Ejemplo |
 |---|---|---|
-| **parcial** | Es un total y le faltan partes. El valor es "sin dato" y la suma parcial va abajo | El total de "Res. USD" de Posiciones cuando una posición no tiene CCL de compra |
+| **parcial** | Es un total y le faltan partes. El valor es "sin dato" y la suma parcial va abajo | El total de "Result. USD" de Posiciones cuando una posición no tiene CCL de compra |
 | **pendiente** | Falta un dato que llega después | El costo de una compra del día, que IEB muestra con PPP `-` hasta el día siguiente |
 | **viejo** | El dato tiene más de 2 días hábiles. Los feriados y los días sin rueda en BYMA no cuentan; un día con rueda aunque los bancos cierren (el Día del Bancario, un no laborable con fines turísticos) sí cuenta (D-129) | Un precio que no se actualiza porque no cargaste esa cuenta; el CCL de hace tres días hábiles (D-16, D-109) |
 | **inferido** | Se calculó a partir de otro dato; no se leyó tal cual | El precio de una compra deducido del cambio de PPP; una compra pendiente valuada al precio del día (D-110) |
@@ -138,7 +138,52 @@ El resultado de cada control (el Excel contra B2 y sus Subtotales, la captura de
 
 **Para qué:** saber en diez segundos cuánto tenés y qué pasó.
 
-**La frase del día.** Siempre dice desde cuándo mide. Ejemplo:
+Se lee de arriba abajo, como toda pantalla (D-157): la pregunta, la respuesta, las cifras, los gráficos y, al final, el detalle. En la compu son cuatro filas (D-160).
+
+**Arriba: la pregunta y la lectura.** "Jueves 15 de octubre · ¿Cómo estoy hoy?" y, en letra grande, la respuesta: qué le pasó a lo invertible (tu patrimonio financiero) desde la carga anterior, en pesos y en dólares, y de dónde vino. Por ejemplo:
+
+> Ayer sumaste $ 590.125, pero perdiste US$ 340: subió el *dólar*.
+
+> Ayer sumaste $ 900.000 y US$ 600. Dos tercios vinieron del *dólar*, no de tus activos.
+
+- Arranca diciendo desde cuándo mide: "Hoy", "Ayer", "El mié 14/10" o, si volviste después de unos días, "Desde el vie 09/10".
+- Cada cifra se toca y muestra su cálculo. Son las mismas que la frase del día, redondeadas igual.
+- Si a la variación le falta una partida, no da cifras: "no se puede saber cuánto cambió lo invertible: falta SPY".
+- Después de una carga express, o de una carga sin CCL, dice que el cambio queda **sin atribuir** hasta tu próxima carga completa.
+- Con una sola carga: "Primera carga guardada. Mañana vas a ver qué cambió y por qué."
+
+**El patrimonio neto**, a la derecha: el total (D-03), en pesos y en dólares, cada uno con su variación desde la carga anterior (el monto y el %). Debajo, de qué está hecho: **Financiero** (lo invertible: tus posiciones de IEB y Galicia y la liquidez de las tres cuentas), **Bienes** (la casa y la camioneta, a su última valuación) y **Pasivos** (la deuda del leasing, en sangría). Financiero + Bienes + Pasivos = patrimonio neto.
+- La camioneta cuenta "sujeta a opción de compra" del leasing.
+- Mientras no cargues tus bienes o el leasing (Datos), el patrimonio neto y su variación son "sin dato", con la suma de lo que sí cargaste a la vista (D-65, D-126).
+- La deuda del leasing es una sola en toda la app: el valor de cancelación que informe la leasera o, sin él, la **según el cuadro de marcha** (baja con cada cuota que pagás) o, sin el cuadro, el estimado que aprobaste (D-131). Las dos últimas son estimados: el total lleva el chip "estimado", y su traza dice cómo se calculó (D-154).
+
+**Segunda fila, tres tarjetas:**
+- **Variación del día · de dónde vino.** La barra de lo que cambió lo invertible, partida en lo que pusieron **tus activos** (tinta; en sangría si restaron) y lo que puso **el CCL** (oro), y cuánto se movió el CCL entre las dos cargas ("Del CCL (+1,08%)"). Cada parte, en pesos y en dólares, se toca. Si quedó algo **sin atribuir**, es un tercer tramo.
+- **Exposición neta al peso** (D-101). Tus activos financieros que arriesgan pesos, menos lo que debés del leasing: "$ 32.783.100 · US$ 21.175 · pesos financieros − deuda del leasing ($ 54,2 M − $ 21,4 M)". La barra tiene el cero en el medio: si estás **corto** (debés más pesos de los que tenés) va a la izquierda, en sangría; si estás **largo**, a la derecha. Debajo, "Si el CCL sube 1%, perdés US$ 210": es una sensibilidad, no un pronóstico. **Largo** quiere decir que tenés más pesos que deuda en pesos: si el dólar sube, perdés en dólares. La casa y la camioneta no entran: les falta la moneda de riesgo, que se elige desde la 1b (D-73). La deuda es la que cuenta en toda la app (D-131); sin ninguna, es "sin dato", nunca $0, y el neto queda "sin dato" (D-126). "Ver exposición →" lleva a la pantalla.
+- **Excedente invertible · octubre.** Tus ingresos declarados (los dólares, al cripto de tu última carga) − los gastos fijos − la cuota del leasing que pagás vos (+ el reintegro del IVA y la percepción, si declaraste en Pasivos que la empresa te lo reintegra), en pesos y en dólares, con su traza y su chip. Es la misma cifra que arriba de Flujo. La barra muestra los gastos fijos, la cuota (sangría) y lo que sobra (verde); si gastos y cuota pasan a los ingresos, lo dice. Abajo dice qué es real y qué sigue proyectado ("Proyectado; el real se cierra a fin de mes."). Si falta algo (el cripto, el cuadro de marcha), dice "sin dato" y qué falta. "Ver flujo →" lleva a Flujo y escenarios.
+
+**Tercera fila:**
+- **Patrimonio neto · 12 meses.** Dos gráficos chicos con las mismas fechas: en dólares (oro) arriba y en pesos abajo. Hay un punto por carga: entre dos cargas no se inventa nada, y un día sin dato es un hueco. A la izquierda, cuánto cambió cada uno en el período; abajo, por qué difieren: "En pesos tu patrimonio neto subió 3,0%; en dólares, bajó 0,4%. La diferencia es el CCL, que pasó de 1.497,30 a 1.548,20." El cambio incluye lo que pusiste o sacaste: no es un resultado (eso está en Evolución y PnL, "Ver resultados"). Mientras no tengas 12 meses de historia, el rótulo dice desde cuándo hay ("desde el jue 01/10"). "Ver como tabla" muestra los números. Sin bienes o sin leasing cargados no hay patrimonio neto: dice qué falta.
+- **Próximos 30 días.** Lo que pasa con fecha, en orden, cada uno con su día:
+  - "Todavía no cargaste hoy", un día hábil sin carga después del cierre de BYMA (17 h). A la mañana no aparece: los datos de hoy todavía no existen (D-127);
+  - las **cuotas del leasing** ("Cuota 14 del leasing · La pagás vos · $ 1.339.200 · US$ 865"). Una cuota que ya venció y tu planilla no marca pagada va en sangría;
+  - lo que **cobrás de tus bonos y letras** ("Vence S13N6 · En 29 días · cobrás $ 12.702.900 · US$ 8.205"). A menos de 15 días, en sangría;
+  - el **cierre del mes**: "Cargá el flujo real: ingreso · gasto", que abren Cargar ingreso y Cargar gasto (sección 4.11).
+
+  Los montos en dólares van al CCL de tu última carga. Debajo va Atención.
+
+**Atención.** Lo que le falta a tus datos, con un botón: la **cuota del leasing** que vence en los próximos 10 días o que ya venció (con "Ver el cuadro de marcha"), lo que **vence de tus bonos y letras** ("Vence S13N6 el vie 13/11", con "Ver el flujo"), "Falta el CCL", el CCL que se está arrastrando de otro día, "SPY: dato viejo", "Pesos en Mercado Pago: dato viejo", "SPY: IEB ya no la lista" (gravedad alta: registrá la venta o el vencimiento en Cargar, D-117), "IEB: la carga del mar 06/10 quedó parcial" (algo quedó pendiente; se resuelve en tu próxima carga de esa cuenta, D-118), "Casa: sin valuación", "Leasing: sin capital pendiente", "T30J7: compra con precio pendiente", "YPFD: declarar CCL de compra". Va de lo más grave a lo más leve, todo junto: una cuota vencida o que vence esta semana nunca queda plegada detrás de pendientes leves. En la compu va debajo de Próximos 30 días, plegada ("Atención · 3 pendientes de datos ▸"), salvo que haya algo grave; en el teléfono, en un renglón que se despliega. Lo que ya está en Próximos 30 días no se repite. Si no hay nada: "Tus datos están completos. Nada que revisar."
+
+**Cuarta fila: Qué tenés y qué debés.** Tres barras a la misma escala, la del activo total:
+- **Activos:** un tramo por activo, en su color (el mismo que en todos los gráficos), con el ticker adentro si entra; la liquidez junta y, al final, la casa y la camioneta;
+- **Pasivos:** el leasing, en sangría;
+- **Neto:** un rectángulo punteado.
+
+A la derecha, cada total en pesos y en dólares. "Ver posiciones →" lleva a Posiciones.
+
+**Abajo, el detalle: "Qué pasó desde la última carga".**
+
+**La frase del día**, completa. Siempre dice desde cuándo mide. Ejemplo:
 
 > Desde la carga del mar 13/10: +$590.125 en pesos (+0,57%), pero −US$ 340 en dólares (−0,50%). En pesos, el CCL sumó $532.812 y tus activos sumaron $57.313. En dólares, tus activos sumaron US$ 37 y la suba del CCL le restó US$ 377 a tus pesos.
 
@@ -152,29 +197,20 @@ El resultado de cada control (el Excel contra B2 y sus Subtotales, la captura de
 - Si la carga **no tiene CCL**: "Esta carga no tiene CCL: los dólares usan el del mar 13/10 y no hay con qué separar activo de tipo de cambio…" (D-109).
 - Si a una partida le falta un dato (por ejemplo, una tenencia que la fuente ya no lista), la variación es "sin dato" y la frase dice cuál falta y por qué, en vez de repartir cifras que no existen: "Desde la carga del lun 05/10: sin dato en pesos y sin dato en dólares. Falta SPY: IEB ya no la lista desde el mar 06/10…" (D-117). Cada "sin dato" se toca y muestra la suma parcial.
 - En el teléfono, la frase es texto corrido. **"Ver la frase completa y cada cifra"** abre una hoja con cada número en su renglón, para tocarlo; en una carga express, también cada cifra de la segunda oración (por ejemplo, "De SPY"). La frase se recorta solo con el dedo: con mouse, aunque la ventana sea angosta, se lee entera.
-
-**Las dos tarjetas** (D-03):
-- **Patrimonio financiero**: lo invertible. Tus posiciones de IEB y Galicia y la liquidez de las tres cuentas. Sobre esto se miden Posiciones, la concentración y los resultados. Debajo, su variación y su desglose: activos, CCL y, si hay, sin atribuir. Las tres partes suman la variación.
-- **Patrimonio total**: el financiero, más la casa, más tu parte de la camioneta (su valuación menos la deuda del leasing), "sujeta a opción de compra". Dice la fecha de cada valuación. Mientras no cargues tus bienes o el leasing (Datos), el patrimonio total y su variación son "sin dato", con la suma de lo que sí cargaste a la vista (D-65, D-126). La deuda del leasing es una sola en toda la app: el valor de cancelación que informe la leasera o, sin él, la **según el cuadro de marcha** (baja con cada cuota que pagás) o, sin el cuadro, el estimado que aprobaste (D-131). Las dos últimas son estimados: el total lleva el chip "estimado", y su traza dice cómo se calculó (D-154).
-- En la compu, debajo de cada tarjeta, un enlace: **"Ver la evolución y el PnL"** (financiero) y **"Ver el balance"** (total).
-
-**Pesos financieros − deuda del leasing** (D-101). Tus activos financieros que arriesgan pesos, menos lo que debés del leasing: "largo $32.783.100 ($54,18 M − $21,40 M) · US$ 21.175 · si el CCL sube 1%, pierde US$ 210". **Largo** quiere decir que tenés más pesos que deuda en pesos: si el dólar sube, perdés en dólares. El "+1%" es una sensibilidad, no un pronóstico. La casa y la camioneta no entran: les falta la moneda de riesgo, que se elige desde la 1b (D-73). La deuda es la que cuenta en toda la app (D-131): la informada por la leasera; sin ella, la según el cuadro de marcha; sin cuadro o sin la tasa del contrato, tu estimado. Sin ninguna de las tres, la deuda es "sin dato", nunca $0, y el neto queda "sin dato", con lo que da sin la deuda (D-126).
-
-**Atención.** Lo que le falta a tus datos, con un botón: la **cuota del leasing** que vence en los próximos 10 días o que ya venció (con "Ver el cuadro de marcha"), lo que **vence de tus bonos y letras** ("Vence S13N6 el vie 13/11", con "Ver el flujo"), "Falta el CCL", el CCL que se está arrastrando de otro día, "SPY: dato viejo", "Pesos en Mercado Pago: dato viejo", "SPY: IEB ya no la lista" (gravedad alta: registrá la venta o el vencimiento en Cargar, D-117), "IEB: la carga del mar 06/10 quedó parcial" (algo quedó pendiente; se resuelve en tu próxima carga de esa cuenta, D-118), "Casa: sin valuación", "Leasing: sin capital pendiente", "T30J7: compra con precio pendiente", "YPFD: declarar CCL de compra". Va de lo más grave a lo más leve, todo junto: una cuota vencida o que vence esta semana nunca queda plegada detrás de pendientes leves. En la compu va en una columna a la derecha desde 1280 px; en el teléfono, en un renglón que se despliega. Si no hay nada: "Tus datos están completos. Nada que revisar."
-
-**Lo demás:**
-- **"Todavía no cargaste hoy · Cargar"**, un día hábil sin carga, después del cierre de BYMA (17 h). A la mañana, antes del cierre, no aparece: los datos de hoy todavía no existen (D-127).
-- **Un día de datos sin CCL** lo avisa arriba: "El mié 14/10 no tiene CCL: los dólares usan el CCL del mar 13/10 y el cambio del día queda sin atribuir" (D-109).
-- **"Quién movió tu financiero"**: cada posición con su aporte a la variación. Una sin precio nuevo dice "sin precio nuevo", nunca 0. Cada aporte se toca y muestra su cuenta: valores, CCL y flujos del día.
+- **"Quién movió tu financiero"** (plegado): cada posición con su aporte a la variación. Una sin precio nuevo dice "sin precio nuevo", nunca 0. Cada aporte se toca y muestra su cuenta: valores, CCL y flujos del día.
 - **El cuadre:** el patrimonio de hoy recalculado desde los hechos, contra el de la carga anterior más cada parte de la frase (D-66). La línea dice por cuánto, en pesos y en dólares, y cada cifra se toca para ver su cálculo:
   - **✓** "cierra (diferencia $ 0,00 · US$ 0,00)";
   - **≠** "no cierra por +$ X · +US$ Y", y abajo "Si no tiene explicación, es un bug: revisalo";
   - **○** no se puede verificar porque falta un dato del financiero, y dice cuál.
 
   La plata de una operación en una cuenta sin saldo cargado en esa moneda (Galicia no carga saldos; o un dividendo en dólares de IEB, si nunca cargaste su saldo en dólares) cuenta como plata que entró o salió de la app: el cuadre cierra y la nombra ("Cuenta como plata que entró o salió de la app: compra de … en Galicia, $ … (Galicia no tiene saldo en pesos cargado)", D-125).
-- **El excedente del mes** ("Excedente de octubre"): tus ingresos declarados (los dólares, al cripto de tu última carga) − los gastos fijos − la cuota del leasing que pagás vos (+ el reintegro del IVA y la percepción, si declaraste en Pasivos que la empresa te lo reintegra), en pesos y en dólares, con su traza y su chip. Es la misma cifra que arriba de Flujo. Si falta algo (el cripto, el cuadro de marcha), dice "sin dato" y qué falta. Debajo, **"Ver el flujo y los escenarios"**, y los botones **Cargar ingreso** y **Cargar gasto** (sección 4.11).
+
+**En el teléfono.** Arriba del pliegue entran la lectura, el patrimonio neto y el financiero (una tarjeta de cuatro renglones, cada monto con su variación %), la exposición en un renglón ("Pesos fin. − leasing · largo $ 32,8 M · US$ 21.175"), Atención en un renglón que se despliega y "Todavía no cargaste hoy · Cargar". Después, las tarjetas, una debajo de otra.
+
+**Lo demás:**
+- **Un día de datos sin CCL** lo avisa arriba: "El mié 14/10 no tiene CCL: los dólares usan el CCL del mar 13/10 y el cambio del día queda sin atribuir" (D-109).
 - **En diciembre**, un aviso: "La carga del último día hábil del año es tu foto al 31/12: la vas a necesitar para Bienes Personales" (D-76). Ese día hacé la carga completa.
-- **Sin datos todavía**, Hoy muestra el **Día cero**, en el orden de la sección 5: primero Datos › Leasing y Bienes (el catálogo es opcional) y después la primera carga. El botón principal lleva a Datos › Leasing; el segundo, a Cargar (D-128). Después de la primera carga dice "Primera carga guardada. Mañana vas a ver qué cambió y por qué."
+- **Sin datos todavía**, Hoy muestra el **Día cero**, en el orden de la sección 5: primero Datos › Leasing y Bienes (el catálogo es opcional) y después la primera carga. El botón principal lleva a Datos › Leasing; el segundo, a Cargar (D-128).
 
 ### 4.2 Cargar
 
@@ -227,36 +263,51 @@ Lo que podés encontrar en la bandeja:
 
 **Para qué:** cada posición en pesos y en dólares, con su desglose.
 
-**En la compu**, una tabla de 13 columnas. En el orden en que entran según el ancho: Activo, Res. USD, Res. ARS, % fin., Precio, Activo / TC en US$, Activo / TC en $, PPC USD, PPC ARS, Cant., Días, Valor $ y Valor US$. Las que no entran van al **detalle de la fila** (el chevron ›). A 1280 px con la barra lateral abierta entran 7; a 1600 px, 10 (hasta Cant.), y 11 con la barra colapsada. Todas entran desde unos 1910 px (1730 px con la barra colapsada).
+**Arriba**, la pregunta ("Patrimonio · ¿Qué tengo y cómo le va a cada cosa?") y la respuesta: cuántas posiciones tenés y cuál explica más de lo que ganaste, o perdiste, en pesos.
+
+> Seis posiciones. SPY explica casi *tres cuartos* de lo que ganaste en pesos.
+
+Si una sola ganó más que todo junto, lo dice ("el resto restó"); si al resultado le falta una fila, dice cuál.
+
+**Cuatro cifras clave** (D-161):
+- **Valor de la cartera**, en pesos y en dólares;
+- **Resultado total**, desde la compra. Si al de dólares le faltan filas, dice "sin dato" y debajo la suma parcial: "En dólares, suma parcial (3 de 6): +US$ 1.630" (D-65);
+- **Mejor**: la posición con más resultado en pesos (%), con su % en dólares;
+- **Peor en dólares**: la de menos resultado en dólares (%), con su % en pesos.
+
+**En la compu, una tabla** (la grilla común, D-157) con las columnas en este orden: Activo, Cantidad, PPC ARS, PPC USD, Precio, Valor, Result. ARS, Result. USD, Activo · TC, % cartera y Días. A 1440 px entran todas. Si no entran, las menos importantes se esconden (primero Días, después Cantidad, PPC ARS, PPC USD y Precio) y cada fila suma un botón **"⋯"** con lo que no se ve: a 1280 px con la barra lateral abierta van ahí Cantidad, PPC ARS y Días. Nunca hay scroll hacia el costado. Con el dedo (una tablet), las filas son más altas: cada cifra se toca sin pisar la de al lado.
 
 | Columna | Qué es |
 |---|---|
-| **Cant.** | Lo que tenés, derivado de tus operaciones (apertura, compras, ventas) |
+| **Activo** | El ticker, con el color del activo (el mismo en todos los gráficos) y, debajo, el nombre y la cuenta. Si el precio es viejo (más de 2 días hábiles, D-16), debajo dice "precio de hace 7 días" y el precio va en gris |
+| **Cantidad** | Lo que tenés, derivado de tus operaciones (apertura, compras, ventas) |
 | **PPC ARS** | Precio promedio de compra en pesos, por unidad (o por 1 VN en bonos y letras) |
 | **PPC USD** | Lo mismo en dólares: cada compra pasada a dólares con el CCL de su día. En una posición que ya tenías antes de la primera carga, "sin dato", porque no se conoce el CCL de la compra original (D-14) |
-| **Precio** | El último precio cargado, por unidad o por 1 VN. Si es viejo, la fila va en gris con su chip |
-| **Res. ARS / Res. USD** | Resultado desde la compra, en $ y en %: lo que vale hoy menos lo que costó, en cada moneda |
-| **Activo / TC en $** y **en US$** | El resultado partido en lo que hizo el activo y lo que hizo el tipo de cambio |
-| **% fin.** | Su peso en tu patrimonio financiero |
-| **Días** | Días en posición: desde la primera compra registrada o desde la fecha de compra declarada. En una posición que ya tenías antes de la primera carga y sin fecha declarada, se cuentan desde la apertura en la app, y lo dice. La cifra se toca y muestra la cuenta ("jue 15/10 − jue 01/10 = 14 días desde la apertura en la app"), y lleva el chip "desde apertura" o "declarado" |
-| **Valor $** y **Valor US$** | Lo que vale la posición hoy, en cada moneda |
+| **Precio** | El último precio cargado, por unidad o por 1 VN |
+| **Valor** | Lo que vale la posición hoy: en pesos y, debajo, en dólares |
+| **Result. ARS / Result. USD** | Resultado desde la compra, con su signo (verde si ganás, sangría si perdés) y, debajo, el %: lo que vale hoy menos lo que costó, en cada moneda |
+| **Activo · TC** | Una barra: el resultado en pesos partido en lo que hizo el activo (tinta, o sangría si restó) y lo que hizo el tipo de cambio (oro). Se toca y muestra las dos partes en pesos y en dólares |
+| **% cartera** | Su peso en tu patrimonio financiero, con una barrita en el color del activo (la más grande llena la caja) |
+| **Días** | Días en posición: desde la primera compra registrada o desde la fecha de compra declarada («decl.»). En una posición que ya tenías antes de la primera carga y sin fecha declarada, se cuentan desde la apertura en la app («ap.»). La cifra se toca y muestra la cuenta ("jue 15/10 − jue 01/10 = 14 días desde la apertura en la app") |
 
 **Cómo leer el desglose.** La moneda de riesgo decide dónde aparece el efecto del CCL:
-- **Un CEDEAR** arriesga dólares. En pesos, su resultado tiene una parte de activo y otra de CCL: "De tus +$ 6,2 M en pesos, +$ 3,4 M fueron el CCL" (los montos compactos llevan su signo). En dólares, todo es activo.
-- **Una LECAP o un bono en pesos** arriesgan pesos. En dólares, su resultado tiene una parte de activo y otra de CCL; por ejemplo, S13N6: +US$ 326,16 de activo y −US$ 247,94 de CCL = +US$ 78,22. En pesos, todo es activo.
+- **Un CEDEAR** arriesga dólares. En pesos, su resultado tiene una parte de activo y otra de CCL: la barra **Activo · TC** las muestra (tinta el activo, oro el tipo de cambio), y en el teléfono lo dice la tarjeta: "De tus +$ 6,2 M en pesos, +$ 3,5 M fueron el CCL" (los montos compactos llevan su signo). En dólares, todo es activo.
+- **Una LECAP o un bono en pesos** arriesgan pesos. En dólares, su resultado tiene una parte de activo y otra de CCL; por ejemplo, S13N6: +US$ 326,16 de activo y −US$ 247,94 de CCL = +US$ 78,22. En pesos, todo es activo: su barra es toda tinta, y el desglose en dólares está en la traza de la barra.
 - El desglose desde la compra es la **suma de los mismos intervalos** que usa Hoy, así que Posiciones y Hoy dan el mismo reparto (D-35). Lo anterior a tu primera carga es un solo tramo por compra, con el CCL de compra. Si la última carga no trajo precio o CCL nuevo para esa posición, el desglose muestra también lo que queda **sin atribuir**. La traza lista cada tramo.
 - El desglose es el de **lo que tenés hoy**: después de una venta parcial, lo acumulado se reparte en la proporción que queda (como el costo), y los cupones y dividendos no entran (D-114). Lo que ves suma el resultado de la fila (D-35).
 - Si el resultado es "sin dato" (una compra con precio pendiente, o una tenencia que la fuente ya no lista), el desglose también, con el mismo motivo (D-126). Una tenencia que la fuente ya no lista dice "IEB ya no la lista desde el …: registrá la venta o el vencimiento en Cargar" (D-117). En una apertura sin CCL de compra, ese CCL se declara desde la 1b (Pendientes).
 
 **Cupones, dividendos y amortizaciones** (D-114). Una amortización te devuelve capital: baja el costo de la posición en lo que cobraste, así que no aparece como pérdida. Un cupón o un dividendo no toca el costo: se ve en la frase del día en que lo cobrás (pasa del título a tu saldo). El resultado de cada fila es el del título, sin los cupones cobrados.
 
-**Totales** fijos abajo. Si a una columna le falta una fila, el total es "sin dato" con la suma parcial (D-65). Pasa todos los días con las posiciones sin CCL de compra.
+**Totales** fijos abajo, de lo que está a la vista: con un filtro, dice "Total · lo filtrado". Si a una columna le falta una fila, el total es "sin dato" y debajo va la suma parcial con una marca ¹; la leyenda de abajo dice qué filas faltan ("¹ Suma parcial: en Result. USD, faltan YPFD, FIMA y TXMJ0", D-65). Pasa todos los días con las posiciones sin CCL de compra.
 
-**La liquidez** (los pesos y dólares de cada cuenta) va en un bloque aparte, al pie, con el patrimonio financiero.
+**Debajo de la tabla** (en la compu), lo pendiente de cada fila, que antes estaba en su detalle: "YPFD, FIMA y TXMJ0: Falta el CCL de compra de la apertura…", una compra con precio pendiente, una tenencia que la fuente ya no lista, y lo que quedó **sin atribuir** hoy (después de una carga express), con su monto.
 
-**Filtros:** por cuenta, clase y moneda de riesgo; "solo con sin dato"; "solo precios viejos". Se ordena tocando el encabezado de cualquier columna.
+**La liquidez** (los pesos y dólares de cada cuenta) va en la misma tabla, al pie, como "Pesos" o "Dólares" con su cuenta. No tiene costo ni resultado: esas celdas dicen "—" (no aplica), que no es "sin dato". El % cartera de todas las filas suma 100%.
 
-**En el teléfono**, una tarjeta por posición: arriba, la moneda en la que arriesga, en grande; una grilla con los resultados; y la línea del desglose. Si ganás en pesos y perdés en dólares, lo dice un chip: **"ganás en pesos, perdés en dólares"**. Los totales van en una tarjeta al final.
+**Filtros:** por cuenta, clase y moneda de riesgo; "solo con sin dato"; "solo precios viejos"; "Limpiar filtros". **Ordenar:** tocás el encabezado de una columna; los números van de mayor a menor al primer toque y, al segundo, al revés. "Sin dato" y la liquidez quedan siempre al final.
+
+**En el teléfono**, una tarjeta por posición: arriba, el valor en la moneda en la que arriesga, en grande; los dos resultados, con su %; y la línea del desglose. Si ganás en pesos y perdés en dólares, lo dice un chip: **"ganás en pesos, perdés en dólares"**. "Más datos" muestra el precio, la cantidad, los PPC, los días, la barra Activo · TC y lo pendiente. Los totales van en una tarjeta al final.
 
 ### 4.4 Exposición
 

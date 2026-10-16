@@ -60,10 +60,40 @@ El diseño nuevo que pediste el 15/10 («nuevo diseño de app, implementalo»), 
 - **Dependencias** (versiones exactas): `ag-grid-community` y `ag-grid-react` 36.2.0, `@fontsource-variable/newsreader` y `@fontsource-variable/jetbrains-mono` 5.3.0.
 
 #### Hoy
-_Lo suma quien rediseña Hoy._
+- **Se lee como toda pantalla** (D-157, D-160): la pregunta con la fecha ("Jueves 15 de octubre · ¿Cómo estoy hoy?") y, en serif, la respuesta: qué le pasó a lo invertible desde la carga anterior, en pesos y en dólares, y de dónde vino ("Ayer sumaste $ 590.125, pero perdiste US$ 340: subió el *dólar*."). Cada cifra se toca y muestra su cálculo. Si a la variación le falta una partida, lo dice con palabras ("falta …"), sin cifras.
+- **El patrimonio neto**, a la derecha: el total de siempre (D-03), en pesos y en dólares, cada uno con su variación (monto y %). Debajo, de qué está hecho: **Financiero · Bienes · Pasivos**, que suman el neto (D-160). Reemplaza a las dos tarjetas de antes (financiero y total). Si le falta una parte, "sin dato" y la suma parcial, como antes (D-65).
+- **Segunda fila, tres tarjetas:**
+  - **Variación del día · de dónde vino:** la barra de lo que pusieron tus activos (tinta) y el CCL (oro), cada parte en pesos y en dólares, y cuánto se movió el CCL ("Del CCL (+1,08%)"). Es el desglose que antes iba debajo del financiero.
+  - **Exposición neta al peso:** el neto en pesos y en dólares, lo que netea con sus dos partes ("pesos financieros − deuda del leasing ($ 54,2 M − $ 21,4 M)"), la barra con el eje al medio (corto a la izquierda, en sangría; largo a la derecha) y la sensibilidad a una suba del 1% del CCL.
+  - **Excedente invertible · octubre:** la misma cifra que arriba de Flujo, con la barra de gastos fijos, cuota y lo que sobra, y si es proyectado o real.
+- **Tercera fila:**
+  - **Patrimonio neto · 12 meses:** dos gráficos chicos con las mismas fechas, en dólares y en pesos, un punto por carga (un día sin dato es un hueco, nunca un punto inventado), con cuánto cambió cada uno y por qué difieren: el CCL. Mientras no haya 12 meses de historia, dice desde cuándo ("desde el jue 01/10"). "Ver como tabla" muestra los números. El modo privado tapa los montos del gráfico y de la tabla.
+  - **Próximos 30 días:** lo que pasa con fecha, en orden: "Todavía no cargaste hoy" (después del cierre de BYMA), las cuotas del leasing (quién la paga; una vencida que tu planilla no marca pagada, en sangría), lo que cobrás de tus bonos y letras (a menos de 15 días, en sangría) y el cierre del mes, con **Cargar ingreso** y **Cargar gasto**. Cada monto, en pesos y en dólares. Debajo, **Atención**, de lo más grave a lo más leve.
+- **Cuarta fila, Qué tenés y qué debés:** activos (un tramo por activo, en su color, con el ticker adentro si entra; la liquidez junta; la casa y la camioneta), pasivos (el leasing) y el neto, a la misma escala, con los totales en pesos y en dólares.
+- **Abajo, el detalle:** la frase del día completa (con su hoja cifra por cifra en el teléfono), "Quién movió tu financiero" y el cuadre, como antes.
+- **Nada se perdió:** "Ver la evolución y el PnL" ahora es "Ver resultados" (en el gráfico); "Ver el balance", "Ver exposición" y "Ver posiciones"; Atención está en Próximos 30 días y, en el teléfono, en su renglón.
+- **En el teléfono** (el diseño no lo dibuja): arriba del pliegue, la lectura, el patrimonio neto y el financiero en una tarjeta de cuatro renglones de 44 px, la exposición en un renglón, Atención y "Todavía no cargaste hoy". Después, las tarjetas una debajo de otra.
+- **Para quien construye:** las cuentas nuevas son funciones puras con test: `src/lib/vistas/armar-hoy.ts` (activos y pasivos, el CCL del período, la serie de 12 meses y Próximos 30 días) y, en `src/components/hoy/`, la lectura, los números en palabras, las barras y la opción del gráfico.
+- **Pruebas:** unitarias de cada función nueva y de la página entera renderizada en el servidor; las de interacción, con la anatomía nueva (lo que tiene que entrar arriba del pliegue, la traza desde la tarjeta del patrimonio).
 
 #### Posiciones
-_Lo suma quien rediseña Posiciones._
+- **Se lee como toda pantalla** (D-157, D-161): la pregunta ("Patrimonio · ¿Qué tengo y cómo le va a cada cosa?") y la lectura: cuántas posiciones tenés y cuál explica más de lo que ganaste, o perdiste, en pesos ("Seis posiciones. SPY explica casi *tres cuartos* de lo que ganaste en pesos."). Si al resultado le falta una fila, dice cuál.
+- **Cuatro cifras clave:** el valor de la cartera, el resultado total (si al de dólares le faltan filas, "sin dato" y la suma parcial: "En dólares, suma parcial (3 de 6): +US$ 1.630"), la mejor (por su resultado en pesos) y la peor en dólares, cada una con su % en la otra moneda.
+- **La tabla es una grilla** (AG Grid): Activo · Cantidad · PPC ARS · PPC USD · Precio · Valor · Result. ARS · Result. USD · Activo · TC · % cartera · Días.
+  - **Activo · TC** es una barra: el resultado en pesos, partido en lo que hizo el activo (tinta, o sangría si restó) y lo que hizo el tipo de cambio (oro). Su traza tiene el desglose en pesos y en dólares. Reemplaza a las dos columnas de desglose.
+  - **% cartera** (antes "% fin.") lleva una mini barra en el color del activo.
+  - **Días** dice «ap.» (desde la apertura en la app) o «decl.» (desde la fecha que declaraste).
+  - Un **precio viejo** se dice en la fila: "precio de hace 7 días" (D-16).
+  - A 1440 px entran las once columnas. Lo que no entra en el ancho va a "⋯", al final de cada fila (antes, el chevron ›).
+- **La liquidez va en la misma tabla, al pie** ("Pesos" y "Dólares", con su cuenta): no tiene costo ni resultado, así que esas celdas dicen "—" (no aplica), que no es "sin dato".
+- **Totales fijos abajo**, de lo que está a la vista; con un filtro, "Total · lo filtrado". Si a una columna le falta una fila: "sin dato" y debajo la suma parcial con ¹, y la leyenda dice qué filas faltan (D-65).
+- **Lo pendiente de cada fila, debajo de la tabla:** lo que antes estaba en el detalle de la fila (una apertura sin CCL de compra, una compra con precio pendiente, una tenencia que la fuente ya no lista y lo que quedó sin atribuir hoy, con su monto), agrupado: "YPFD, FIMA y TXMJ0: Falta el CCL de compra de la apertura…".
+- **Ordenar:** tocás el encabezado; los números van de mayor a menor al primer toque, y "sin dato" y la liquidez, siempre al final. Los filtros son los de siempre.
+- **En el teléfono**, una tarjeta por fila, como antes, con "Más datos" (precio, cantidad, PPC, días y la barra Activo · TC) y una al final con los totales.
+- **Con el dedo** (una tablet), las filas miden 100 px: cada cifra es un tocable de 44 px y las celdas llevan dos, una arriba de la otra (D-100).
+- **Arreglo en la grilla común:** el ancho para columnas descuenta el borde de la grilla (1 px de cada lado). Unas columnas que sumaban justo el ancho del contenedor dejaban 2 px de scroll horizontal adentro (Posiciones a 1024 px).
+- **Para quien construye:** las cuentas de la tabla (`src/components/cartera/cuentas.ts`) y la lectura (`lectura.ts`) son funciones puras con test.
+- **Pruebas:** unitarias de cada cuenta, de las celdas de cada columna y de la página; las de interacción, con la grilla: ordenar y filtrar, el panel de la traza junto al borde derecho y las columnas que entran a 1440 y a 1280 px.
 
 #### Exposición
 _Lo suma quien rediseña Exposición, que recibe el Balance (D-156)._

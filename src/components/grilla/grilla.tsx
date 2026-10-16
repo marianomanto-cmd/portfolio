@@ -176,7 +176,9 @@ export function Grilla<T>(p: PropsGrilla<T>) {
   useLayoutEffect(() => {
     const el = contenedor.current
     if (!escritorio || !el) return
-    const medir = () => setAncho(Math.floor(el.clientWidth))
+    // El borde de la grilla (wrapperBorder del tema: 1 px de cada lado) no es lugar para
+    // columnas: sin restarlo, columnas que suman justo el ancho del contenedor desbordan 2 px.
+    const medir = () => setAncho(Math.max(0, Math.floor(el.clientWidth) - 2))
     medir()
     const ro = new ResizeObserver(medir)
     ro.observe(el)

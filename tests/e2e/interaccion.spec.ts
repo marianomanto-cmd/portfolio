@@ -14,7 +14,7 @@ const { defaultBrowserType: _webkit, ...IPHONE_13 } = devices['iPhone 13']
 test.describe('teléfono (iPhone 13, 390 × 664)', () => {
   test.use(IPHONE_13)
 
-  test('Hoy entra arriba del pliegue: frase, dos tarjetas, exposición, Atención y "Todavía no cargaste hoy"', async ({ page }) => {
+  test('Hoy entra arriba del pliegue: la lectura, el patrimonio, la exposición, Atención y "Todavía no cargaste hoy"', async ({ page }) => {
     await page.goto('/')
     expect(await esperarHidratacion(page)).toBe(true)
     await sinIndicadorDev(page)
@@ -30,16 +30,16 @@ test.describe('teléfono (iPhone 13, 390 × 664)', () => {
       const b = await loc.boundingBox()
       return b!.y + b!.height
     }
-    const frase = page.getByLabel('Qué pasó desde la última carga')
-    const financiero = page.getByRole('region', { name: 'Patrimonio financiero' })
-    const total = page.getByRole('region', { name: 'Patrimonio total' })
+    // Rediseño (D-157): la lectura reemplaza a la frase arriba (la frase completa sigue en el detalle)
+    // y el patrimonio neto y el financiero van en una sola tarjeta de cuatro renglones.
+    const lectura = page.getByRole('heading', { level: 1 })
+    const patrimonio = page.getByRole('region', { name: 'Patrimonio neto y financiero' })
     const exposicion = page.getByRole('link', { name: 'Pesos fin. − leasing' })
-    const atencion = page.locator('summary', { hasText: 'Atención' })
+    const atencion = page.locator('summary:visible', { hasText: 'Atención' })
     const cargar = page.getByRole('link', { name: /Todavía no cargaste hoy/ })
     for (const [nombre, loc] of [
-      ['frase', frase],
-      ['financiero', financiero],
-      ['total', total],
+      ['lectura', lectura],
+      ['patrimonio', patrimonio],
       ['exposición', exposicion],
       ['atención', atencion],
       ['todavía no cargaste hoy', cargar],
@@ -47,16 +47,17 @@ test.describe('teléfono (iPhone 13, 390 × 664)', () => {
       const y = await fondo(loc)
       expect(y, `${nombre} termina en ${Math.round(y)} px (pliegue: ${pliegue})`).toBeLessThanOrEqual(pliegue)
     }
-    // Las tarjetas miden lo que calcula la visión (112 px).
-    expect(Math.round((await financiero.boundingBox())!.height)).toBeLessThanOrEqual(112)
+    // El patrimonio entra en lo que la visión le daba a las dos tarjetas (2 × 112 px), con renglones tocables.
+    expect(Math.round((await patrimonio.boundingBox())!.height)).toBeLessThanOrEqual(224)
+    for (const b of await patrimonio.getByRole('button').all()) expect(Math.round((await b.boundingBox())!.height)).toBeGreaterThanOrEqual(44)
   })
 
   test('tocar un número abre su traza como hoja inferior, y se cierra', async ({ page }) => {
     await page.goto('/')
     expect(await esperarHidratacion(page)).toBe(true)
     await sinIndicadorDev(page)
-    const financiero = page.getByRole('region', { name: 'Patrimonio financiero' })
-    await financiero.getByRole('button', { name: /104\.271\.540/ }).first().tap()
+    const patrimonio = page.getByRole('region', { name: 'Patrimonio neto y financiero' })
+    await patrimonio.getByRole('button', { name: /104\.271\.540/ }).first().tap()
     const hoja = page.getByRole('dialog', { name: 'Patrimonio financiero · en pesos' })
     await expect(hoja).toBeVisible()
     const b = (await hoja.boundingBox())!
@@ -112,7 +113,7 @@ test.describe('teléfono (iPhone 13, 390 × 664)', () => {
     await expect(page).toHaveURL(/\/ajustes$/)
   })
 
-  test('Cartera en tarjetas: el chip único cuando los signos difieren', async ({ page }) => {
+  test('Posiciones en tarjetas: el chip único cuando los signos difieren', async ({ page }) => {
     await page.goto('/cartera')
     expect(await esperarHidratacion(page)).toBe(true)
     const t30 = page.locator('[data-tarjeta="T30J7"]')
@@ -120,6 +121,7 @@ test.describe('teléfono (iPhone 13, 390 × 664)', () => {
     await expect(t30).toContainText('ganás en pesos, perdés en dólares')
     await expect(page.locator('[data-tarjeta="SPY"]')).not.toContainText('ganás en pesos')
     await expect(page.locator('table:visible')).toHaveCount(0)
+    await expect(page.getByRole('grid')).toHaveCount(0)
   })
 })
 
@@ -147,8 +149,9 @@ test.describe('desktop (1280 × 900)', () => {
     await page.goto('/')
     expect(await esperarHidratacion(page)).toBe(true)
     await sinIndicadorDev(page)
-    const financiero = page.getByRole('region', { name: 'Patrimonio financiero' })
-    await financiero.getByRole('button', { name: /104\.271\.540/ }).last().click()
+    // En la tarjeta del patrimonio neto, lo financiero es una de sus partes (D-158).
+    const neto = page.getByRole('region', { name: 'Patrimonio neto', exact: true })
+    await neto.getByRole('button', { name: /104\.271\.540/ }).first().click()
     const panel = page.getByRole('dialog', { name: 'Patrimonio financiero · en pesos' })
     await expect(panel).toBeVisible()
     await expect(panel).toContainText('$ 43.586.000,00')
@@ -159,9 +162,12 @@ test.describe('desktop (1280 × 900)', () => {
   test('el panel de una cifra pegada al borde derecho no se sale de la pantalla', async ({ page }) => {
     await page.goto('/cartera')
     expect(await esperarHidratacion(page)).toBe(true)
-    const fila = page.locator('tr[data-fila="SPY"]')
-    const celdas = fila.locator('td:visible')
-    const ultima = celdas.last()
+    // La grilla (D-157): la última columna con una cifra (a 1280 px, % cartera; lo que no entra va en la ficha ⋯).
+    const grilla = page.getByRole('grid', { name: 'Posiciones, en pesos y en dólares' })
+    await expect(grilla).toBeVisible()
+    const fila = grilla.locator('.ag-row:not(.ag-row-pinned)').filter({ hasText: 'SPY' })
+    const ultima = fila.locator('.ag-cell:not([col-id="__ficha"])').last()
+    await expect(ultima).toHaveAttribute('col-id', 'peso')
     await ultima.getByRole('button').first().click()
     const panel = page.getByRole('dialog').first()
     await expect(panel).toBeVisible()
@@ -199,15 +205,53 @@ test.describe('desktop (1280 × 900)', () => {
     }
   })
 
-  test('Cartera: ordenar por una columna y filtrar', async ({ page }) => {
+  test('Posiciones: ordenar por una columna y filtrar (la grilla, D-157)', async ({ page }) => {
     await page.goto('/cartera')
     expect(await esperarHidratacion(page)).toBe(true)
-    await page.getByRole('button', { name: 'Res. ARS' }).click() // de mayor a menor
-    await expect(page.locator('tbody tr[data-fila]').first()).toHaveAttribute('data-fila', 'SPY')
+    const grilla = page.getByRole('grid', { name: 'Posiciones, en pesos y en dólares' })
+    await expect(grilla).toBeVisible()
+    // Las filas (sin la de totales, fija abajo) y la primera en el orden que se ve.
+    const filas = grilla.locator('.ag-row:not(.ag-row-pinned)')
+    const primera = grilla.locator('.ag-row[row-index="0"]')
+    await expect(filas).toHaveCount(9) // 6 posiciones y 3 saldos de liquidez
+    const resultado = grilla.getByRole('columnheader', { name: 'Result. ARS' })
+    await resultado.click() // los números, de mayor a menor al primer clic
+    await expect(resultado).toHaveAttribute('aria-sort', 'descending')
+    await expect(primera).toContainText('SPY')
+    await resultado.click()
+    await expect(resultado).toHaveAttribute('aria-sort', 'ascending')
+    await expect(primera).toContainText('TXMJ0')
+    // La liquidez no tiene resultado: va al final en las dos direcciones.
+    await expect(grilla.locator('.ag-row[row-index="8"]')).toContainText('Liquidez')
     await page.getByLabel('Moneda de riesgo').selectOption('USD')
-    await expect(page.locator('tbody tr[data-fila]')).toHaveCount(1)
+    await expect(filas).toHaveCount(2) // SPY y los dólares de IEB
+    await expect(page.getByText('1 de 6 posiciones y 3 saldos de liquidez')).toBeVisible()
+    await expect(grilla.locator('.ag-row-pinned')).toContainText('Total · lo filtrado')
     await page.getByRole('button', { name: 'Limpiar filtros' }).click()
-    await expect(page.locator('tbody tr[data-fila]')).toHaveCount(6)
+    await expect(filas).toHaveCount(9)
+  })
+
+  test('Posiciones: a 1440 px entran las once columnas; a 1280, lo que no entra va en la ficha ⋯', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/cartera')
+    expect(await esperarHidratacion(page)).toBe(true)
+    const grilla = page.getByRole('grid', { name: 'Posiciones, en pesos y en dólares' })
+    await expect(grilla).toBeVisible()
+    const titulos = ['Activo', 'Cantidad', 'PPC ARS', 'PPC USD', 'Precio', 'Valor', 'Result. ARS', 'Result. USD', 'Activo · TC', '% cartera', 'Días']
+    for (const t of titulos) await expect(grilla.getByRole('columnheader', { name: t, exact: true })).toBeVisible()
+    await expect(grilla.getByRole('button', { name: /ver lo que no entra en la tabla/ })).toHaveCount(0)
+    expect(await revisarGrillas(page)).toEqual([])
+
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await expect(grilla.getByRole('columnheader', { name: 'Días', exact: true })).toHaveCount(0)
+    expect(await revisarGrillas(page)).toEqual([])
+    await grilla.getByRole('button', { name: 'SPY: ver lo que no entra en la tabla' }).click()
+    const ficha = page.getByRole('dialog').filter({ hasText: 'Lo que no entra en la tabla' })
+    await expect(ficha).toBeVisible()
+    await expect(ficha).toContainText('Días')
+    await expect(ficha).toContainText('decl.')
+    await ficha.getByRole('button', { name: 'Cerrar' }).click()
+    await expect(ficha).toBeHidden()
   })
 
   test('el ojo oculta montos y deja porcentajes; el tema (oscuro por defecto) se elige en Ajustes y se recuerda', async ({ page }) => {
@@ -220,7 +264,7 @@ test.describe('desktop (1280 × 900)', () => {
     await expect(page.locator('html')).toHaveAttribute('data-privado', '1')
     const filtro = await page.locator('.monto').first().evaluate((el) => getComputedStyle(el).filter)
     expect(filtro).toContain('blur')
-    const pct = page.getByRole('region', { name: 'Patrimonio financiero' }).getByRole('button', { name: '+0,57%' }).last()
+    const pct = page.getByRole('region', { name: 'Patrimonio neto', exact: true }).getByRole('button', { name: '+0,91%' }).first()
     expect(await pct.evaluate((el) => getComputedStyle(el.querySelector('span')!).filter)).toBe('none')
     await page.goto('/ajustes')
     expect(await esperarHidratacion(page)).toBe(true)
