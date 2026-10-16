@@ -15,7 +15,7 @@ Una sola pantalla, sin wizard:
 4. La **bandeja** muestra lo que entendió de cada fuente, con lo raro arriba y lo verificado plegado.
 5. **Enter** guarda lo verificado de todas las cuentas a la vez, en un solo lote (D-104).
 
-Lo que no se carga ese día queda con su último valor conocido, marcado como **viejo** cuando pasa los 2 días hábiles (D-16). Los aportes, retiros y transferencias se cargan en **Datos › Movimientos** (D-111); la bandeja avisa cuando un saldo remunerado sube más de lo que explica su TNA, o baja.
+Lo que no se carga ese día queda con su último valor conocido, marcado como **viejo** cuando pasa los 2 días hábiles (D-16). Los aportes, retiros y transferencias se cargan en **Datos › Movimientos** (D-111); la bandeja avisa cuando un saldo remunerado sube más de lo que explica su TNA, o baja. Si baja y no se sabe adónde fue la plata, es un gasto (D-168, abajo).
 
 ### Las tres cargas válidas (D-64)
 
@@ -157,6 +157,17 @@ Saldo en pesos de la cuenta remunerada. Se guarda como saldo de liquidez.
 - Una elección vale para la propuesta sobre la que se hizo: si la bandeja se rearma, las que ya no aplican se caen.
 - **El tiempo activo (D-62)** se mide mientras cargás: suma los tramos con gestos y corta un tramo después de 60 s sin gestos. La espera de la lectura de una captura (como mucho 50 s) cae dentro de un tramo, así que se cuenta. Se guarda con el lote.
 - **Modo privado:** todos los montos de la bandeja (motivos, controles, fórmulas, las dos lecturas, saldos) se ocultan como en el resto de la app.
+
+## Plata que falta entre composiciones (D-168)
+
+Al cargar una composición, se arma la cuenta de cada saldo con la composición anterior:
+
+- **Falta plata** (el saldo nuevo es menor que el anterior menos los movimientos y las operaciones ya cargados): la diferencia es un **gasto**. Va como retiro de esa cuenta en Datos › Movimientos, con la fecha de la composición nueva y la cuenta en la nota: saldo anterior − movimientos conocidos − saldo nuevo.
+- **Sobra plata:** si lo explica la TNA del saldo, es rendimiento y no se carga nada. Si no, es un **aporte** (plata de afuera), nunca rendimiento.
+- **Lo que la captura no muestra** queda con su último valor conocido (D-16): una captura puede mostrar solo una parte de la cuenta.
+- **Plata que se fue a una tenencia que la app no sigue** (por ejemplo, un fondo suscripto desde otra cuenta): es un retiro de la cuenta de la que salió. Cuando la tenencia aparece en una composición, se elige "Ya la tenía" en la bandeja: entra como apertura, plata de afuera a su valor de ese día y no ganancia, con el costo sin dato si la captura no lo muestra.
+
+Ejemplo, con números inventados: Mercado Pago tenía $ 1.000.000, pasaste $ 300.000 a IEB (transferencia cargada) y la composición siguiente dice $ 500.000. El gasto es 1.000.000 − 300.000 − 500.000 = $ 200.000, retiro de Mercado Pago con la fecha de la composición nueva.
 
 ## Después del Enter
 
