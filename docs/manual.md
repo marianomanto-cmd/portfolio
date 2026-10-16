@@ -119,7 +119,7 @@ El menú se ordena por la pregunta que contesta cada pantalla (D-156). En la com
 - **Compromisos y futuro:** Pasivos ("¿Cuánto me falta pagar?") y Flujo y escenarios ("¿Adónde me lleva?").
 - **Al pie:** Registro, Datos, Ajustes y el **Mapa de la app**, que muestra todo esto, cómo se lee cada pantalla y qué quiere decir cada color.
 
-Se colapsa a íconos con su botón (o en Ajustes). **Cartera ahora se llama Posiciones** (la dirección sigue siendo `/cartera`), y **el Balance está dentro de Exposición**: `/patrimonio` te lleva ahí.
+Se colapsa a íconos con su botón (o en Ajustes). Si la abrís en una pantalla angosta (entre 768 y unos 1.000 px), la tabla a la que no le entra lo imprescindible pasa a tarjetas, como en el teléfono, y vuelve a ser tabla cuando la colapsás (D-167). **Cartera ahora se llama Posiciones** (la dirección sigue siendo `/cartera`), y **el Balance está dentro de Exposición**: `/patrimonio` te lleva ahí.
 
 **Cargar no está en el menú: es el botón fijo** arriba a la derecha (o la tecla `c`). En el teléfono es el botón del centro de la barra de abajo: **Hoy · Patrimonio · [Cargar] · Resultados · Más**. Patrimonio abre Posiciones, con una pestaña arriba para pasar a Exposición; Resultados abre Evolución y PnL; "Más" abre Pasivos, Flujo y escenarios, Registro, Datos, Ajustes y el Mapa de la app.
 

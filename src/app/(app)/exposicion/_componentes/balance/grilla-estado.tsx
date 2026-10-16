@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { fechaLarga } from '@/lib/domain/fechas'
 import { Grilla, type ColumnaGrilla } from '@/components/grilla'
 import { TextoConMontos } from '@/components/monto'
@@ -12,8 +12,9 @@ import { Accion, Pct } from './tarjetas'
 // El estado de situación en pantalla, desde 768 px: la Grilla común (AG Grid,
 // D-157), sin orden (los renglones van como los lee un contador). La primera
 // fila de cada sección (Activo, Pasivo, Patrimonio neto) lleva el borde
-// marcado. En el teléfono va EstadoMovil (tarjetas que se pliegan) y al
-// imprimir, la tabla (estado.tsx).
+// marcado. Donde no va la grilla (el teléfono, o un ancho donde lo
+// imprescindible no entra: D-167) van las tarjetas que se pliegan
+// (EstadoMovil, armadas en estado.tsx); al imprimir, la tabla.
 
 const SANGRIA: Record<0 | 1 | 2, string> = { 0: '', 1: 'pl-3', 2: 'pl-6' }
 
@@ -113,10 +114,11 @@ function Porcentaje({ f }: { f: FilaEstado }) {
 }
 
 /**
- * Recibe las filas ya armadas (filasEstado, en el servidor) y la fecha: no la
- * vista entera, que es grande y además la usan otras piezas de la pantalla.
+ * Recibe las filas ya armadas (filasEstado, en el servidor), la fecha y las
+ * tarjetas que se pliegan (EstadoMovil, también del servidor): no la vista
+ * entera, que es grande y además la usan otras piezas de la pantalla.
  */
-export function GrillaEstado({ filas, fecha }: { filas: FilaEstado[]; fecha: string | null }) {
+export function GrillaEstado({ filas, fecha, tarjetas }: { filas: FilaEstado[]; fecha: string | null; tarjetas: ReactNode }) {
   const columnas = useMemo<ColumnaGrilla<FilaEstado>[]>(
     () => [
       { id: 'partida', titulo: 'Partida', ancho: 240, flex: 2.4, prioridad: 0, altoAuto: true, celda: (f) => <Partida f={f} /> },
@@ -135,8 +137,8 @@ export function GrillaEstado({ filas, fecha }: { filas: FilaEstado[]; fecha: str
       nombreFila={nombreFilaEstado}
       grupo={(f) => f.seccion}
       maxFilas={200}
-      // En el teléfono no se ve la grilla: van las tarjetas que se pliegan (EstadoMovil).
-      tarjeta={() => null}
+      // Donde no va la grilla, no una tarjeta por renglón: las tarjetas que se pliegan (EstadoMovil).
+      tarjetas={tarjetas}
     />
   )
 }

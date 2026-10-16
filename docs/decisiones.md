@@ -755,7 +755,7 @@ El 15/10 pediste un diseño nuevo para toda la app: «nuevo diseño de app, impl
   - la fila de totales, fija abajo;
   - alto automático hasta 25 filas;
   - nunca scroll horizontal: las columnas son flexibles con un ancho mínimo; las que no entran se ocultan por prioridad, y cada fila suma un botón "⋯" que muestra lo que falta;
-  - tarjetas debajo de 768 px (D-30);
+  - tarjetas debajo de 768 px (D-30) y, desde 768, donde lo imprescindible no entra (D-167);
   - el teclado y el ARIA de AG Grid, con el foco a la vista.
 
   Solo se registran los módulos que se usan. Las listas cortas de clave–valor, como los insumos de una traza, no son tablas. Registro es el primer uso.
@@ -958,6 +958,25 @@ Lo pediste el 15/10: «en flujos y escenarios quiero ver graficos» y «seleccio
 - **Descartado:**
   - Cargar ingreso y Cargar gasto a la derecha del encabezado: el diseño no tiene nada ahí;
   - las barras en una columna al costado de los gráficos: el diseño reparte ese ancho entre la cascada y el patrimonio.
+
+### D-167 · Si lo imprescindible de una tabla no entra en su lugar, tarjetas, también desde 768 px (detalla la Grilla de D-157) — P (provisoria, a confirmar)
+- **El caso:** la barra lateral abierta a mano (su botón, o Ajustes) queda abierta en todos los anchos (D-156). Entre 768 y 1279 px ocupa 232 px en lugar de 68, y a 768 px al contenido le quedan unos 480. La Grilla oculta columnas por prioridad, pero las de prioridad 0 se veían siempre, aunque no sumaran: era "responsabilidad de la pantalla" que entraran a 768 px, y cada pantalla las ajustó con la barra colapsada. Con la barra abierta, a 768 px, siete grillas tenían scroll horizontal adentro (D-30): Posiciones, el estado de situación y el comparativo del balance, Registro, el PnL por mes, lo pagado y lo que falta del leasing, y proyectado contra real. El test de layout no lo veía: recorría siempre con la barra en automático.
+- **Qué:** la Grilla ya medía su lugar para elegir columnas. Ahora, si lo imprescindible no entra, no dibuja la tabla: en su lugar van las tarjetas, las mismas que debajo de 768 px.
+  - **Lo imprescindible:** las columnas de prioridad 0 y, si alguna columna queda afuera, el botón "⋯" de la ficha (48 px). Si entran todas, no hace falta la ficha. Es la condición exacta para que lo que elige la grilla, con su ficha, no pase el ancho. La calcula una función pura con test (`entraLoImprescindible`, en `src/components/grilla/columnas.ts`).
+  - **Sigue midiendo:** si la ventana crece o colapsás la barra, vuelve la tabla; si la abrís, vuelven las tarjetas. Mientras no hay medida, el esqueleto de siempre.
+  - **Una sola lista a la vez,** con el nombre de la tabla: las tarjetas van adentro del contenedor de la grilla (marcado `data-modo="tarjetas"`) o, debajo de 768 px, donde iban. Nunca en los dos lugares.
+  - **Tarjetas que no son una por fila:** la pantalla se las pasa armadas a la Grilla (`tarjetas`). Es el caso del estado de situación: van sus tarjetas que se pliegan (IEB ▸, Galicia ▸, Bienes ▸), las del teléfono.
+  - **Donde entra, nada cambia:** los anchos que ya pasaban siguen con la misma tabla y las mismas columnas.
+- **Se revisa la nota de la Grilla** (`columnas.ts`): «Las de prioridad 0 entran siempre (aunque no sumen): es responsabilidad de la pantalla que lo imprescindible quepa en 768 px» pasa a «Las de prioridad 0 se eligen siempre, aunque no sumen. Si no entran (con la ficha, si alguna queda afuera), la grilla no se dibuja: pasa a tarjetas». Cada pantalla sigue eligiendo qué es imprescindible y sus anchos, para que a 768 px con la barra colapsada se vea la tabla. Un lugar que no previó ya no rompe nada.
+- **Fuera de la Grilla, a 768 px con la barra abierta:**
+  - Datos › Catálogo, una tabla común, pasa a las tarjetas del teléfono con menos de 600 px de lugar (una consulta de contenedor). La tabla pide unos 550 con los datos de ejemplo, y a 768 px con la barra colapsada tiene 644;
+  - en Cargar, el botón Guardar no se achica: el tiempo activo de su izquierda baja de renglón.
+- **Cómo se prueba:** el test de layout (D-30) recorre también 768 y 1024 px con la barra abierta: todas las pantallas, con capturas. Una grilla en tarjetas no es "no se dibujó": sus tarjetas las revisa el control de layout, como cualquier contenido. Un test de propiedades compara la cuenta con lo que elige la grilla, con columnas y anchos al azar.
+- **Por qué:** las tarjetas ya son la forma de la app para el poco ancho (D-30) y muestran todo, también lo que en la tabla iría a "⋯". El ancho de la barra lo elegís vos, no la pantalla: que cada pantalla prevea cada combinación de ventana y barra no escala.
+- **Descartado:**
+  - colapsar la barra sola cuando una tabla no entra: la abriste vos, y la preferencia es tuya;
+  - achicar los mínimos de las columnas hasta que entren en 480 px: las cifras más largas se cortarían;
+  - dejar la tabla con scroll horizontal adentro: D-30 lo prohíbe en cualquier ancho.
 
 ## Propuestas que la 1a implementa en forma provisoria
 

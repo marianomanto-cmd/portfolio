@@ -1,5 +1,6 @@
+import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
-import { altoGrilla, ANCHO_FICHA, columnasVisibles, iniciosDeGrupo, medidas } from './columnas'
+import { altoGrilla, ANCHO_FICHA, columnasVisibles, entraLoImprescindible, iniciosDeGrupo, medidas, type MedidaColumna } from './columnas'
 import { compararAsc, compararOrden, esDecimal, ordenarFilas } from './orden'
 
 // La grilla común (AG Grid, D-157): el orden de los montos, las columnas que
@@ -91,6 +92,69 @@ describe('las columnas que entran (nunca scroll horizontal)', () => {
       const minimo = cols.filter((c) => c.prioridad === 0).reduce((s, c) => s + c.ancho, 0) + ANCHO_FICHA
       expect(usado <= ancho || usado <= minimo, `ancho ${ancho}`).toBe(true)
     }
+  })
+})
+
+describe('lo imprescindible: si no entra, tarjetas (D-167)', () => {
+  // Las mismas columnas: todas suman 630; lo de prioridad 0 (activo y valor), 300; con la ficha, 348.
+  const cols = [
+    { id: 'activo', ancho: 170, prioridad: 0 },
+    { id: 'valor', ancho: 130, prioridad: 0 },
+    { id: 'resultado', ancho: 130, prioridad: 1 },
+    { id: 'ppc', ancho: 110, prioridad: 3 },
+    { id: 'peso', ancho: 90, prioridad: 2 },
+  ]
+
+  it('si entran todas, entra: no hace falta la ficha', () => {
+    expect(entraLoImprescindible(cols, 1000)).toBe(true)
+    expect(entraLoImprescindible(cols, 630)).toBe(true)
+  })
+
+  it('si alguna queda afuera, lo de prioridad 0 más la ficha: justo en el límite entra, un píxel menos no', () => {
+    expect(entraLoImprescindible(cols, 629)).toBe(true)
+    expect(entraLoImprescindible(cols, 300 + ANCHO_FICHA)).toBe(true)
+    expect(entraLoImprescindible(cols, 300 + ANCHO_FICHA - 1)).toBe(false)
+  })
+
+  it('lo de prioridad 0 solo, sin lugar para la ficha, no alcanza', () => {
+    // 300 px entran activo y valor, pero las otras tres columnas no tendrían dónde verse.
+    expect(entraLoImprescindible(cols, 300)).toBe(false)
+    expect(columnasVisibles(cols, 300).ocultas).toEqual(['resultado', 'ppc', 'peso'])
+  })
+
+  it('si todas son imprescindibles, no hay ficha: entran o no entran', () => {
+    const todas = [
+      { id: 'renglon', ancho: 175, prioridad: 0 },
+      { id: 'actual', ancho: 150, prioridad: 0 },
+      { id: 'anterior', ancho: 150, prioridad: 0 },
+      { id: 'diferencia', ancho: 150, prioridad: 0 },
+    ]
+    expect(entraLoImprescindible(todas, 625)).toBe(true)
+    expect(entraLoImprescindible(todas, 624)).toBe(false)
+  })
+
+  it('una columna más angosta que la ficha: si entran todas, entra; si no, hace falta la ficha y no entra', () => {
+    // 300 + 40 = 340 sin ficha; sacar la de 40 pide la ficha de 48: 348.
+    const angosta = [
+      { id: 'nombre', ancho: 300, prioridad: 0 },
+      { id: 'dias', ancho: 40, prioridad: 1 },
+    ]
+    expect(entraLoImprescindible(angosta, 340)).toBe(true)
+    expect(entraLoImprescindible(angosta, 339)).toBe(false)
+    expect(entraLoImprescindible(angosta, 348)).toBe(true)
+  })
+
+  it('entra justo cuando lo que elige columnasVisibles, con su ficha, no pasa el ancho (columnas y anchos al azar)', () => {
+    const columna = fc.record({ ancho: fc.integer({ min: 30, max: 320 }), prioridad: fc.integer({ min: 0, max: 4 }) })
+    fc.assert(
+      fc.property(fc.array(columna, { minLength: 1, maxLength: 12 }), fc.integer({ min: 0, max: 2600 }), (xs, disponible) => {
+        const cs: MedidaColumna[] = xs.map((x, i) => ({ id: `c${i}`, ...x }))
+        const r = columnasVisibles(cs, disponible)
+        const usado = cs.filter((c) => r.visibles.has(c.id)).reduce((s, c) => s + c.ancho, 0) + (r.ocultas.length ? ANCHO_FICHA : 0)
+        return entraLoImprescindible(cs, disponible) === usado <= disponible
+      }),
+      { numRuns: 2000 },
+    )
   })
 })
 

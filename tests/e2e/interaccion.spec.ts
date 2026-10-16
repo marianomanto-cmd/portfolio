@@ -1,5 +1,5 @@
 import { devices, expect, test } from '@playwright/test'
-import { esperarHidratacion, montosALaVista, revisarGrillas, sinIndicadorDev } from './ayudas'
+import { esperarHidratacion, montosALaVista, revisarGrillas, revisarLayout, sinIndicadorDev } from './ayudas'
 
 // Interacciones que el layout no ve: Hoy arriba del pliegue en el teléfono,
 // la traza al tocar un número (hoja inferior en el teléfono, panel en
@@ -412,6 +412,39 @@ test.describe('desktop (1280 × 900)', () => {
     await expect(ficha).toContainText('Tiempo activo')
     await ficha.getByRole('button', { name: 'Cerrar' }).click()
     await expect(ficha).toBeHidden()
+  })
+
+  test('con la barra lateral abierta a 768 px, una grilla cuyo imprescindible no entra pasa a tarjetas, y vuelve al colapsarla (D-167)', async ({ page }) => {
+    await page.addInitScript(() => window.localStorage.setItem('portfolio:nav', 'expandida'))
+    await page.setViewportSize({ width: 768, height: 900 })
+    await page.goto('/registro')
+    expect(await esperarHidratacion(page)).toBe(true)
+    await sinIndicadorDev(page)
+    const nombre = 'Registro de cargas: un lote por fila'
+    const contenedor = page.locator(`[data-grilla="${nombre}"]`)
+    // La fecha, las cargas y el lote, con la ficha, piden 623 px; con la barra abierta, la grilla tiene 478.
+    await expect(contenedor).toHaveAttribute('data-modo', 'tarjetas')
+    await expect(page.getByRole('grid', { name: nombre })).toHaveCount(0)
+    // Una sola lista, con el nombre de la tabla, y en cada tarjeta lo de su lote (Revertir incluido).
+    const lista = page.getByRole('list', { name: nombre })
+    await expect(lista).toHaveCount(1)
+    await expect(lista.getByRole('button', { name: 'Revertir el lote' }).first()).toBeVisible()
+    expect(await revisarGrillas(page)).toEqual([])
+    expect(await revisarLayout(page, false)).toEqual([])
+
+    // Al colapsar la barra, el contenedor vuelve a medir: vuelve la grilla, sin scroll horizontal, y la lista se va.
+    await page.getByRole('button', { name: 'Colapsar la barra lateral' }).click()
+    await expect(page.getByRole('grid', { name: nombre })).toBeVisible()
+    await expect(contenedor).not.toHaveAttribute('data-modo', 'tarjetas')
+    await expect(lista).toHaveCount(0)
+    expect(await revisarGrillas(page)).toEqual([])
+    expect(await revisarLayout(page, false)).toEqual([])
+
+    // Abierta otra vez, tarjetas otra vez.
+    await page.getByRole('button', { name: 'Expandir la barra lateral' }).click()
+    await expect(contenedor).toHaveAttribute('data-modo', 'tarjetas')
+    await expect(page.getByRole('grid', { name: nombre })).toHaveCount(0)
+    await expect(lista).toHaveCount(1)
   })
 
   test('la barra superior dice dónde estás; Cargar está siempre (tecla C) y el Mapa, al pie de la barra lateral (D-156)', async ({ page }) => {

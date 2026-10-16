@@ -14,7 +14,8 @@ import { Accion, Pct } from './tarjetas'
 // bienes), PASIVO (cada deuda con su origen) y PATRIMONIO NETO, cada renglón
 // en pesos, en dólares y en % del activo. Desde 768 px es la Grilla
 // (grilla-estado.tsx, D-157); al imprimir, la tabla de acá (D-158); en el
-// teléfono, tarjetas que se pliegan, nunca una tabla.
+// teléfono, tarjetas que se pliegan, nunca una tabla, y también desde 768 px
+// si la grilla no entra en su lugar (la barra lateral abierta, D-167).
 
 const POR: Record<VistaBalance['agrupar'], string> = { cuenta: 'por cuenta', instrumento: 'por instrumento', clase: 'por clase' }
 
@@ -367,19 +368,16 @@ export function EstadoSituacion({ v }: { v: VistaBalance }) {
         </Rotulo>
         <span className="text-[12px] text-muted">al {v.fecha ? fechaLarga(v.fecha) : '—'} · en pesos, en dólares al CCL de la fecha y en % del activo</span>
       </div>
-      {/* Al imprimir, una tabla (AG Grid no arma hojas A4, D-158); en pantalla, la Grilla. */}
+      {/* Al imprimir, una tabla (AG Grid no arma hojas A4, D-158). En pantalla, la Grilla; donde no va (el teléfono, o un ancho donde no entra: D-167), la Grilla pone las tarjetas que se pliegan. */}
       <div className="hidden print:block">
         <TablaEstado v={v} />
       </div>
-      <div className="hidden min-w-0 md:block print:hidden">
-        <GrillaEstado filas={filasEstado(v)} fecha={v.fecha} />
+      <div className="min-w-0 print:hidden">
+        <GrillaEstado filas={filasEstado(v)} fecha={v.fecha} tarjetas={<EstadoMovil v={v} />} />
       </div>
       <p className="hidden text-[12px] text-muted md:block print:block">
         Cada cifra se toca y muestra su fórmula. Lo que no tiene dato dice "sin dato", nunca cero. Un bien financiado y su deuda entran juntos: nunca se suma el bien sin su deuda (D-03).
       </p>
-      <div className="md:hidden print:hidden">
-        <EstadoMovil v={v} />
-      </div>
     </section>
   )
 }

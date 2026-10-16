@@ -129,6 +129,41 @@ test.describe('desktop (1280 × 900)', () => {
   })
 })
 
+test.describe('768 px con la barra lateral abierta (D-167)', () => {
+  test.use({ viewport: { width: 768, height: 900 } })
+
+  test('el estado de situación y el comparativo no entran: van las tarjetas del teléfono, y sus cifras abren la traza', async ({ page }) => {
+    await page.addInitScript(() => window.localStorage.setItem('portfolio:nav', 'expandida'))
+    await abrir(page, '/exposicion')
+    // El estado de situación: las tarjetas que se pliegan (las del teléfono), en lugar de la grilla.
+    const estado = page.locator('[data-grilla^="Estado de situación patrimonial"]')
+    await expect(estado).toHaveAttribute('data-modo', 'tarjetas')
+    await expect(page.getByRole('grid', { name: /^Estado de situación patrimonial/ })).toHaveCount(0)
+    await expect(estado.getByRole('heading', { name: 'Activo por cuenta' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Activo por cuenta' })).toHaveCount(1)
+    const grupo = estado.getByRole('button', { name: /^IEB/ })
+    await grupo.click()
+    await expect(grupo).toHaveAttribute('aria-expanded', 'true')
+    // El comparativo: una tarjeta por renglón, en una sola lista con el nombre de la tabla.
+    const comparativo = page.locator('[data-grilla^="Comparativo del balance"]')
+    await expect(comparativo).toHaveAttribute('data-modo', 'tarjetas')
+    await expect(page.getByRole('grid', { name: /^Comparativo del balance/ })).toHaveCount(0)
+    await expect(page.getByRole('list', { name: /^Comparativo del balance/ })).toHaveCount(1)
+    expect(await revisarLayout(page, false)).toEqual([])
+    // Una cifra de cada una abre su traza, como en la grilla.
+    for (const donde of [estado, comparativo]) {
+      const cifra = donde.locator('[data-cifra] button[aria-controls]:visible').first()
+      await cifra.scrollIntoViewIfNeeded()
+      await cifra.click()
+      const panel = page.locator(`[id="${await cifra.getAttribute('aria-controls')}"]`)
+      await expect(panel).toBeVisible()
+      const texto = (await panel.textContent()) ?? ''
+      expect(texto.includes('=') || texto.includes('Sin dato.'), texto.slice(0, 80)).toBe(true)
+      await page.keyboard.press('Escape')
+    }
+  })
+})
+
 test.describe('teléfono (iPhone 13, 390 × 664)', () => {
   test.use(IPHONE_13)
 

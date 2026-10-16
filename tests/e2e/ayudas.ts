@@ -199,11 +199,19 @@ export async function revisarLayout(page: Page, grueso: boolean): Promise<string
  * puede tardar más que el asiento de esperarHidratacion: antes de revisar se
  * espera, hasta 10 s, a que todas las que se ven estén dibujadas. Una que en
  * ese tiempo sigue en esqueleto es un problema ("no se dibujó").
+ *
+ * Una grilla cuyo lugar no alcanza para lo imprescindible pasa a tarjetas
+ * (data-modo="tarjetas", D-167): está resuelta y no es una tabla. Sus
+ * tarjetas las revisa revisarLayout, como cualquier contenido.
  */
 export async function revisarGrillas(page: Page): Promise<string[]> {
   const dibujadas = () =>
     Array.from(document.querySelectorAll<HTMLElement>('[data-grilla]')).every(
-      (g) => getComputedStyle(g).display === 'none' || g.getBoundingClientRect().width === 0 || g.querySelector('.ag-root-wrapper') !== null,
+      (g) =>
+        getComputedStyle(g).display === 'none' ||
+        g.getBoundingClientRect().width === 0 ||
+        g.dataset.modo === 'tarjetas' ||
+        g.querySelector('.ag-root-wrapper') !== null,
     )
   if (!(await page.evaluate(dibujadas))) {
     await page.waitForFunction(dibujadas, null, { timeout: 10_000 }).catch(() => undefined)
@@ -216,6 +224,11 @@ export async function revisarGrillas(page: Page): Promise<string[]> {
       const rg = g.getBoundingClientRect()
       if (getComputedStyle(g).display === 'none' || rg.width === 0) continue
       const nombre = `grilla «${g.dataset.grilla}»`
+      // En tarjetas no hay tabla que revisar (las revisa revisarLayout); pero tarjetas y tabla a la vez, no.
+      if (g.dataset.modo === 'tarjetas') {
+        if (g.querySelector('.ag-root-wrapper')) out.push(`${nombre}: está en tarjetas y también dibuja la tabla`)
+        continue
+      }
       const raiz = g.querySelector<HTMLElement>('.ag-root-wrapper')
       if (!raiz) {
         // Mientras mide su lugar dibuja un esqueleto; si quedó así, no se dibujó.
