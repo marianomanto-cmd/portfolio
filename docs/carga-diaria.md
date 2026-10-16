@@ -160,11 +160,12 @@ Saldo en pesos de la cuenta remunerada. Se guarda como saldo de liquidez.
 
 ## Plata que falta entre composiciones (D-168)
 
-La composición que manda el dueño es completa: lo que no manda no lo tiene. Al cargarla, se arma la cuenta de cada saldo con la composición anterior:
+Al cargar una composición, se arma la cuenta de cada saldo con la composición anterior:
 
 - **Falta plata** (el saldo nuevo es menor que el anterior menos los movimientos y las operaciones ya cargados): la diferencia es un **gasto**. Va como retiro de esa cuenta en Datos › Movimientos, con la fecha de la composición nueva y la cuenta en la nota: saldo anterior − movimientos conocidos − saldo nuevo.
-- **Sobra plata:** si lo explica la TNA del saldo, es rendimiento y no se carga nada. Si vino de una cuenta propia que la app no sigue, es un aporte. Si no se sabe, se pregunta.
-- **Un fondo o un saldo que desaparece** de una composición a la siguiente no se arrastra: su plata entra en la cuenta de la que salió.
+- **Sobra plata:** si lo explica la TNA del saldo, es rendimiento y no se carga nada. Si no, es un **aporte** (plata de afuera), nunca rendimiento.
+- **Lo que la captura no muestra** queda con su último valor conocido (D-16): una captura puede mostrar solo una parte de la cuenta.
+- **Plata que se fue a una tenencia que la app no sigue** (por ejemplo, un fondo suscripto desde otra cuenta): es un retiro de la cuenta de la que salió. Cuando la tenencia aparece en una composición, se elige "Ya la tenía" en la bandeja: entra como apertura, plata de afuera a su valor de ese día y no ganancia, con el costo sin dato si la captura no lo muestra.
 
 Ejemplo, con números inventados: Mercado Pago tenía $ 1.000.000, pasaste $ 300.000 a IEB (transferencia cargada) y la composición siguiente dice $ 500.000. El gasto es 1.000.000 − 300.000 − 500.000 = $ 200.000, retiro de Mercado Pago con la fecha de la composición nueva.
 

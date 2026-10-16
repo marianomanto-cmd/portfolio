@@ -678,6 +678,8 @@ Debajo, "Últimos movimientos": cada uno con lo que salió y lo que entró, en l
 
 **Plata que falta y no sabés adónde fue** (D-168): si entre dos composiciones una cuenta tiene menos plata de la que explican los movimientos y las operaciones, la diferencia se carga como gasto (un retiro de esa cuenta), con la fecha de la composición que la muestra. Así no se lee como pérdida de tus inversiones.
 
+Si la plata se fue a algo que la app todavía no sigue (por ejemplo, un fondo que suscribiste desde otra cuenta), es un retiro de esa cuenta. Cuando el fondo aparece en una captura, en la bandeja elegís **Ya la tenía**: entra como apertura, plata que entra de afuera a su valor de ese día, no como ganancia. Lo que una captura no muestra queda con su último valor conocido (D-16).
+
 ## 10. Modo privado, tema y paleta
 
 - **Modo privado:** el ojo de la barra de arriba, o `h`. Desenfoca los montos y deja los porcentajes, para mirar la app con gente al lado. Vale en todas las pantallas, Cargar y Datos incluidas, y también para los montos dentro de un texto (por ejemplo, el motivo de un "sin dato"). Las trazas que abrís a propósito muestran la cuenta entera.
