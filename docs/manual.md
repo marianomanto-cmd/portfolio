@@ -676,6 +676,8 @@ Debajo, "Últimos movimientos": cada uno con lo que salió y lo que entró, en l
 
 **Cuándo hacerlo:** el día que movés plata. Si te olvidás, la bandeja te lo recuerda cuando el saldo de Mercado Pago sube más de lo que explica su TNA o cuando baja ("¿Entró o salió plata?"), y su acceso abre el formulario con el movimiento precargado (cuenta, moneda, monto y fecha) para que lo revises y lo confirmes.
 
+**Plata que falta y no sabés adónde fue** (D-168): si entre dos composiciones una cuenta tiene menos plata de la que explican los movimientos y las operaciones, la diferencia se carga como gasto (un retiro de esa cuenta), con la fecha de la composición que la muestra. Así no se lee como pérdida de tus inversiones.
+
 ## 10. Modo privado, tema y paleta
 
 - **Modo privado:** el ojo de la barra de arriba, o `h`. Desenfoca los montos y deja los porcentajes, para mirar la app con gente al lado. Vale en todas las pantallas, Cargar y Datos incluidas, y también para los montos dentro de un texto (por ejemplo, el motivo de un "sin dato"). Las trazas que abrís a propósito muestran la cuenta entera.

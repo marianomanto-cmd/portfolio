@@ -978,6 +978,17 @@ Lo pediste el 15/10: «en flujos y escenarios quiero ver graficos» y «seleccio
   - achicar los mínimos de las columnas hasta que entren en 480 px: las cifras más largas se cortarían;
   - dejar la tabla con scroll horizontal adentro: D-30 lo prohíbe en cualquier ancho.
 
+### D-168 · La plata que falta entre dos composiciones y no se sabe adónde fue es un gasto — D
+- **Lo que dijiste (16/10):** «yo te paso la composición de mi portafolio constantemente con capturas acá. Si hay plata que no sabés dónde se fue porque encontrás una diferencia en el neto, considerala un gasto».
+- **Qué:** al cargar una composición, si una cuenta tiene menos plata de la que explican la composición anterior, las operaciones y los movimientos ya cargados, la diferencia es un **gasto**. Se carga como un retiro de esa cuenta (Datos › Movimientos), con la fecha de la composición que la muestra y una nota con la cuenta que la arma (saldo anterior − movimientos conocidos − saldo nuevo).
+- **La composición que mandás es completa:** lo que no mandás no lo tenés (lo mismo que «si no te paso es porque no tengo»). Un fondo o un saldo que no aparece en la composición siguiente no se arrastra como si siguiera: su plata entra en la diferencia de la cuenta de la que salió.
+- **Lo que sobra no es gasto:** si una cuenta tiene más plata de la que se explica, no se inventa nada. Si lo explica la TNA del saldo, es rendimiento. Si dijiste que vino de una cuenta tuya que la app no sigue, es un aporte. Si no, se pregunta.
+- **Por qué:** sin la regla, la plata que gastaste se leía como pérdida de tus inversiones (el resultado de la cuenta), y Hoy, Exposición y Evolución decían que perdiste lo que en realidad gastaste.
+- **Cómo se carga:** como un retiro en los movimientos de capital, no como un gasto cargado en Flujo. En Flujo, un gasto del mes cargado reemplaza a los gastos declarados de ese mes en el excedente, y una diferencia no dice de qué fue ni si es del mes entero.
+- **Descartado:**
+  - preguntar por cada diferencia: pediste no hacerlo;
+  - repartir la diferencia entre los días que separan dos composiciones: no hay dato de cada día. Va con la fecha de la composición que la muestra, que da el mismo resultado entre esas dos composiciones.
+
 ## Propuestas que la 1a implementa en forma provisoria
 
 Estas propuestas de `docs/investigacion-mercado.md` (D-35 a D-53) y de `docs/vision.md` §6 (D-54 a D-103) siguen esperando tu aprobación. La 1a ya las usa porque el código las necesitaba. Estado de todas: **P (provisoria, a confirmar)**. Si rechazás una, se cambia el código y se anota acá.
