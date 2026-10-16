@@ -311,24 +311,46 @@ Si una sola ganó más que todo junto, lo dice ("el resto restó"); si al result
 
 ### 4.4 Exposición
 
-**Para qué:** ver la deuda en pesos como lo que es, una posición corta en pesos, y tu neto contra el peso.
+**Para qué:** ver la deuda en pesos como lo que es, una posición corta en pesos, y tu neto contra el peso. Abajo, desde el rediseño (15/10), está tu balance: lo que era la pantalla Balance (ver [4.8](#48-balance)).
 
-**Arriba, el selector Financiero · Total**, con lo que netea cada vista escrito en su rótulo (D-101):
+**Arriba, la pregunta y la lectura:** "¿Cuánto estoy jugado al peso?" y una frase que la contesta (números inventados):
+
+> Tenés más pesos de los que debés: estás ***largo*** en pesos por $ 32.783.100.
+
+Si debés más pesos de los que tenés, estás *corto*. Sin la deuda del leasing, la frase dice que falta cargarla; en la vista Total, mientras tus bienes no tengan moneda de riesgo, que el neto todavía no se calcula. Tocá la cifra para ver de dónde sale.
+
+**A la derecha, Financiero · Total**, con lo que netea cada vista escrito debajo (D-101):
 - **Financiero:** "pesos financieros − deuda del leasing".
 - **Total:** eso más cada bien, en la moneda de riesgo que le elijas. Mientras la casa y la camioneta no tengan moneda de riesgo (se elige desde la 1b), el neto total es **"sin dato"**, con la suma parcial sin ellas, y en la composición por moneda aparecen como "Sin elegir": la camioneta no entra en silencio por estar valuada en pesos.
 
-**La frase:**
+Cambiar de vista no cambia la fecha ni el agrupamiento del balance de abajo, y al revés.
 
-> Estás **largo en pesos por $32.783.100** (US$ 21.175): tus pesos financieros ($54,18 M) superan lo que debés del leasing ($21,40 M). Por cada +1% de CCL: en dólares, ese neto pierde US$ 210; en pesos, tus activos en dólares suman $500.884.
+**Largo y corto · en pesos de hoy:** barras con un solo cero; a la derecha lo que tenés, a la izquierda lo que debés.
+- **Activos en pesos:** cada título por su ticker y tu liquidez en pesos, junta ("LIQ").
+- **Pasivos en pesos:** el leasing, con la deuda que cuenta: lo que informa la leasera; sin eso, la según el cuadro de marcha o tu estimado, con su chip.
+- **Neto en pesos:** LARGO o CORTO, la resta de los dos de arriba.
+- **Activos en dólares:** CEDEARs y dólares, aunque coticen en pesos ("LIQ US$" es tu liquidez en dólares).
+- **En la vista Total, tus bienes**, en su renglón, hasta que les elijas la moneda de riesgo.
 
-**Largo, corto y neto:** tus pesos financieros, la deuda del leasing (la que cuenta: lo que informa la leasera; sin eso, la según el cuadro de marcha o tu estimado, con su chip), el neto en pesos y en dólares, y tus activos que arriesgan dólares ("CEDEARs y dólares, aunque coticen en pesos").
+Cada renglón dice cuánto es, en pesos y en dólares; cada cifra muestra su cuenta al tocarla.
 
-**Composición**, en barras horizontales: por clase, por moneda de riesgo y por geografía. La liquidez cuenta en la geografía de su custodio: los dólares que están en IEB son AR en geografía y USD en moneda de riesgo.
+**Exposición neta al peso · 12 meses:** tu neto en cada carga de los últimos 12 meses (o desde tu primera carga, si todavía no pasó un año). La línea punteada es el neutral: arriba, largo en pesos; abajo, corto. Debajo dice de dónde a dónde fue. Pasá el mouse (o tocá) para ver cada punto en pesos y en dólares.
 
-**Concentración:** tu posición más grande y tus tres más grandes, como porcentaje del **patrimonio financiero** (también en la vista Total, D-03). Dice "sin umbral": la app no juzga la concentración hasta que cargues el tuyo (1b, D-42). Sin el total del financiero (por ejemplo, con una tenencia que la fuente ya no lista), la concentración es "sin dato".
+**Apertura de activos:** por clase y por geografía, en barras que suman 100%. La liquidez cuenta en la geografía de su custodio: los dólares que están en IEB son AR en geografía y USD en moneda de riesgo.
+
+**TOP 1 y TOP 3:** tu posición más grande y tus tres más grandes, como porcentaje del **patrimonio financiero** (también en la vista Total, D-03), con sus nombres. La app no juzga la concentración hasta que cargues tu umbral (1b, D-42). Sin el total del financiero (por ejemplo, con una tenencia que la fuente ya no lista), la concentración es "sin dato".
+
+**El detalle: tu exposición**, lo de siempre:
+- **En una frase**, con la sensibilidad al CCL:
+
+  > Estás **largo en pesos por $32.783.100** (US$ 21.175): tus pesos financieros ($54,18 M) superan lo que debés del leasing ($21,40 M). Por cada +1% de CCL: en dólares, ese neto pierde US$ 210; en pesos, tus activos en dólares suman $500.884.
+- **Concentración**, con el neto en pesos como parte de tus activos.
+- **Composición** por clase, por moneda de riesgo y por geografía: lo que vale cada parte, en pesos y en dólares, y su porcentaje.
+
+**El detalle: tu balance:** tu estado de situación patrimonial a la fecha de carga que elijas; lo explica [4.8](#48-balance). Lo de arriba es siempre de hoy: si el balance es de otra fecha, lo dice.
 
 **Cuando falta algo:**
-- Sin ninguna carga, la composición dice "sin dato · aparece con tu primera carga" y el botón lleva a Cargar.
+- Sin ninguna carga, la lectura dice que tu exposición aparece con la primera, la composición dice "sin dato · aparece con tu primera carga" y el botón lleva a Cargar.
 - Sin el leasing cargado, o sin ninguna deuda (ni informada, ni según el cuadro con la tasa del contrato, ni estimada), la deuda en pesos es "sin dato", y también el neto, la sensibilidad y el % neto, con lo que da sin la deuda (D-126). El botón lleva a Datos › Leasing.
 
 ### 4.5 Registro
@@ -373,9 +395,9 @@ Todo esto se recuerda **por dispositivo**: el teléfono y la compu tienen cada u
 
 ### 4.8 Balance
 
-**Para qué:** tu estado de situación patrimonial, el que te pediría un contador: qué tenés (activo), qué debés (pasivo) y cuánto es tuyo (patrimonio neto), en pesos y en dólares, a cualquier fecha de carga. Desde el rediseño (15/10) está dentro de **Patrimonio › Exposición**: `/patrimonio` te lleva ahí (D-156).
+**Para qué:** tu estado de situación patrimonial, el que te pediría un contador: qué tenés (activo), qué debés (pasivo) y cuánto es tuyo (patrimonio neto), en pesos y en dólares, a cualquier fecha de carga. Desde el rediseño (15/10) está dentro de **Patrimonio › Exposición**, abajo, en "El detalle: tu balance": `/patrimonio` te lleva ahí (D-156, D-158).
 
-**La frase de arriba** (números inventados):
+**La frase del balance** (números inventados):
 
 > Tenés **$ 375 M** (US$ 250.000) sin contar la camioneta. La casa es el **72%** de eso; lo invertible, el **28%**.
 
@@ -389,9 +411,9 @@ La camioneta nunca se suma sin su deuda: lo que entra es **tu parte**, lo que va
 
 **Las tarjetas:** el **activo**, con una barra de lo financiero, la casa y la camioneta; y el **pasivo**, con la deuda, **de dónde sale** ("estimada por vos el jue 08/10 · provisoria") y **"Cargar el valor de la leasera"**, que lleva a Datos › Leasing. Debajo, **"Lo que falta pagar según contrato"**: las cuotas que faltan, con intereses, IVA y seguro. No es la deuda y **nunca se resta**; aparece cuando importes el cuadro de marcha.
 
-**El estado de situación patrimonial:** ACTIVO (lo financiero y tus bienes), PASIVO y PATRIMONIO NETO, cada renglón en pesos, en dólares y en **% del activo**. Lo financiero se ve **por cuenta** (IEB › SPY…), **por instrumento** (SPY, todas las cuentas juntas; los saldos, por moneda) o **por clase**. Cada bien dice su valuación, su fuente y su fecha. En el teléfono es una lista de tarjetas que se abren con un toque (IEB ▸, Galicia ▸, Bienes ▸).
+**El estado de situación patrimonial:** ACTIVO (lo financiero y tus bienes), PASIVO y PATRIMONIO NETO, cada renglón en pesos, en dólares y en **% del activo**. Lo financiero se ve **por cuenta** (IEB › SPY…), **por instrumento** (SPY, todas las cuentas juntas; los saldos, por moneda) o **por clase**. Cada bien dice su valuación, su fuente y su fecha. Desde 768 px es una tabla con sus tres grupos; en el teléfono, una lista de tarjetas que se abren con un toque (IEB ▸, Galicia ▸, Bienes ▸).
 
-**Comparativo:** tu balance de la fecha elegida al lado del de otra fecha de carga (por defecto, tu primera carga; **"Comparar con"** para elegir otra), renglón por renglón, en pesos y en dólares, con la diferencia. La diferencia no es lo que ganaste: incluye lo que pusiste o sacaste. Lo que ganaste o perdiste está en Evolución y PnL.
+**Comparativo:** tu balance de la fecha elegida al lado del de otra fecha de carga (por defecto, tu primera carga; **"Comparar con"** para elegir otra), renglón por renglón, en pesos y en dólares, con la diferencia (en el teléfono, en tarjetas). La diferencia no es lo que ganaste: incluye lo que pusiste o sacaste. Lo que ganaste o perdiste está en Evolución y PnL.
 
 **Indicadores del balance:** **solvencia** (cuántas veces lo que tenés cubre lo que debés), **endeudamiento** (qué parte de tu patrimonio neto debés) e **inmovilización** (qué parte de tu activo está en bienes). Cada uno muestra su cuenta al tocarlo; no dicen si está bien o mal (D-133).
 
@@ -399,7 +421,7 @@ La camioneta nunca se suma sin su deuda: lo que entra es **tu parte**, lo que va
 
 **Evolución:** el activo por clase y tu patrimonio neto, un punto por fecha de carga, en pesos o en dólares. La línea rayada es el patrimonio con la deuda estimada; la punteada, lo firme. Con una sola carga es un punto: la curva empieza con la próxima.
 
-**Fecha, agrupamiento e impresión:** elegí cualquier fecha con carga y cómo ver lo financiero (en el teléfono, desde **"Ver por: Cuenta ▾"**). **"Imprimir"** arma el balance en hojas A4, en claro (el estado de situación, los indicadores, el comparativo y la composición), con la fecha, el CCL usado y su fuente, las dos monedas y las etiquetas como texto, para mandarle a tu contador (D-133). Con el modo privado, los montos quedan tapados también en el gráfico y dentro de los textos (la fuente de la deuda, lo que falta pagar).
+**Fecha, agrupamiento e impresión:** elegí cualquier fecha con carga y cómo ver lo financiero (en el teléfono, desde **"Ver por: Cuenta ▾"**). Lo de arriba de Exposición no cambia: es de hoy. **"Imprimir"** arma el balance en hojas A4, en claro (el estado de situación, los indicadores, el comparativo y la composición), con la fecha, el CCL usado y su fuente, las dos monedas y las etiquetas como texto, para mandarle a tu contador (D-133). Se imprime solo el balance: lo de arriba de Exposición queda afuera. Con el modo privado, los montos quedan tapados también en el gráfico y dentro de los textos (la fuente de la deuda, lo que falta pagar).
 
 **Cuando falta algo:**
 - Sin cargas: te dice que hagas la primera y que cargues tus bienes.
@@ -411,7 +433,28 @@ La camioneta nunca se suma sin su deuda: lo que entra es **tu parte**, lo que va
 
 ### 4.9 Evolución y PnL
 
-Cuánto ganaste o perdiste en un período, en qué, por precio o por dólar, realizado o no. Arriba elegís qué mirás (**Financiero** o **Total**: con la casa, la camioneta y la deuda del leasing), en qué moneda (pesos, dólares o ambas) y el período: la última semana, el último mes, tres meses, desde el día cero o dos fechas con carga. En el teléfono, el período se elige en una hoja desde "Período: …". Todo queda en la dirección de la página: la podés guardar como favorito. El último período que elegiste queda recordado en este dispositivo: si entrás desde el menú, vuelve.
+Cuánto ganaste o perdiste en un período, en qué, por precio o por dólar, realizado o no.
+
+**Arriba, la pregunta y la lectura:** "¿Gané o perdí, y por qué?" y una frase que la contesta (números inventados):
+
+> En el período ganaste $ 4.670.000 en pesos, pero en dólares ***perdiste***: US$ 654.
+
+Si ganaste (o perdiste) en las dos monedas, dice quién puso la mayor parte: el dólar o tus activos.
+
+**A la derecha elegís qué mirás** (**Financiero** o **Total**: con la casa, la camioneta y la deuda del leasing) **y el período**, en la pastilla **1M · 3M · YTD · 12M · INICIO**:
+- **1M**, **3M** y **12M:** el último mes, los últimos 3 y los últimos 12;
+- **YTD:** en lo que va del año, desde tu última carga del año anterior (si tu historia empieza este año, desde el día cero);
+- **INICIO:** desde el día cero.
+
+Debajo dice cuál es y de qué fecha a qué fecha. **Otro período** tiene la última semana y **Elegir fechas** (dos fechas con carga); en el teléfono se abre en una hoja desde abajo. Cada período arranca en una fecha con carga: la última en o antes del corte. La moneda (pesos, dólares o ambas) se elige en el detalle, en "El detalle: tu PnL". Todo queda en la dirección de la página: la podés guardar como favorito. El último período que elegiste queda recordado en este dispositivo: si entrás desde el menú, vuelve.
+
+**Las cuatro cifras clave:** el **resultado en pesos** y el **resultado en dólares** (con su porcentaje sobre lo que tenías al empezar), lo que pusieron **tus activos** y lo que puso **el tipo de cambio** (con cuánto se movió el CCL en el período). Tocá cada una para ver su cuenta.
+
+**Composición en dólares:** lo que vale cada clase en cada carga del período, apiladas, con tu patrimonio rayado encima. En Total suma tus bienes; las deudas las resta la línea.
+
+**Resultado en pesos · activo vs. TC:** por partida, lo que hizo el activo (o lo que perdió, en sangría) y lo que hizo el CCL (en oro), desde un mismo cero; en gris, lo que todavía no se puede separar. El monto de la derecha muestra su cuenta.
+
+**Abajo, "El detalle: tu PnL"**, con la moneda en su encabezado, tiene todo lo que sigue.
 
 **Con una sola carga** (tu día cero) ves tu punto de partida, lo que ya traías desde la compra según el PPP de tus brókers (en dólares, solo donde declaraste el CCL de compra), qué pasa si mañana el CCL sube 1% (cuánto varía tu financiero en pesos, por lo que tenés en dólares, y en dólares, por lo que tenés en pesos) y el flujo del mes en curso. En la vista Total, mientras la deuda del leasing sea la estimada, la cifra grande, la curva y todo lo que sale de la deuda llevan el chip "estimado". El puente dice "sin dato · necesita una segunda carga": con tu próxima carga se completa.
 
@@ -420,9 +463,9 @@ Cuánto ganaste o perdiste en un período, en qué, por precio o por dólar, rea
 - **La frase del período**, como la de Hoy.
 - **El puente:** de tu patrimonio al inicio al del final, línea por línea: aportes y retiros, las cuotas del leasing pagadas desde tus cuentas (una salida, no una pérdida), lo que pusieron tus activos, lo que puso el dólar y lo que todavía no se puede separar. En Total suma la amortización de la deuda y, debajo, la revaluación de tus bienes, el dólar sobre tus bienes (la camioneta valuada en pesos, la casa en dólares) y el dólar sobre la deuda en pesos. Abajo, el cuadre: tiene que dar ✓ 0. En la computadora, tocá un escalón de la cascada: en "activos" y "dólar" ves quiénes más sumaron y restaron.
 - **Quién sumó y quién restó:** cada partida, partida en precio (sólido) y dólar (rayado). Tocá una barra para ver su cálculo.
-- **Resultados por activo y cuenta:** el resultado del período y sus partes, lo **realizado** (lo que vendiste o cobraste, menos lo que te había costado) y lo **no realizado** (lo que seguís teniendo). Arriba elegís verlo por partida, **por cuenta** (IEB, Galicia…) o **por activo** (el mismo título en dos cuentas, junto), y lo ordenás por cualquier columna (tocando el título de la columna o con "Ordenar por"). La liquidez "no aplica": no tiene costo.
+- **Resultados por activo y cuenta:** el resultado del período y sus partes, lo **realizado** (lo que vendiste o cobraste, menos lo que te había costado) y lo **no realizado** (lo que seguís teniendo). Arriba elegís verlo por partida, **por cuenta** (IEB, Galicia…) o **por activo** (el mismo título en dos cuentas, junto), y lo ordenás por cualquier columna (tocando su título o con "Ordenar por"). En el teléfono son tarjetas. La liquidez "no aplica": no tiene costo.
 - **Tu patrimonio en el tiempo** y el capital aportado: lo que queda entre las dos líneas es lo que ganaste o perdiste. Un punto hueco quiere decir que ese día algún precio o saldo era viejo. Con "Ambas" monedas podés verlas juntas, en índice 100 (las dos arrancan en 100 el día cero).
-- **PnL por mes:** cada mes es la suma exacta de sus días.
+- **PnL por mes:** cada mes es la suma exacta de sus días, en una tabla que se ordena por columna (en el teléfono, tarjetas).
 - **Estado de resultados:** ingresos − gastos − costo del leasing = ahorro; + inversiones + revaluación de bienes + licuación de la deuda = variación explicada; la diferencia con la variación real es "no explicado" (consumo que no cargaste, plata que quedó afuera…). Los gastos fijos declarados llevan el chip "declarado": no son gastos reales.
 - **El futuro:** con un escenario de Flujo (el que estás probando o, si llegás por el menú, el último que guardaste), la curva sigue punteada desde hoy y abajo va el PnL proyectado por mes, todo con el chip "supuesto". Con más de un escenario guardado, **"Ver con: «…»"** cambia el que se muestra. "Ajustar supuestos" te lleva a Flujo con ese escenario abierto: sus supuestos, y "Guardar cambios" lo actualiza (no crea otro).
 
@@ -629,7 +672,7 @@ Los tres se recuerdan por dispositivo.
 
 | Fase | Qué agrega |
 |---|---|
-| **1b · Núcleo completo** | Pendientes como pantalla; la ficha de cada activo (con el CCL de empate de las LECAP); gráficos de Exposición; borrador compartido entre el teléfono y la compu; alias por bróker; pegar series (CCL histórico); tu tesis cargada como datos; umbrales; Ayuda con estos documentos adentro de la app |
+| **1b · Núcleo completo** | Pendientes como pantalla; la ficha de cada activo (con el CCL de empate de las LECAP); gráficos de Exposición (el rediseño del 15/10 ya trae el largo y corto y el neto en el tiempo; falta apilar el neto por pasivo cuando haya más de uno); borrador compartido entre el teléfono y la compu; alias por bróker; pegar series (CCL histórico); tu tesis cargada como datos; umbrales; Ayuda con estos documentos adentro de la app |
 | **2 · Contexto** | El cierre del mes por diferencia de saldos (D-79); calendario con alertas (vencimiento a menos de 15 días sin destino decidido) |
 | **3 · Motor** | Monte Carlo y el abanico de resultados (D-144) |
 | **4 · Disciplina** | Tesis y niveles contra tu cartera, la línea de veredicto ("Nada que hacer según tus reglas"), la revisión semanal, rendimientos realizados y la comparación contra SPY |

@@ -1,18 +1,20 @@
 import type { Pantalla } from './tipos'
 
-// Balance (entrega 4): cada ruta y cada estado demo de la pantalla (plan §3 A.8).
-// El estado por defecto es el de hoy en producción: la deuda del leasing estimada.
+// Exposición con el balance adentro (rediseño 15/10, D-156): cada estado demo
+// del balance, que ahora vive en /exposicion (/patrimonio redirige acá). La
+// Exposición por defecto y la vista Total están en base.ts. El estado por
+// defecto es el de hoy en producción: la deuda del leasing estimada.
 export const PANTALLAS_PATRIMONIO: Pantalla[] = [
-  { ruta: '/patrimonio', nombre: 'balance' },
-  { ruta: '/patrimonio?demo=un-dia', nombre: 'balance-un-dia' },
-  { ruta: '/patrimonio?demo=completo', nombre: 'balance-cancelacion-informada' },
-  { ruta: '/patrimonio?demo=segun-cuadro', nombre: 'balance-segun-cuadro' },
-  { ruta: '/patrimonio?demo=sin-deuda', nombre: 'balance-sin-deuda' },
-  { ruta: '/patrimonio?demo=sin-valuacion', nombre: 'balance-casa-sin-valuacion' },
-  { ruta: '/patrimonio?demo=sin-bienes', nombre: 'balance-sin-bienes' },
-  { ruta: '/patrimonio?demo=viejo', nombre: 'balance-precios-viejos' },
-  { ruta: '/patrimonio?demo=vacio', nombre: 'balance-sin-cargas' },
-  { ruta: '/patrimonio?agrupar=instrumento', nombre: 'balance-por-instrumento' },
-  { ruta: '/patrimonio?agrupar=clase&fecha=2026-10-01', nombre: 'balance-primera-fecha-por-clase' },
-  { ruta: '/patrimonio?comparar=2026-10-08&demo=segun-cuadro', nombre: 'balance-comparativo' },
+  { ruta: '/exposicion?demo=un-dia', nombre: 'exposicion-balance-un-dia' },
+  { ruta: '/exposicion?demo=completo', nombre: 'exposicion-balance-cancelacion-informada' },
+  { ruta: '/exposicion?demo=segun-cuadro', nombre: 'exposicion-balance-segun-cuadro' },
+  { ruta: '/exposicion?demo=sin-deuda', nombre: 'exposicion-balance-sin-deuda' },
+  { ruta: '/exposicion?demo=sin-valuacion', nombre: 'exposicion-balance-casa-sin-valuacion' },
+  { ruta: '/exposicion?demo=sin-bienes', nombre: 'exposicion-balance-sin-bienes' },
+  { ruta: '/exposicion?demo=viejo', nombre: 'exposicion-balance-precios-viejos' },
+  { ruta: '/exposicion?demo=vacio', nombre: 'exposicion-sin-cargas' },
+  { ruta: '/exposicion?agrupar=instrumento', nombre: 'exposicion-balance-por-instrumento' },
+  { ruta: '/exposicion?agrupar=clase&fecha=2026-10-01', nombre: 'exposicion-balance-primera-fecha-por-clase' },
+  { ruta: '/exposicion?comparar=2026-10-08&demo=segun-cuadro', nombre: 'exposicion-balance-comparativo' },
+  { ruta: '/exposicion?vista=total&demo=sin-deuda', nombre: 'exposicion-total-sin-deuda' },
 ]

@@ -96,10 +96,39 @@ El diseño nuevo que pediste el 15/10 («nuevo diseño de app, implementalo»), 
 - **Pruebas:** unitarias de cada cuenta, de las celdas de cada columna y de la página; las de interacción, con la grilla: ordenar y filtrar, el panel de la traza junto al borde derecho y las columnas que entran a 1440 y a 1280 px.
 
 #### Exposición
-_Lo suma quien rediseña Exposición, que recibe el Balance (D-156)._
+Exposición toma la anatomía del diseño y recibe el Balance (D-156, D-158):
+
+- **La pregunta y la lectura:** "Patrimonio · ¿Cuánto estoy jugado al peso?" y una frase con un solo énfasis: "Tenés más pesos de los que debés: estás *largo* en pesos por $ …" (o *corto*). Si falta la deuda del leasing, dice que falta cargarla; en la vista Total, mientras tus bienes no tengan moneda de riesgo, que el neto todavía no se calcula. La cifra abre su traza.
+- **Financiero · Total**, arriba a la derecha, en la pastilla del diseño, con lo que netea cada vista escrito debajo (D-101).
+- **Largo y corto · en pesos de hoy:** barras divergentes con un solo cero (en el 40% del ancho, como en el diseño) y una sola escala para los cuatro renglones: activos en pesos (cada título por su ticker y la liquidez junta, "LIQ"), pasivos en pesos (el leasing, hacia la izquierda), el neto (LARGO o CORTO) y activos en dólares. En la vista Total, tus bienes en su renglón, "sin moneda elegida". Cada renglón en pesos y en dólares, y cada cifra abre su traza.
+- **Exposición neta al peso · 12 meses** (o desde tu primera carga): tu neto en cada carga, con la línea punteada del neutral (arriba, largo; abajo, corto) y, debajo, de dónde a dónde fue. Sin montos en el eje, como en el diseño: están en el tooltip y en la tabla del gráfico, en pesos y en dólares al CCL de cada día.
+- **Apertura de activos** por clase y por geografía, en barras al 100%, y la **concentración**: TOP 1 y TOP 3 sobre tu patrimonio financiero, con sus nombres.
+- **El detalle: tu exposición:** lo que la pantalla tenía, con el estilo nuevo: la frase con la sensibilidad al CCL, la concentración con el neto sobre tus activos y la composición por clase, por moneda de riesgo y por geografía, con lo que vale cada parte.
+- **El detalle: tu balance:** todo el Balance (`/patrimonio` te trae acá): la fecha, "Ver por", la frase, la cifra grande, el activo y el pasivo, **el estado de situación y el comparativo en la Grilla** (desde 768 px; en el teléfono, tarjetas), los indicadores, la composición y la evolución. Lo de arriba es siempre de hoy; si el balance es de otra fecha, lo dice. **Imprimir** saca solo el balance, en A4, como antes.
+- **Lo que elegís no se pisa:** cambiar qué netea conserva la fecha, el agrupamiento y la comparación del balance, y al revés. Todo queda en la dirección.
+- Toda cifra en pesos y en dólares, con su traza. El modo privado tapa los montos, también en los gráficos, y deja los porcentajes.
+- **El rótulo adentro de cada tramo** (el ticker, "LIQ", el % de la apertura) va en la tinta que se lee sobre su color, con contraste AA: casi negra sobre los colores claros y clara sobre los oscuros (un bien "sin moneda elegida", un bono de color oscuro).
+- **Arreglo en la Grilla (común):** apretar una cifra de una fila que asoma por abajo de la pantalla no abría su traza: la grilla le daba el foco a la celda, la página subía entre el apretar y el soltar y el clic se perdía. Ahora el clic en una cifra (o en un botón) de la celda lo maneja la cifra; el teclado sigue igual.
+- **Por dentro:**
+  - `src/lib/vistas/armar-exposicion.ts`: las barras por activo, el neto de cada carga en dólares y las posiciones más grandes. Agrupa las partidas de la foto, cada una con su traza, sin calcular nada nuevo;
+  - las funciones de la pantalla en `exposicion/_lib/` (lectura, largo y corto, apertura, neto en el tiempo, filas del estado de situación), puras y con test;
+  - el modo demo arma la Exposición y su balance con los mismos hechos de cada estado (`?demo=…`): el neto de arriba y el balance de abajo usan la misma deuda;
+  - el componente común `Segmentado`, la pastilla del diseño (`src/components/pantalla/segmentado.tsx`), que también usa Evolución;
+  - sin migraciones.
+- **Pruebas:** `tests/e2e/exposicion.spec.ts` (nueva: el cero común, las trazas del gráfico y del TOP, qué netea con el balance y `/patrimonio`), `balance.spec.ts` sobre `/exposicion` (también la impresión, que deja afuera lo de arriba) y los estados del balance en el test de layout. El test de layout ya no toma por "texto cortado" el texto solo para el lector de pantalla (`.sr-only`) adentro de un link o un botón (`tests/e2e/ayudas.ts`, común).
 
 #### Evolución y PnL
-_Lo suma quien rediseña Evolución y PnL._
+Evolución y PnL toma la anatomía del diseño (D-159):
+
+- **La pregunta y la lectura:** "Resultados · ¿Gané o perdí, y por qué?" y una frase con un solo énfasis: cuánto ganaste o perdiste en el período, en pesos y en dólares, y quién puso la mayor parte, el dólar o tus activos. Si ganaste en pesos y perdiste en dólares, eso es lo que dice primero. Con un solo día, que tu historia empieza ese día.
+- **Arriba a la derecha:** qué mirás (Financiero · Total) y **el período en la pastilla 1M · 3M · YTD · 12M · INICIO**, con su nombre y sus fechas debajo ("Los últimos 3 meses · del … al …"). **Otro período** trae la última semana y "Elegir fechas" (en el teléfono, en una hoja desde abajo). **YTD** (desde tu última carga del año anterior) y **12M** son nuevos; como siempre, el período arranca en una fecha con carga.
+- **Cuatro cifras clave:** el resultado en pesos y en dólares (con su porcentaje sobre lo que tenías al empezar), lo que pusieron tus activos y lo que puso el tipo de cambio (en oro, con lo que se movió el CCL en el período). Cada una abre su traza; si falta un dato, dice cuál.
+- **Composición en dólares · área apilada:** lo que vale cada clase en cada carga del período, con tu patrimonio rayado encima. En Total suma tus bienes; las deudas las resta la línea.
+- **Resultado en pesos · activo vs. TC:** por partida, lo que hizo el activo (tinta, o sangría si perdió) y lo que hizo el CCL (oro), con un solo cero y, en gris, lo que todavía no se puede separar.
+- **El detalle: tu PnL:** todo lo que la pantalla tenía, con el estilo nuevo y la moneda (Pesos · Dólares · Ambas) en su encabezado: la frase del período, el puente, quién sumó y quién restó, **los resultados por activo y cuenta, el PnL por mes, el día cero y el futuro en la Grilla** (se ordenan tocando el título de la columna; en el teléfono, tarjetas), el patrimonio en el tiempo, el estado de resultados y la sensibilidad. Cada columna de montos mide lo que pide su cifra más larga (con su signo, su flecha y la pastilla): ninguna se sale de su celda.
+- Lo que elegís sigue en la dirección, y el último período queda recordado en el dispositivo (HO-7), también YTD y 12M.
+- **Por dentro:** `armar-evolucion.ts` suma YTD y 12M, el CCL al inicio del período y la composición en dólares (estricta: si a una clase le falta el dólar, "sin dato"); la lectura, las cifras clave y las barras de activo vs. TC son funciones puras con test (`evolucion/_lib/`). Sin migraciones.
+- **Pruebas:** `tests/e2e/evolucion.spec.ts` prueba la pastilla y "Otro período" (también en el teléfono), las cuatro cifras clave, el resultado por partida y la Grilla; el test de layout recorre 12M y YTD.
 
 #### Pasivos
 _Lo suma quien rediseña Pasivos._

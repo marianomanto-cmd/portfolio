@@ -160,3 +160,26 @@ describe('gráficos de Evolución', () => {
     expect(cifraTexto(null, 'ARS', true)).toBe('sin dato')
   })
 })
+
+describe('composición en dólares (rediseño 15/10)', () => {
+  it('un área por clase, apiladas, y la línea de tu patrimonio; "sin dato" es un hueco y el privado no muestra montos', async () => {
+    const { ejemploEvolucion } = await import('@/lib/vistas/ejemplo-evolucion')
+    const { leerParametros } = await import('./parametros')
+    const { opcionComposicion } = await import('./graficos')
+    const v = ejemploEvolucion(leerParametros({}), 'mes')
+    const { opcion, tabla } = opcionComposicion(v.composicion, v.serie, false)
+    const ss = opcion.series as { name: string; stack?: string; data: (number | null)[] }[]
+    expect(ss.filter((s) => s.stack === 'composicion')).toHaveLength(v.composicion.clases.length)
+    expect(ss.at(-1)!.name).toBe('Tu patrimonio')
+    for (const s of ss) expect(s.data).toHaveLength(v.composicion.puntos.length)
+    expect(tabla.filas).toHaveLength(v.composicion.puntos.length)
+    // La suma de las clases es el financiero de ese día (la vista Financiero no tiene deudas).
+    const ultimo = v.composicion.puntos.at(-1)!
+    const suma = Object.values(ultimo.usd).reduce((a, x) => a + Number(x), 0)
+    expect(suma).toBeCloseTo(Number(v.serie.find((p) => p.fecha === ultimo.fecha)!.usd), 4)
+    const privado = opcionComposicion(v.composicion, v.serie, true)
+    expect(privado.tabla.filas.flat().some((x) => x.includes('$'))).toBe(false)
+    const conHueco = opcionComposicion({ clases: [{ clave: 'cedear', nombre: 'CEDEARs', color: '#E0A458' }], puntos: [{ fecha: '2026-10-01', usd: { cedear: null } }] }, [], false)
+    expect((conHueco.opcion.series as { data: (number | null)[] }[])[0].data).toEqual([null])
+  })
+})

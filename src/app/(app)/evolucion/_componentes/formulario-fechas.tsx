@@ -4,13 +4,14 @@
 import { fechaCorta } from '@/lib/domain/fechas'
 import type { Fecha } from '@/lib/domain/tipos'
 import type { ParametrosEvolucion } from '@/lib/vistas/contratos-evolucion'
+import { clasesBoton } from '@/components/ui'
 import { POR_DEFECTO } from '../_lib/parametros'
 
 export function FormularioFechas({ p, demo, fechas }: { p: ParametrosEvolucion; demo: string | null; fechas: Fecha[] }) {
   if (fechas.length < 2) return <p className="text-sm text-muted">Con dos cargas o más vas a poder elegir las fechas.</p>
   const desde = p.periodo === 'elegir' && p.desde ? p.desde : fechas[0]
   const hasta = p.periodo === 'elegir' && p.hasta ? p.hasta : fechas.at(-1)
-  const campo = 'tocable min-h-11 w-full min-w-0 rounded-lg border border-border bg-surface px-2 text-sm'
+  const campo = 'tocable min-h-11 w-full min-w-0 rounded-item border border-border bg-surface px-2 text-sm'
   return (
     <form action="/evolucion" method="get" className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[minmax(0,10rem)_minmax(0,10rem)_auto]">
       {demo ? <input type="hidden" name="demo" value={demo} /> : null}
@@ -38,7 +39,7 @@ export function FormularioFechas({ p, demo, fechas }: { p: ParametrosEvolucion; 
           ))}
         </select>
       </label>
-      <button type="submit" className="tocable col-span-2 min-h-11 rounded-lg bg-accent px-4 text-sm font-medium text-on-accent hover:bg-accent-strong sm:col-span-1">
+      <button type="submit" className={`${clasesBoton('primario', 'sm')} col-span-2 min-h-11 sm:col-span-1`}>
         Ver
       </button>
     </form>

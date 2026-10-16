@@ -771,6 +771,47 @@ El 15/10 pediste un diseño nuevo para toda la app: «nuevo diseño de app, impl
   - `next/font/google`: el build dependería de la red;
   - AG Grid Enterprise: la licencia es paga y Community alcanza.
 
+### D-158 · Exposición con el balance adentro: arriba la respuesta de hoy, abajo el detalle; el balance se imprime en tablas comunes — P (provisoria, a confirmar)
+- **Qué:** Exposición sigue la anatomía del diseño (handoff, capturas 05 y 06): la pregunta y la lectura, el gráfico de largo y corto en pesos de hoy, la exposición neta al peso de los últimos 12 meses, la apertura por clase y por geografía y el TOP 1 y el TOP 3. Abajo, en este orden:
+  1. **El detalle: tu exposición:** lo que la pantalla mostraba y el diseño no tiene arriba: la frase con la sensibilidad al CCL, la concentración con el neto sobre tus activos y la composición con lo que vale cada parte.
+  2. **El detalle: tu balance:** el Balance entero de la entrega 4 (D-131 a D-134), con sus controles.
+- **Lo de arriba es de hoy; el balance, de la fecha que elijas.** Si elegís otra fecha, el balance lo dice y ofrece "Ver el último".
+- **Una sola dirección para las dos partes:** `?vista=` (qué netea) y `?fecha=`, `?agrupar=` y `?comparar=` (el balance) viven juntas, y cambiar una conserva las otras. `/patrimonio` sigue redirigiendo a `/exposicion` con su búsqueda (D-156); la página vieja se borró.
+- **Las barras de largo y corto, partidas por activo,** como en el diseño:
+  - cada título por su ticker, y la liquidez de cada moneda junta ("LIQ": la suma de los saldos, con su traza);
+  - una sola escala para los cuatro renglones, con el cero en el 40% del ancho como en el diseño: lo más largo de la derecha llega al borde, y si la deuda es más grande, la izquierda se llena primero;
+  - no es un cálculo nuevo: las barras suman exactamente lo que dice el resumen de siempre (test);
+  - en la vista Total, los bienes van en su propio renglón mientras no tengan moneda de riesgo (D-73): no se suman ni a los pesos ni a los dólares.
+- **El neto en el tiempo, "12 meses":** la ventana del diseño. Con menos historia arranca en la primera carga, y el rótulo lo dice ("· desde el jue 01/10"). El eje no lleva montos, como en el diseño: están en el tooltip y en la tabla del gráfico, en pesos y en dólares al CCL de cada día. Un "sin dato" corta la línea; nunca es cero.
+- **El estado de situación y el comparativo pasan a la Grilla** (D-157) en la pantalla. **Al imprimir siguen siendo tablas comunes,** solo para la hoja: AG Grid dibuja las filas que entran en su contenedor y no sabe cortarse en hojas A4. Es la única excepción a "toda tabla pasa por la Grilla", y no se ve en pantalla.
+- **Imprimir saca solo el balance,** como antes: lo de arriba de Exposición no se imprime.
+- **El modo demo arma las dos partes con los mismos hechos** en cada estado (`?demo=…`), como en producción: el neto de arriba y el balance de abajo usan la misma deuda.
+- **Por qué:** el diseño pone arriba la pregunta del peso, y el balance es lo mismo, lo que tenés y lo que debés, con más detalle. Abajo no se pierde nada (D-156) y arriba queda la respuesta.
+- **Descartado:**
+  - pestañas Exposición | Balance dentro de la pantalla: esconden la mitad, y el diseño no las tiene;
+  - imprimir la Grilla: corta filas y columnas en A4;
+  - otra ventana para el neto en el tiempo (toda la historia, por ejemplo): el diseño dice 12 meses, y con menos historia es lo mismo.
+
+### D-159 · Evolución: el período en la pastilla 1M · 3M · YTD · 12M · INICIO; la semana y las fechas, en "Otro período" — P (provisoria, a confirmar)
+- **Qué:** la pastilla del diseño elige el período (`?periodo=`):
+  - **1M** (`mes`): el último mes;
+  - **3M** (`3m`): los últimos 3 meses;
+  - **YTD** (`ytd`): en lo que va del año, desde tu última carga hasta el 31/12 del año anterior; si tu historia empieza este año, desde el día cero;
+  - **12M** (`12m`): los últimos 12 meses;
+  - **INICIO** (`todo`): desde el día cero, el de siempre por defecto.
+
+  Como todos los períodos, cada uno arranca en la última fecha con carga en o antes del corte: el resultado se calcula con hechos de ese día.
+- **Lo que ya estaba no se va:** la última semana y "Elegir fechas" (dos fechas con carga) están en **Otro período**, al lado de la pastilla; en el teléfono, en una hoja desde abajo. Debajo de la pastilla se nombra lo elegido, con sus fechas.
+- **Los controles:** qué mirás (Financiero · Total) va al lado del período; la moneda (Pesos · Dólares · Ambas) pasa al encabezado del detalle, porque las cuatro cifras clave y los dos gráficos de arriba ya van en las dos monedas.
+- **Las cuatro cifras clave** son las del diseño: el resultado en pesos, el resultado en dólares, lo que pusieron tus activos y lo que puso el tipo de cambio. Sus notas (el resultado sobre lo que tenías al empezar, la parte de tus activos, cuánto se movió el CCL) salen de funciones puras, con su fórmula en la traza.
+- **Composición en dólares:** cada clase en cada carga del período, al CCL de ese día; en Total suma los bienes. Las deudas no se apilan: la línea del patrimonio ya las resta. Si a una clase le falta el dólar, ese punto es "sin dato", no cero; una clase que ese día no tenías vale 0.
+- **Activo vs. TC:** las ocho partidas con más resultado, con un solo cero; las demás están en "Resultados por activo y cuenta".
+- **La lectura** dice primero si ganaste en pesos y perdiste en dólares (o al revés). Si no, quién puso "la mayor parte" (la más grande de las tres partes, aunque no llegue a la mitad): el dólar, tus activos o lo que todavía no se puede atribuir.
+- **Por qué:** el diseño pone el período arriba, en una sola fila, y 1M, 3M, YTD y 12M son los cortes con que se compara un resultado. Ninguna función se pierde.
+- **Descartado:**
+  - sacar la semana: sirve para la rutina de todos los días;
+  - un YTD desde el 1/1 exacto: no hay hechos ese día si no cargaste; se arranca en la carga anterior, como en los otros períodos.
+
 ### D-160 · Hoy: el patrimonio neto partido en financiero, bienes y pasivos, y las cuatro filas del diseño — P (provisoria, a confirmar)
 - **Qué:** Hoy sigue la anatomía de D-157 con las cuatro filas del handoff:
   1. la pregunta con la fecha ("Jueves 15 de octubre · ¿Cómo estoy hoy?"), la lectura y, a la derecha, el patrimonio neto;

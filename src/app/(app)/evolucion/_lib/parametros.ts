@@ -14,13 +14,33 @@ const SUPUESTOS = /^[A-Za-z0-9_-]{1,8000}$/
 /** El id de un escenario guardado. */
 const ID = /^[1-9]\d{0,9}$/
 
+/** Todos los períodos, con su nombre largo (la hoja "Otro período", lo que dice el período elegido). */
 export const PERIODOS: { periodo: PeriodoElegido; nombre: string }[] = [
-  { periodo: 'semana', nombre: 'Semana' },
-  { periodo: 'mes', nombre: 'Mes' },
-  { periodo: '3m', nombre: '3 meses' },
+  { periodo: 'semana', nombre: 'La última semana' },
+  { periodo: 'mes', nombre: 'El último mes' },
+  { periodo: '3m', nombre: 'Los últimos 3 meses' },
+  { periodo: 'ytd', nombre: 'En lo que va del año' },
+  { periodo: '12m', nombre: 'Los últimos 12 meses' },
   { periodo: 'todo', nombre: 'Desde el día cero' },
   { periodo: 'elegir', nombre: 'Elegir fechas' },
 ]
+
+/**
+ * La pastilla de arriba (handoff: 1M · 3M · YTD · 12M · INICIO, D-159). La
+ * semana y "Elegir fechas" no se fueron: están en "Otro período".
+ */
+export const PERIODOS_PASTILLA: { periodo: PeriodoElegido; nombre: string }[] = [
+  { periodo: 'mes', nombre: '1M' },
+  { periodo: '3m', nombre: '3M' },
+  { periodo: 'ytd', nombre: 'YTD' },
+  { periodo: '12m', nombre: '12M' },
+  { periodo: 'todo', nombre: 'Inicio' },
+]
+
+/** El nombre largo de un período ("El último mes"). */
+export function nombrePeriodo(p: PeriodoElegido): string {
+  return PERIODOS.find((x) => x.periodo === p)?.nombre ?? 'Desde el día cero'
+}
 
 export const MONEDAS: { moneda: MonedaElegida; nombre: string }[] = [
   { moneda: 'ars', nombre: 'Pesos' },

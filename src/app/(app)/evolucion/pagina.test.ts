@@ -79,7 +79,8 @@ describe('Evolución y PnL (modo demo)', () => {
     // La cuota 14 venció el 17/09, antes del día cero: no tiene nada que ver con este período y no se avisa (revisión 15/10).
     expect(t).not.toMatch(/cuota 14/)
     expect(html).toContain('data-tarjeta="SPY"')
-    expect(html).toContain('data-fila="SPY"')
+    // La tabla es la Grilla (AG Grid): en el servidor se arma su lugar; las filas las dibuja el navegador.
+    expect(html).toContain('data-grilla="Resultado del período por partida')
   })
 
   it('vista Total: amortización de la deuda, revaluación de bienes y el dólar sobre la deuda', () => {
@@ -171,11 +172,29 @@ describe('Evolución y PnL (modo demo)', () => {
 
   it('el futuro: cada mes proyectado lleva su chip "supuesto", no solo el título', () => {
     const html = seccion(pagina('mes'), 'aria-labelledby="futuro"')
-    const meses = (html.match(/<li class="rounded-lg border border-border p-3"/g) ?? []).length
+    const meses = (html.match(/data-mes-futuro=/g) ?? []).length
     expect(meses).toBe(12)
     const chips = (texto(html).match(/\bsupuesto\b/g) ?? []).length
-    // Uno por mes en las tarjetas, uno por mes en la tabla, y el del título.
-    expect(chips).toBeGreaterThanOrEqual(12 * 2 + 1)
+    // Uno por mes (en las tarjetas; la Grilla las dibuja en el navegador con su chip en la celda del mes), y el del título.
+    expect(chips).toBeGreaterThanOrEqual(12 + 1)
+  })
+
+  // ───────────── Rediseño (15/10, D-159) ─────────────
+
+  it('la anatomía del diseño: la pregunta, la lectura (h1), qué mirás, el período, las cuatro cifras y los dos gráficos', () => {
+    const html = pagina('mes')
+    const t = texto(html)
+    expect(t).toContain('Resultados · ¿Gané o perdí, y por qué?')
+    for (const x of ['1M', '3M', 'YTD', '12M', 'Inicio', 'Otro período', 'Resultado en pesos', 'Resultado en dólares', 'De tus activos', 'Del tipo de cambio', 'Composición en dólares · área apilada', 'Resultado en pesos · activo vs. TC', 'El detalle: tu PnL'])
+      expect(t, x).toContain(x)
+    // El período elegido está marcado en la pastilla (el demo "mes" es 1M).
+    expect(html).toMatch(/bg-surface-3 text-text">1M</)
+  })
+
+  it('la semana y "Elegir fechas" siguen al alcance, en "Otro período"', () => {
+    const t = texto(pagina('mes'))
+    expect(t).toContain('La última semana')
+    expect(t).toContain('Elegir fechas')
   })
 })
 
