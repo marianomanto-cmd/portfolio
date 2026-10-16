@@ -4,13 +4,18 @@ import { numero } from '@/lib/domain/dinero'
 import { vistaFlujo } from '@/lib/vistas/flujo'
 import type { VistaFlujo } from '@/lib/vistas/contratos-flujo'
 import { ErrorVista } from '@/components/error-vista'
-import { Tarjeta } from '@/components/ui'
+import { Encabezado } from '@/components/pantalla/encabezado'
+import { enfasis, texto } from '@/components/pantalla/lectura'
+import { Segmentado } from '@/components/pantalla/segmentado'
+import { Rotulo, Tarjeta } from '@/components/ui'
 import { CargarFlujo } from '../_componentes/cargar-flujo'
 import { Cargados } from '../_componentes/cargados'
 
 // Cargar ingreso / Cargar gasto (pedido del dueño del 14/10; plan §6 D.9): su
-// propia página, para que Hoy, el menú de Cargar y la barra de abajo la
-// enlacen (?sentido=ingreso|gasto). Debajo, lo último que cargaste, con
+// propia página, para que Hoy, el menú de Cargar y el mes en curso de Flujo la
+// enlacen (?sentido=ingreso|gasto). Con la anatomía de toda pantalla (D-157,
+// D-166): la pregunta, la lectura (el h1, "Cargar ingreso") y, a la derecha,
+// Ingreso · Gasto en la pastilla. Debajo, lo último que cargaste, con
 // Deshacer y Anular.
 
 export const dynamic = 'force-dynamic'
@@ -42,42 +47,34 @@ export default async function PaginaCargarFlujo({ searchParams }: { searchParams
 
   return (
     // Ancho completo, sin max-width en el contenedor (spec): desde 1024 px, el formulario y lo cargado lado a lado.
-    <div className="flex w-full min-w-0 flex-col gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-xl font-semibold text-text md:text-2xl">{titulo}</h1>
-          <p className="mt-0.5 text-sm text-muted">
-            {sentido === 'ingreso' ? 'Cuando te entra plata, cargala acá: el mes se vuelve real y tu proyección arranca de ahí.' : 'Un gasto que no estaba declarado, o el gasto fijo del mes con su monto real.'}
-          </p>
-        </div>
-        <nav aria-label="Ingreso o gasto" className="inline-grid grid-cols-2 gap-1 rounded-lg border border-border bg-surface-2 p-1">
-          {(['ingreso', 'gasto'] as const).map((x) => (
-            <Link
-              key={x}
-              href={conDemo(x)}
-              aria-current={sentido === x ? 'page' : undefined}
-              className={`tocable inline-flex min-h-9 items-center justify-center rounded-md px-3 text-sm font-medium ${sentido === x ? 'bg-surface text-text shadow-[var(--shadow)]' : 'text-muted hover:text-text'}`}
-            >
-              {x === 'ingreso' ? 'Ingreso' : 'Gasto'}
-            </Link>
-          ))}
-        </nav>
-      </div>
+    <div className="flex w-full min-w-0 flex-col gap-5">
+      <Encabezado
+        pregunta={sentido === 'ingreso' ? 'Futuro · ¿Qué te entró?' : 'Futuro · ¿Qué pagaste?'}
+        lectura={[texto('Cargar '), enfasis(sentido)]}
+        ayuda={sentido === 'ingreso' ? 'Cuando te entra plata, cargala acá: el mes se vuelve real y tu proyección arranca de ahí.' : 'Un gasto que no estaba declarado, o el gasto fijo del mes con su monto real.'}
+        acciones={
+          <Segmentado
+            etiqueta="Ingreso o gasto"
+            opciones={(['ingreso', 'gasto'] as const).map((x) => ({ href: conDemo(x), nombre: x === 'ingreso' ? 'Ingreso' : 'Gasto', actual: sentido === x }))}
+          />
+        }
+      />
 
-      <div className="grid min-w-0 gap-4 lg:grid-cols-12 lg:items-start">
-        <Tarjeta className="min-w-0 p-4 lg:col-span-7">
+      <div className="grid min-w-0 gap-5 lg:grid-cols-12 lg:items-start">
+        <Tarjeta className="min-w-0 p-5 lg:col-span-7">
           <CargarFlujo key={sentido} sentido={sentido} hoy={v.hoy} cuentas={v.cuentas} criptoHoy={cripto} movimientos={v.movimientos_datos} />
         </Tarjeta>
 
-        <Tarjeta className="min-w-0 p-4 lg:col-span-5" aria-labelledby="titulo-ultimos">
-          <h2 id="titulo-ultimos" className="text-base font-semibold text-text">
-            Lo que cargaste
-          </h2>
-          <p className="mb-3 mt-0.5 text-xs text-muted">Lo último primero. Deshacer y Anular, con las reglas de Registro.</p>
+        <Tarjeta className="flex min-w-0 flex-col gap-3 p-5 lg:col-span-5" aria-labelledby="titulo-ultimos">
+          <Rotulo id="titulo-ultimos">Lo que cargaste</Rotulo>
+          <p className="text-[13px] text-muted">Lo último primero. Deshacer y Anular, con las reglas de Registro.</p>
           <Cargados filas={v.cargados} limite={8} />
-          <p className="mt-3">
-            <Link href={demo ? `/flujo?demo=${encodeURIComponent(demo)}#real-contra-proyectado` : '/flujo#real-contra-proyectado'} className="tocable inline-flex min-h-10 items-center text-sm font-medium text-accent hover:underline">
-              Ver tu flujo: proyectado contra real
+          <p>
+            <Link
+              href={demo ? `/flujo?demo=${encodeURIComponent(demo)}#real-contra-proyectado` : '/flujo#real-contra-proyectado'}
+              className="tocable inline-flex min-h-10 items-center gap-1 text-[13px] text-muted transition-colors hover:text-text"
+            >
+              Ver tu flujo: proyectado contra real <span aria-hidden>→</span>
             </Link>
           </p>
         </Tarjeta>

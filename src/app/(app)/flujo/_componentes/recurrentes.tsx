@@ -8,13 +8,14 @@
 import { useId, useState } from 'react'
 import { fechaCorta } from '@/lib/domain/fechas'
 import type { FilaRecurrente } from '@/lib/vistas/contratos-flujo'
+import { SegmentadoBotones } from '@/components/pantalla/segmentado'
 import { Chip, ParMonto } from '@/components/ui'
 import { guardarRecurrenteAccion } from '../acciones'
 import { CAMPO, Campo, FormAccion } from './form-accion'
 
 const NATURALEZA: Record<string, string> = { sueldo: 'sueldo', honorarios: 'honorarios', dividendo: 'dividendo', retiro_a_cuenta: 'retiro a cuenta', otro: 'otro' }
 const FRECUENCIAS = ['mensual', 'bimestral', 'trimestral', 'semestral', 'anual'] as const
-const BOTON = 'tocable inline-flex min-h-9 items-center justify-center rounded-lg border border-border bg-surface px-3 text-sm font-medium text-text hover:bg-surface-2'
+const BOTON = 'tocable inline-flex min-h-9 items-center justify-center rounded-full border border-border-strong px-3 text-[13px] text-text transition-colors hover:border-text'
 
 type Abierto = { id: number; que: 'cambiar' | 'cerrar' | 'anular' } | null
 
@@ -22,10 +23,10 @@ function Fila({ f, hoy, abierto, onAbrir }: { f: FilaRecurrente; hoy: string; ab
   const id = useId()
   const esta = abierto?.id === f.id ? abierto.que : null
   return (
-    <li className="p-3" data-recurrente={f.id}>
+    <li className="px-3 py-3" data-recurrente={f.id}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-text">
+          <p className="text-[14px] text-text">
             {f.concepto}{' '}
             <span className="font-normal text-muted">
               · {f.sentido === 'ingreso' ? 'ingreso' : 'gasto'} {f.frecuencia !== 'mensual' ? f.frecuencia : 'mensual'}
@@ -62,7 +63,7 @@ function Fila({ f, hoy, abierto, onAbrir }: { f: FilaRecurrente; hoy: string; ab
         ) : null}
       </div>
       {esta ? (
-        <div id={`${id}-f`} className="mt-3 rounded-lg border border-border bg-surface-2 p-3">
+        <div id={`${id}-f`} className="mt-3 rounded-item border border-border bg-surface-2 p-3">
           {esta === 'cambiar' ? (
             <FormAccion accion={guardarRecurrenteAccion} boton="Guardar el cambio" ocultos={{ accion: 'cambiar_desde', sentido: f.sentido, id: String(f.id) }}>
               {(e) => (
@@ -103,19 +104,16 @@ function Alta({ hoy }: { hoy: string }) {
     <FormAccion accion={guardarRecurrenteAccion} boton={sentido === 'ingreso' ? 'Declarar el ingreso' : 'Declarar el gasto'} ocultos={{ accion: 'alta', sentido }}>
       {(e) => (
         <>
-          <div role="group" aria-label="Ingreso o gasto" className="inline-grid grid-cols-2 gap-1 rounded-lg border border-border bg-surface-2 p-1">
-            {(['ingreso', 'gasto'] as const).map((x) => (
-              <button
-                key={x}
-                type="button"
-                aria-pressed={sentido === x}
-                onClick={() => setSentido(x)}
-                className={`tocable inline-flex min-h-8 items-center justify-center rounded-md px-3 text-sm font-medium ${sentido === x ? 'bg-surface text-text shadow-[var(--shadow)]' : 'text-muted hover:text-text'}`}
-              >
-                {x === 'ingreso' ? 'Ingreso' : 'Gasto'}
-              </button>
-            ))}
-          </div>
+          <SegmentadoBotones
+            etiqueta="Ingreso o gasto"
+            className="self-start"
+            actual={sentido}
+            alElegir={setSentido}
+            opciones={[
+              { valor: 'ingreso', nombre: 'Ingreso' },
+              { valor: 'gasto', nombre: 'Gasto' },
+            ]}
+          />
           <div className="grid gap-3 sm:grid-cols-2">
             <Campo etiqueta="Concepto" htmlFor={`${id}-concepto`} error={e.concepto}>
               <input id={`${id}-concepto`} name="concepto" maxLength={80} autoComplete="off" placeholder={sentido === 'ingreso' ? 'Ej.: honorarios del exterior' : 'Ej.: gastos de la casa'} className={CAMPO} />
@@ -179,18 +177,18 @@ export function Recurrentes({ filas, hoy }: { filas: FilaRecurrente[]; hoy: stri
   return (
     <div className="space-y-3">
       {vigentes.length ? (
-        <ul className="divide-y divide-border rounded-lg border border-border">
+        <ul className="divide-y divide-border rounded-item border border-border">
           {vigentes.map((f) => (
             <Fila key={f.id} f={f} hoy={hoy} abierto={abierto} onAbrir={setAbierto} />
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-muted">Todavía no declaraste ingresos ni gastos: sin ellos, tu excedente es sin dato.</p>
+        <p className="text-[13px] text-muted">Todavía no declaraste ingresos ni gastos: sin ellos, tu excedente es sin dato.</p>
       )}
       {viejas.length ? (
         <details>
-          <summary className="tocable inline-flex min-h-9 cursor-pointer items-center text-sm text-muted">Los que ya no valen ({viejas.length})</summary>
-          <ul className="mt-1 divide-y divide-border rounded-lg border border-border">
+          <summary className="tocable inline-flex min-h-9 cursor-pointer items-center text-[13px] text-muted hover:text-text">Los que ya no valen ({viejas.length})</summary>
+          <ul className="mt-1 divide-y divide-border rounded-item border border-border">
             {viejas.map((f) => (
               <Fila key={f.id} f={f} hoy={hoy} abierto={abierto} onAbrir={setAbierto} />
             ))}
@@ -198,7 +196,7 @@ export function Recurrentes({ filas, hoy }: { filas: FilaRecurrente[]; hoy: stri
         </details>
       ) : null}
       {alta ? (
-        <div className="rounded-lg border border-border bg-surface-2 p-3">
+        <div className="rounded-item border border-border bg-surface-2 p-3">
           <Alta hoy={hoy} />
         </div>
       ) : (

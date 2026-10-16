@@ -1,13 +1,16 @@
 // Las partes de Flujo que no dependen de un escenario (plan §6 D.1 bloques 1 y
-// 2, D.9): el mes en curso con los datos de hoy, el calendario de la plata que
-// ya se sabe y lo proyectado contra lo real de cada mes. Sin estado: sirven en
-// el servidor. Cada cifra viene armada (con su traza) desde armar-flujo.ts.
+// 2): el mes en curso con los datos de hoy (con Cargar ingreso y Cargar
+// gasto, D-166), el calendario de la plata que ya se sabe y lo que falta
+// cargar. Sin estado: sirven en el servidor. Cada cifra viene armada (con su
+// traza) desde armar-flujo.ts. Proyectado contra real, con su Grilla, está en
+// real.tsx.
 
-import Link from 'next/link'
-import { NOMBRE_ETIQUETA, type Etiqueta } from '@/lib/domain/calc'
-import type { FilaCalendario, MesActual, MesCalendario, MesCerrado, VistaFlujo } from '@/lib/vistas/contratos-flujo'
+import { ArrowDownCircle, ArrowUpCircle } from 'lucide-react'
+import { NOMBRE_ETIQUETA, type CalcVista, type Etiqueta } from '@/lib/domain/calc'
+import { fechaCorta } from '@/lib/domain/fechas'
+import type { FilaCalendario, MesActual, MesCalendario, VistaFlujo } from '@/lib/vistas/contratos-flujo'
 import { MontoTrazado, TextoConMontos } from '@/components/monto'
-import { Chip, ChipEtiqueta, ParMonto, Rotulo, Tarjeta } from '@/components/ui'
+import { Boton, Chip, ChipEtiqueta, ParMonto, Rotulo, Tarjeta } from '@/components/ui'
 
 const nombreChip = (c: string) => NOMBRE_ETIQUETA[c as Etiqueta] ?? c
 
@@ -32,21 +35,52 @@ function Frase({ partes }: { partes: MesActual['partes'] }) {
   )
 }
 
-export function SeccionMes({ m, pagador }: { m: MesActual; pagador: VistaFlujo['pagador_declarado'] }) {
+/** Cargar ingreso y Cargar gasto: van en el mes en curso, que es donde se usan (D-166). */
+export function AccionesCargar() {
   return (
-    <Tarjeta className="p-4" aria-labelledby="titulo-mes">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Rotulo as="h2">
-          <span id="titulo-mes">{m.nombre}, con los datos de hoy</span>
-        </Rotulo>
-        <span className="flex flex-wrap gap-1">
+    <div className="flex flex-wrap gap-2">
+      <Boton href="/flujo/cargar?sentido=ingreso" variante="contorno" tam="sm">
+        <ArrowDownCircle aria-hidden className="size-4" /> Cargar ingreso
+      </Boton>
+      <Boton href="/flujo/cargar?sentido=gasto" variante="contorno" tam="sm">
+        <ArrowUpCircle aria-hidden className="size-4" /> Cargar gasto
+      </Boton>
+    </div>
+  )
+}
+
+export function SeccionMes({
+  m,
+  pagador,
+  datos,
+}: {
+  m: MesActual
+  pagador: VistaFlujo['pagador_declarado']
+  /** Con qué datos se armaron el mes y la cascada de arriba: la fecha de tu última carga, el CCL y el cripto. */
+  datos?: { fecha: string | null; ccl: CalcVista; cripto: CalcVista }
+}) {
+  return (
+    <Tarjeta className="flex min-w-0 flex-col gap-3 p-5" aria-labelledby="titulo-mes">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <Rotulo as="h2">
+            <span id="titulo-mes">{m.nombre}, con los datos de hoy</span>
+          </Rotulo>
           {m.reales.ingresos ? <Chip>ingreso cargado</Chip> : <Chip>declarado</Chip>}
-        </span>
+        </div>
+        <AccionesCargar />
       </div>
-      <div className="mt-2">
-        <Frase partes={m.partes} />
-      </div>
-      <dl className="mt-3 grid gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
+      {datos?.fecha ? (
+        <p className="flex flex-wrap items-baseline gap-x-1.5 text-[12px] text-muted" data-datos-mes>
+          <span>Con lo declarado y tu carga del {fechaCorta(datos.fecha)}: CCL</span>
+          <MontoTrazado calc={datos.ccl} moneda="ARS" titulo="CCL de tu última carga" decimales={2} />
+          <span>· cripto</span>
+          <MontoTrazado calc={datos.cripto} moneda="ARS" titulo="Dólar cripto de tu última carga" decimales={2} />
+          <span>. Es la cascada de arriba: no depende de tus supuestos.</span>
+        </p>
+      ) : null}
+      <Frase partes={m.partes} />
+      <dl className="grid gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
         {(
           [
             ['Ingresos', m.ingresos, false],
@@ -65,30 +99,27 @@ export function SeccionMes({ m, pagador }: { m: MesActual; pagador: VistaFlujo['
           </div>
         ))}
       </dl>
-      <div className="mt-3 flex flex-wrap items-end justify-between gap-3 border-t border-border pt-3">
+      <div className="border-t border-border pt-3">
         <div className="min-w-0">
           <p className="text-xs text-muted" data-excedente-mes>
             Excedente invertible de {m.nombre.toLowerCase()} <ChipEtiqueta calc={m.excedente.ars} omitir={['declarado']} />
           </p>
-          <div className="mt-0.5 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-2xl font-semibold">
+          <div className="cifra mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[22px]">
             <MontoTrazado calc={m.excedente.ars} moneda="ARS" titulo={`Excedente de ${m.nombre} · en pesos`} />
-            <span className="text-lg font-medium">
+            <span className="num text-[14px]">
               <MontoTrazado calc={m.excedente.usd} moneda="USD" titulo={`Excedente de ${m.nombre} · en dólares`} />
             </span>
           </div>
           {m.excedente.ars.valor === null ? <p className="mt-1 text-sm text-muted">{m.excedente.ars.motivo}</p> : null}
         </div>
-        <Link href="/flujo/cargar?sentido=ingreso" className="tocable inline-flex min-h-10 items-center justify-center rounded-lg border border-accent/40 bg-accent-soft px-3 text-sm font-medium text-accent hover:border-accent">
-          Cargar lo que entró
-        </Link>
       </div>
       {m.cuotas.some((c) => c.quien === null) ? (
-        <p className="mt-2 text-sm text-muted">¿Quién paga la cuota del leasing? Elegilo en tus supuestos (Vos · La empresa): hasta entonces, el excedente es sin dato.</p>
+        <p className="text-sm text-muted">¿Quién paga la cuota del leasing? Elegilo en tus supuestos (Vos · La empresa): hasta entonces, el excedente es sin dato.</p>
       ) : pagador === 'empresa' ? (
-        <p className="mt-2 text-sm text-muted">La cuota la paga la empresa: no resta de tu excedente.</p>
+        <p className="text-sm text-muted">La cuota la paga la empresa: no resta de tu excedente.</p>
       ) : null}
       {m.vencimientos.length ? (
-        <ul className="mt-2 space-y-1 text-sm text-muted">
+        <ul className="space-y-1 text-sm text-muted">
           {m.vencimientos.map((v) => (
             <li key={`${v.ticker}-${v.fecha}`} className="flex flex-wrap items-baseline gap-x-2">
               <span>
@@ -133,7 +164,7 @@ function FilaCal({ f }: { f: FilaCalendario }) {
 
 function MesCal({ m, className = '' }: { m: MesCalendario; className?: string }) {
   return (
-    <li className={`min-w-0 rounded-lg border border-border p-3 ${className}`} data-calendario={m.mes}>
+    <li className={`min-w-0 rounded-item border border-border bg-surface-2 p-3 ${className}`} data-calendario={m.mes}>
       <div className="flex items-baseline justify-between gap-2">
         <h3 className="text-sm font-semibold text-text">{m.nombre}</h3>
         <span className="text-xs text-muted">{m.filas.length === 0 ? 'nada que ya se sepa' : m.filas.length === 1 ? '1 movimiento' : `${m.filas.length} movimientos`}</span>
@@ -158,11 +189,9 @@ export function SeccionCalendario({ meses }: { meses: MesCalendario[] }) {
   const primeros = meses.slice(0, 2)
   const resto = meses.slice(2)
   return (
-    <Tarjeta className="p-4" aria-labelledby="titulo-calendario">
-      <h2 id="titulo-calendario" className="text-base font-semibold text-text">
-        El calendario de la plata
-      </h2>
-      <p className="mt-0.5 text-xs text-muted">Lo que ya se sabe de los próximos {meses.length} meses, sin supuestos: lo declarado, las cuotas del leasing y lo que vence. El neto no cuenta lo que vence (eso se reinvierte con tu regla).</p>
+    <Tarjeta className="p-5" aria-labelledby="titulo-calendario">
+      <Rotulo id="titulo-calendario">El calendario de la plata</Rotulo>
+      <p className="mt-1 text-[13px] text-muted">Lo que ya se sabe de los próximos {meses.length} meses, sin supuestos: lo declarado, las cuotas del leasing y lo que vence. El neto no cuenta lo que vence (eso se reinvierte con tu regla).</p>
       <ul className="mt-3 grid gap-2 md:grid-cols-2">
         {primeros.map((m, i) => (
           <MesCal key={m.mes} m={m} className={i > 0 ? 'hidden md:block' : ''} />
@@ -170,7 +199,7 @@ export function SeccionCalendario({ meses }: { meses: MesCalendario[] }) {
       </ul>
       {meses.length > 1 ? (
         <details className={`mt-2 ${resto.length ? '' : 'md:hidden'}`}>
-          <summary className="tocable inline-flex min-h-10 cursor-pointer items-center text-sm font-medium text-accent">Ver los {meses.length} meses</summary>
+          <summary className="tocable inline-flex min-h-10 cursor-pointer items-center text-[13px] text-muted hover:text-text">Ver los {meses.length} meses ▸</summary>
           <ul className="mt-2 grid gap-2 md:grid-cols-2">
             {primeros.slice(1).map((m) => (
               <MesCal key={m.mes} m={m} className="md:hidden" />
@@ -185,102 +214,11 @@ export function SeccionCalendario({ meses }: { meses: MesCalendario[] }) {
   )
 }
 
-export function SeccionRealContraProyectado({ meses }: { meses: MesCerrado[] }) {
-  return (
-    <div id="real-contra-proyectado" className="scroll-mt-4">
-    <Tarjeta className="p-4" aria-labelledby="titulo-real">
-      <h2 id="titulo-real" className="text-base font-semibold text-text">
-        Proyectado contra real
-      </h2>
-      <p className="mt-0.5 text-xs text-muted">
-        Cada mes nace proyectado con lo que declaraste y se vuelve real con lo que cargás (Cargar ingreso, las cuotas pagadas, tus cargas). Los gastos reales son sin dato salvo los que cargás. Lo extraordinario va aparte: no cambia lo recurrente.
-      </p>
-      {meses.length === 0 ? (
-        <p className="mt-2 text-sm text-muted">Todavía no hay meses con datos para comparar.</p>
-      ) : (
-        <div className="mt-3 space-y-3">
-          {meses.map((m) => (
-            <section key={m.mes} aria-label={`${m.nombre}: proyectado contra real`} className="rounded-lg border border-border p-3" data-real={m.mes}>
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold text-text">{m.nombre}</h3>
-                <Chip>{m.estado === 'en_curso' ? 'en curso' : 'cerrado'}</Chip>
-              </div>
-              {/* Teléfono: una tarjeta por línea. */}
-              <ul className="mt-2 space-y-2 md:hidden">
-                {m.filas.map((f) => (
-                  <li key={f.linea} className="rounded-md bg-surface-2 p-2 text-sm" data-linea={f.linea}>
-                    <p className="font-medium text-text">{f.nombre}</p>
-                    <dl className="mt-1 space-y-1">
-                      {(
-                        [
-                          ['Proyectado', f.proyectado],
-                          ['Real', f.real],
-                          ['Desvío', f.desvio],
-                        ] as const
-                      ).map(([t, p]) => (
-                        <div key={t} className="flex flex-wrap items-baseline justify-between gap-x-2">
-                          <dt className="text-muted">{t}</dt>
-                          <dd>
-                            <ParMonto par={p} titulo={`${f.nombre} de ${m.nombre} · ${t.toLowerCase()}`} signo={t === 'Desvío'} />
-                          </dd>
-                        </div>
-                      ))}
-                    </dl>
-                  </li>
-                ))}
-              </ul>
-              {/* Desde 768 px, la tabla. */}
-              <table className="mt-2 hidden w-full table-fixed text-sm md:table">
-                <caption className="sr-only">{m.nombre}: proyectado, real y desvío por línea</caption>
-                <thead>
-                  <tr className="text-left text-xs text-muted">
-                    <th scope="col" className="w-1/4 py-1 font-medium">
-                      Línea
-                    </th>
-                    <th scope="col" className="py-1 text-right font-medium">
-                      Proyectado
-                    </th>
-                    <th scope="col" className="py-1 text-right font-medium">
-                      Real
-                    </th>
-                    <th scope="col" className="py-1 text-right font-medium">
-                      Desvío
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {m.filas.map((f) => (
-                    <tr key={f.linea} className="border-t border-border align-top" data-linea={f.linea}>
-                      <th scope="row" className="py-1.5 pr-2 text-left font-normal text-text">
-                        {f.nombre}
-                      </th>
-                      <td className="py-1.5 text-right">
-                        <ParMonto par={f.proyectado} titulo={`${f.nombre} de ${m.nombre} · proyectado`} vertical />
-                      </td>
-                      <td className="py-1.5 text-right">
-                        <ParMonto par={f.real} titulo={`${f.nombre} de ${m.nombre} · real`} vertical />
-                      </td>
-                      <td className="py-1.5 text-right">
-                        <ParMonto par={f.desvio} titulo={`${f.nombre} de ${m.nombre} · desvío`} signo vertical />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
-          ))}
-        </div>
-      )}
-    </Tarjeta>
-    </div>
-  )
-}
-
 export function FaltanDatos({ items }: { items: VistaFlujo['faltan_datos'] }) {
   if (!items.length) return null
   return (
-    <Tarjeta className="border-warn/40 bg-warn-soft p-4" aria-labelledby="titulo-faltan">
-      <h2 id="titulo-faltan" className="text-sm font-semibold text-text">
+    <Tarjeta className="border-border-strong bg-surface-2 p-5" aria-labelledby="titulo-faltan">
+      <h2 id="titulo-faltan" className="text-[14px] font-medium text-text">
         {items.length === 1 ? 'Falta un dato' : `Faltan ${items.length} datos`}
       </h2>
       <ul className="mt-1 space-y-1 text-sm text-text">

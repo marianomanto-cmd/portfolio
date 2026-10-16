@@ -278,7 +278,8 @@ export function Catalogo({ activos, ratios, hoy }: { activos: Activo[]; ratios: 
                         <span className="num font-medium">{a.ticker}</span>
                       </span>
                     </td>
-                    <td className="max-w-64 truncate px-3 py-2" title={a.nombre}>
+                    {/* Entre 768 y 1023 px el nombre baja de renglón: en un solo renglón, el más largo empujaba la tabla fuera de su tarjeta (D-30). */}
+                    <td className="max-w-64 truncate px-3 py-2 max-lg:whitespace-normal" title={a.nombre}>
                       {a.nombre}
                       {a.activo_bool ? null : <Chip className="ml-2">no se usa</Chip>}
                     </td>

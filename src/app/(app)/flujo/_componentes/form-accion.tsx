@@ -7,6 +7,7 @@
 // limpiarse.
 
 import { startTransition, useActionState, type ReactNode } from 'react'
+import { clasesBoton } from '@/components/ui'
 import type { EstadoFlujo } from '../acciones'
 
 const INICIAL: EstadoFlujo = { ok: null, mensaje: null, errores: {}, vez: 0 }
@@ -42,7 +43,7 @@ export function FormAccion({
         {children(estado.errores)}
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <button type="submit" disabled={enviando} className="tocable inline-flex min-h-10 items-center justify-center rounded-lg bg-accent px-4 text-sm font-medium text-on-accent hover:bg-accent-strong disabled:opacity-60">
+        <button type="submit" disabled={enviando} className={clasesBoton('primario', 'sm')}>
           {enviando ? 'Guardando…' : boton}
         </button>
         {estado.mensaje ? (
@@ -55,12 +56,12 @@ export function FormAccion({
   )
 }
 
-export const CAMPO = 'tocable min-h-10 w-full min-w-0 rounded-lg border border-border bg-surface px-3 text-base text-text md:text-sm'
+export const CAMPO = 'tocable min-h-10 w-full min-w-0 rounded-item border border-border-strong bg-surface-2 px-3 text-base text-text placeholder:text-faint md:text-sm'
 
 export function Campo({ etiqueta, error, children, htmlFor }: { etiqueta: string; error?: string; children: ReactNode; htmlFor: string }) {
   return (
     <div className="min-w-0">
-      <label htmlFor={htmlFor} className="text-sm text-text">
+      <label htmlFor={htmlFor} className="text-[13px] text-muted">
         {etiqueta}
       </label>
       <div className="mt-1">{children}</div>

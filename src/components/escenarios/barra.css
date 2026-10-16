@@ -1,0 +1,74 @@
+/*
+ * La barra de un supuesto (Flujo, D-164): un input range nativo (teclado,
+ * lector de pantalla y dedo, sin código propio) con el riel transparente. El
+ * riel, la marca de Igual y el tramo pintado los dibuja la barra debajo
+ * (barra.tsx), con el mismo recorrido que el pulgar: su centro va de 11 px a
+ * (ancho − 11 px). Vive acá y no en globals.css: solo lo usa la barra.
+ */
+.barra {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  margin: 0;
+  touch-action: pan-y;
+}
+.barra::-webkit-slider-runnable-track {
+  height: 6px;
+  background: transparent;
+  border: 0;
+}
+.barra::-moz-range-track {
+  height: 6px;
+  background: transparent;
+  border: 0;
+}
+.barra::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  margin-top: -8px;
+  border-radius: 9999px;
+  background: var(--text);
+  border: 3px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--border-strong);
+  transition: transform 160ms var(--ease-sistema);
+}
+.barra::-moz-range-thumb {
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  background: var(--text);
+  border: 3px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--border-strong);
+}
+.barra:active::-webkit-slider-thumb {
+  transform: scale(1.08);
+}
+/* Sin elegir: el pulgar, hueco. */
+.barra[data-vacia]::-webkit-slider-thumb {
+  background: var(--surface);
+  box-shadow: 0 0 0 2px var(--border-strong);
+}
+.barra[data-vacia]::-moz-range-thumb {
+  background: var(--surface);
+  box-shadow: 0 0 0 2px var(--border-strong);
+}
+/* Foco de teclado: el anillo va en el pulgar. */
+.barra:focus-visible {
+  outline: none;
+}
+.barra:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--focus);
+}
+.barra:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--focus);
+}
+@media (prefers-reduced-motion: reduce) {
+  .barra::-webkit-slider-thumb {
+    transition: none;
+  }
+}

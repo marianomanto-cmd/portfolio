@@ -102,6 +102,12 @@ export interface MesActual {
   nombre: string
   partes: ParteFrase[]
   ingresos: Par
+  /** El ingreso en dólares: en pesos, al cripto de tu última carga (o los pesos que recibiste); en dólares, lo declarado o cargado. */
+  ingreso_usd: Par
+  /** El ingreso fijo en pesos (declarado o cargado). */
+  ingreso_pesos: Par
+  /** El reintegro del IVA y la percepción de la cuota, si lo declaraste en Pasivos; null sin reintegro. */
+  reintegro: Par | null
   gastos: Par
   cuota: Par
   excedente: Par

@@ -22,6 +22,11 @@ describe('tema de los gráficos', () => {
     expect(o.dataZoom).toBeUndefined()
     expect(o.tooltip).toMatchObject({ confine: true, borderColor: TEMA_CLARO.borde })
     expect(o.aria).toMatchObject({ enabled: true })
+    // El nombre del gráfico, el de la pantalla: ECharts no lo pisa con su descripción en inglés y con los datos.
+    expect(conTema(barras, TEMA_CLARO, { movil: false, animar: true, nombre: 'Patrimonio neto · 12 meses' }).aria).toMatchObject({
+      enabled: true,
+      label: { description: 'Patrimonio neto · 12 meses' },
+    })
     expect(o.series).toBe(barras.series)
     expect(o.animation).toBe(true)
   })

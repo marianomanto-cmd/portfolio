@@ -3,34 +3,43 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { numero } from '@/lib/domain/dinero'
-import { fechaCorta, fechaLarga } from '@/lib/domain/fechas'
+import { fechaLarga } from '@/lib/domain/fechas'
 import type { CalcVista } from '@/lib/domain/calc'
-import type { Par, TotalesApertura, VistaLeasing, VistaPasivos } from '@/lib/vistas/contratos-pasivos'
+import type { Par, VistaLeasing, VistaPasivos } from '@/lib/vistas/contratos-pasivos'
 import { vistaPasivos } from '@/lib/vistas/pasivos'
 import { ErrorVista } from '@/components/error-vista'
 import { MontoTrazado, Porcentaje, SinDato } from '@/components/monto'
+import { Encabezado } from '@/components/pantalla/encabezado'
 import { Traza } from '@/components/traza'
 import { Chip, ChipEtiqueta, ParMonto, Rotulo, Tarjeta } from '@/components/ui'
+import { TablaApertura } from './_componentes/apertura'
 import { CuadroMarcha } from './_componentes/cuadro'
+import { GraficoCuota } from './_componentes/cuota'
 import { FrasePasivos } from './_componentes/frase'
 import { GraficoApertura, GraficoIndexado } from './_componentes/graficos'
 import { ElegirDato } from './_componentes/pagador'
-import { COLOR_PARTE } from './_lib/graficos'
+import { Proximas } from './_componentes/proximas'
+import { Resumen } from './_componentes/resumen'
+import { lecturaPasivos } from './_lib/pantalla'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Pasivos' }
 
-// Pasivos (plan de la entrega 4, §5): el leasing entero. Cuánto pagaste,
-// cuánto falta y cuánto es en dólares; cada cuota abierta en amortización (lo
-// único que baja la deuda) y gasto; la deuda en tres valores con su origen; la
-// tasa del contrato; la opción de compra. Toda cifra en pesos y en dólares, con
-// su traza; lo que no es un hecho, con su chip.
+// Pasivos (rediseño del 15/10, D-157, D-162 y D-163; handoff "Portfolio UI",
+// capturas 08 y 09): la pregunta, la lectura, la tira de cuotas con las cuatro
+// cifras (saldo de capital, pagado, falta, opción de compra), la cuota en
+// pesos y en dólares y las próximas cuotas. Abajo, "El detalle: tu leasing",
+// lo de siempre: la deuda con su origen, la tasa del contrato, el costo contra
+// el bien, el cuadro de marcha entero, cada cuota abierta (lo único que baja
+// la deuda es la amortización), los totales, el recupero fiscal, la frase, el
+// contrato y quién paga. Toda cifra en pesos y en dólares, con su traza; lo
+// que no es un hecho, con su chip. Las cuentas están en _lib (puras, con test).
 
 const ENLACE = 'tocable inline-flex min-h-11 items-center gap-1 rounded-lg text-sm font-medium text-accent hover:underline lg:min-h-9'
 
 function Seccion({ titulo, id, children, className = '', accion }: { titulo: string; id: string; children: ReactNode; className?: string; accion?: ReactNode }) {
   return (
-    <Tarjeta className={`min-w-0 p-4 md:p-5 ${className}`} aria-labelledby={id}>
+    <Tarjeta className={`min-w-0 p-5 ${className}`} aria-labelledby={id}>
       <div className="mb-3 flex min-w-0 flex-wrap items-center justify-between gap-2">
         <Rotulo as="h2" className="min-w-0">
           <span id={id}>{titulo}</span>
@@ -45,125 +54,18 @@ function Seccion({ titulo, id, children, className = '', accion }: { titulo: str
 /** Un renglón "nombre · pesos · dólares", que en el teléfono se apila. */
 function Renglon({ nombre, par, detalle, punto, cuenta }: { nombre: ReactNode; par: Par; detalle?: ReactNode; punto?: string; cuenta?: boolean }) {
   return (
-    <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 border-t border-border py-1.5 first:border-t-0">
+    <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 border-t border-border py-2 first:border-t-0">
       <dt className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm text-muted">
         {punto ? <span aria-hidden className="inline-block size-2 shrink-0 rounded-full" style={{ background: punto }} /> : null}
         <span>{nombre}</span>
         {par.ars.valor === null ? null : <ChipEtiqueta calc={par.ars} />}
         {cuenta ? <Chip>la que cuenta</Chip> : null}
       </dt>
-      <dd className="min-w-0 text-right">
+      <dd className="ml-auto min-w-0 text-right">
         <ParMonto par={par} titulo={typeof nombre === 'string' ? nombre : 'Monto'} />
         {/* Un "sin dato" dice por qué (nunca un cero). */}
         {par.ars.valor === null && par.ars.motivo ? <span className="block text-xs text-muted">{par.ars.motivo}</span> : detalle ? <span className="block text-xs text-muted">{detalle}</span> : null}
       </dd>
-    </div>
-  )
-}
-
-function Progreso({ hechas, total, pct }: { hechas: number; total: number; pct: number }) {
-  return (
-    <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-surface-3" role="img" aria-label={`${hechas} de ${total} cuotas pagadas`}>
-      <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
-    </div>
-  )
-}
-
-function Tarjetas({ l }: { l: VistaLeasing }) {
-  const t = l.tarjetas
-  return (
-    <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
-      <Tarjeta className="min-w-0 p-4" aria-labelledby={`pagadas-${l.contrato.id}`}>
-        <Rotulo as="h3">
-          <span id={`pagadas-${l.contrato.id}`}>Cuotas pagadas</span>
-        </Rotulo>
-        <p className="cifra mt-1 text-2xl font-semibold text-text">
-          {t.pagadas}
-          <span className="text-base font-normal text-muted"> de {t.total}</span>
-        </p>
-        <Progreso hechas={t.pagadas} total={t.total} pct={t.progreso} />
-        <p className="mt-2 text-xs text-muted">
-          {t.cargadas < t.total ? `El cuadro de marcha trae ${t.cargadas} de ${t.total} cuotas.` : 'Según el cuadro de marcha que importaste.'}
-        </p>
-      </Tarjeta>
-      <Tarjeta className="min-w-0 p-4" aria-labelledby={`proxima-${l.contrato.id}`}>
-        <Rotulo as="h3">
-          <span id={`proxima-${l.contrato.id}`}>Próxima cuota</span>
-        </Rotulo>
-        {t.proxima ? (
-          <>
-            <p className="mt-1 text-sm text-muted">
-              La {t.proxima.nro}, vence el {fechaCorta(t.proxima.fecha)}
-            </p>
-            <div className="mt-1 flex min-w-0 flex-wrap items-baseline gap-x-2 text-xl font-semibold">
-              <MontoTrazado calc={t.proxima.total.ars} moneda="ARS" titulo="Próxima cuota en pesos" />
-              <ChipEtiqueta calc={t.proxima.total.ars} />
-            </div>
-            <p className="mt-1 flex flex-wrap items-baseline gap-x-1 text-sm text-muted">
-              hoy <MontoTrazado calc={t.proxima.total.usd} moneda="USD" titulo="Próxima cuota en dólares al CCL de hoy" /> al CCL de hoy
-            </p>
-          </>
-        ) : (
-          <p className="mt-1 text-sm text-muted">No queda ninguna cuota por pagar.</p>
-        )}
-        {t.vencidas.length ? (
-          <p className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted">
-            <Chip>vencida</Chip>
-            {t.vencidas.length === 1
-              ? `La ${t.vencidas[0].nro} venció el ${fechaCorta(t.vencidas[0].fecha)} y tu planilla no la marca pagada.`
-              : `Las ${t.vencidas.map((v) => v.nro).join(', ')} vencieron y tu planilla no las marca pagadas.`}{' '}
-            Si ya se debitó, importá la planilla actualizada.
-          </p>
-        ) : null}
-      </Tarjeta>
-      <Tarjeta className="min-w-0 p-4" aria-labelledby={`falta-${l.contrato.id}`}>
-        <Rotulo as="h3">
-          <span id={`falta-${l.contrato.id}`}>Falta pagar · {t.falta.cuotas} cuotas</span>
-        </Rotulo>
-        <div className="mt-1 flex min-w-0 flex-wrap items-baseline gap-x-2 text-xl font-semibold">
-          <MontoTrazado calc={t.falta.total.ars} moneda="ARS" titulo="Lo que falta pagar, nominal" />
-          <ChipEtiqueta calc={t.falta.total.ars} />
-        </div>
-        <p className="mt-1 flex flex-wrap items-baseline gap-x-1 text-sm text-muted">
-          hoy <MontoTrazado calc={t.falta.total.usd} moneda="USD" titulo="Lo que falta pagar en dólares al CCL de hoy" /> al CCL de hoy
-        </p>
-        <dl className="mt-2 text-sm">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-2">
-            <dt className="text-muted">canon según contrato</dt>
-            <dd className="text-right">
-              <ParMonto par={t.falta.canon} titulo="Canon que falta" />
-            </dd>
-          </div>
-          <div className="flex flex-wrap items-baseline justify-between gap-x-2">
-            <dt className="text-muted">IVA, seguro y percepción</dt>
-            <dd className="text-right">
-              <ParMonto par={t.falta.resto} titulo="IVA, seguro y percepción que faltan" />
-            </dd>
-          </div>
-        </dl>
-        <p className="mt-1 text-xs text-muted">Más la opción de compra. No es la deuda: trae intereses e impuestos.</p>
-      </Tarjeta>
-      <Tarjeta className="min-w-0 p-4" aria-labelledby={`costo-${l.contrato.id}`}>
-        <Rotulo as="h3">
-          <span id={`costo-${l.contrato.id}`}>Costo total contra el bien</span>
-        </Rotulo>
-        <div className="mt-1 flex min-w-0 flex-wrap items-baseline gap-x-2 text-xl font-semibold">
-          <MontoTrazado calc={t.costo.total.ars} moneda="ARS" titulo="Costo total del leasing, nominal" />
-          <ChipEtiqueta calc={t.costo.total.ars} />
-        </div>
-        <p className="mt-1 text-sm text-muted">pagado + falta + opción + cargos, en pesos nominales</p>
-        <ul className="mt-2 space-y-1 text-sm">
-          <li className="flex min-w-0 flex-wrap items-center gap-x-1">
-            <Veces calc={t.costo.vs_valor} titulo="Costo total ÷ valor del bien del contrato" /> el valor del bien del contrato
-          </li>
-          {t.costo.vs_valuacion ? (
-            <li className="flex min-w-0 flex-wrap items-center gap-x-1">
-              <Veces calc={t.costo.vs_valuacion} titulo={`Costo total ÷ valuación de ${l.bien?.nombre ?? 'el bien'}`} /> lo que vale hoy
-              {l.bien?.fecha ? <span className="text-muted">(valuación del {fechaLarga(l.bien.fecha)})</span> : null}
-            </li>
-          ) : null}
-        </ul>
-      </Tarjeta>
     </div>
   )
 }
@@ -184,8 +86,8 @@ function Deuda({ l }: { l: VistaLeasing }) {
   const aparte = d.posterior && !enInformada ? d.posterior : null
   return (
     <Seccion titulo="La deuda, con su origen" id={`deuda-${l.contrato.id}`}>
-      <p className="mb-2 text-sm text-muted">
-        Cuenta una sola, la misma que restan el Balance, Hoy y Flujo, al {fechaLarga(d.al)} (tu última carga): la que informa la leasera; sin ella, la según el cuadro de
+      <p className="mb-2 text-[13px] text-muted">
+        Cuenta una sola, la misma que restan Exposición, Hoy y Flujo, al {fechaLarga(d.al)} (tu última carga): la que informa la leasera; sin ella, la según el cuadro de
         marcha; sin cuadro o sin la tasa del contrato, la estimada que aprobaste. Lo que falta pagar va al lado: nunca se resta, porque trae intereses e impuestos.
       </p>
       <dl>
@@ -194,7 +96,7 @@ function Deuda({ l }: { l: VistaLeasing }) {
         ) : enInformada ? (
           <Renglon nombre="Valor de cancelación (informado)" par={enInformada.par} detalle={`al ${fechaLarga(enInformada.fecha)} · ${cuentaDespues}${enInformada.fuente ? ` · ${enInformada.fuente}` : ''}`} />
         ) : (
-          <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-1.5">
+          <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-2">
             <dt className="text-sm text-muted">Valor de cancelación (informado)</dt>
             <dd className="text-right text-sm">
               <span className="italic text-muted">sin dato</span> · pedíselo a la leasera.{' '}
@@ -235,16 +137,16 @@ function Tasa({ l }: { l: VistaLeasing }) {
         </div>
       ) : (
         <div className="space-y-1">
-          <p className="flex flex-wrap items-baseline gap-x-3 text-xl font-semibold">
+          <p className="cifra flex flex-wrap items-baseline gap-x-3 text-[22px]">
             <span>
               TEA <Porcentaje calc={l.tea} titulo="TEA implícita del contrato" signo={false} />
             </span>
-            <span className="text-base font-normal">
+            <span className="text-[15px]">
               TEM <Porcentaje calc={l.tem} titulo="TEM equivalente" signo={false} />
             </span>
             <ChipEtiqueta calc={l.tea} />
           </p>
-          <p className="text-sm text-muted">
+          <p className="text-[13px] text-muted">
             Calculada del contrato: lo financiado ({l.contrato.fecha_desembolso ? `desde el ${fechaLarga(l.contrato.fecha_desembolso)}` : 'sin fecha'}) contra cánones y opción, en días/365. No es la
             deuda.
           </p>
@@ -254,47 +156,45 @@ function Tasa({ l }: { l: VistaLeasing }) {
   )
 }
 
-function TablaApertura({ t, titulo, cargos, notaUsd }: { t: TotalesApertura; titulo: string; cargos: boolean; notaUsd: string }) {
+function Costo({ l }: { l: VistaLeasing }) {
+  const t = l.tarjetas
   return (
-    <div className="min-w-0">
-      <p className="mb-1 text-sm font-medium text-text">{titulo}</p>
-      {/* Un "sin dato" en dólares dice por qué una vez, arriba (no en cada renglón). */}
-      {t.total.usd.valor === null ? <p className="mb-1 text-xs text-muted">{notaUsd}</p> : null}
-      <dl>
-        <Renglon nombre="Amortización (baja la deuda)" par={t.amortizacion} punto={COLOR_PARTE.amortizacion} />
-        <Renglon nombre="Interés implícito" par={t.interes} punto={COLOR_PARTE.interes} />
-        <Renglon nombre="IVA" par={t.iva} punto={COLOR_PARTE.iva} />
-        <Renglon nombre="Seguro" par={t.seguro} punto={COLOR_PARTE.seguro} />
-        <Renglon nombre="Percepción RG 3337" par={t.percepcion} punto={COLOR_PARTE.percepcion} />
-        {cargos ? <Renglon nombre="Cargos" par={t.cargos} punto={COLOR_PARTE.cargos} /> : null}
-        <Renglon nombre="Gasto (todo menos la amortización)" par={t.gasto} />
-        <Renglon nombre="Total" par={t.total} />
-      </dl>
-    </div>
+    <Seccion titulo="Costo total contra el bien" id={`costo-${l.contrato.id}`}>
+      <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="cifra text-[22px]">
+          <MontoTrazado calc={t.costo.total.ars} moneda="ARS" titulo="Costo total del leasing, nominal" />
+        </span>
+        <span className="num text-[13px]">
+          <MontoTrazado calc={t.costo.total.usd} moneda="USD" titulo="Costo total del leasing, en dólares al CCL de hoy" decimales={0} />
+        </span>
+        <ChipEtiqueta calc={t.costo.total.ars} />
+      </div>
+      <p className="mt-1 text-[13px] text-muted">Pagado + falta + opción + cargos, en pesos nominales.</p>
+      <ul className="mt-2 space-y-1 text-sm">
+        <li className="flex min-w-0 flex-wrap items-center gap-x-1">
+          <Veces calc={t.costo.vs_valor} titulo="Costo total ÷ valor del bien del contrato" /> el valor del bien del contrato
+        </li>
+        {t.costo.vs_valuacion ? (
+          <li className="flex min-w-0 flex-wrap items-center gap-x-1">
+            <Veces calc={t.costo.vs_valuacion} titulo={`Costo total ÷ valuación de ${l.bien?.nombre ?? 'el bien'}`} /> lo que vale hoy
+            {l.bien?.fecha ? <span className="text-muted">(valuación del {fechaLarga(l.bien.fecha)})</span> : null}
+          </li>
+        ) : null}
+      </ul>
+    </Seccion>
   )
 }
 
 function Apertura({ l }: { l: VistaLeasing }) {
   return (
     <Seccion titulo="Cada cuota, abierta" id={`apertura-${l.contrato.id}`}>
-      <p className="mb-3 text-sm text-muted">
+      <p className="mb-3 text-[13px] text-muted">
         De cada cuota, solo la amortización baja la deuda y cuenta para tu patrimonio. El interés, el IVA, el seguro, la percepción y los cargos son gasto. La
-        amortización y el interés salen de la tasa del contrato: llevan el chip "estimado".
+        amortización y el interés salen de la tasa del contrato: llevan el chip «estimado».
       </p>
       <GraficoApertura leasing={{ cuotas: l.cuotas, opcion: l.opcion, tea: l.tea, hoy: l.hoy }} />
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <TablaApertura
-          t={l.totales.apertura_pagadas}
-          titulo={`Lo que pagaste (${l.tarjetas.pagadas} cuotas)`}
-          cargos={l.totales.hay_cargos}
-          notaUsd="En dólares, lo pagado va al CCL del día de cada pago: sin dato hasta que cargues esos CCL en Datos › Leasing (la planilla no trae la fecha del débito)."
-        />
-        <TablaApertura
-          t={l.totales.apertura_pendientes}
-          titulo={`Lo que falta (${l.tarjetas.falta.cuotas} cuotas)`}
-          cargos={l.totales.hay_cargos}
-          notaUsd="En dólares, sin dato: falta el CCL de hoy o una parte de lo que falta."
-        />
+      <div className="mt-4">
+        <TablaApertura l={l} />
       </div>
     </Seccion>
   )
@@ -317,7 +217,9 @@ function Totales({ l }: { l: VistaLeasing }) {
           detalle={l.totales.pagado.usd.valor === null ? 'en dólares, al CCL de cada pago: cargá los CCL de los pagos en Datos › Leasing' : 'en dólares, al CCL de cada pago'}
         />
         <Renglon nombre="Falta pagar" par={l.totales.falta} detalle="en dólares, al CCL de hoy: una referencia" />
-        <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 border-t border-border py-1.5">
+        <Renglon nombre="De lo que falta: canon según contrato" par={l.tarjetas.falta.canon} />
+        <Renglon nombre="De lo que falta: IVA, seguro y percepción" par={l.tarjetas.falta.resto} />
+        <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 border-t border-border py-2">
           <dt className="text-sm text-muted">Falta pagar, en pesos de hoy</dt>
           <dd className="min-w-0 text-right">
             <MontoTrazado calc={l.falta_pesos_hoy} moneda="ARS" titulo="Lo que falta pagar, en pesos de hoy" />
@@ -338,7 +240,7 @@ function Totales({ l }: { l: VistaLeasing }) {
         {l.totales.hay_cargos ? (
           <Renglon nombre="Cargos extra" par={l.totales.cargos} />
         ) : (
-          <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 border-t border-border py-1.5">
+          <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 border-t border-border py-2">
             <dt className="text-sm text-muted">Cargos extra</dt>
             <dd className="text-sm text-muted">ninguno</dd>
           </div>
@@ -372,7 +274,7 @@ function Fiscal({ l }: { l: VistaLeasing }) {
         <Renglon nombre="Licuación de la deuda" par={l.licuacion_deuda} detalle="cuántos dólares bajó la deuda solo por la suba del CCL, entre tus cargas" />
       </dl>
       <div className="mt-3">
-        <p className="mb-1 text-sm font-medium text-text">La cuota en pesos contra la cuota en dólares</p>
+        <p className="mb-1 text-sm font-medium text-text">La cuota en pesos contra la cuota en dólares, índice 100</p>
         {l.indexado.length ? <GraficoIndexado filas={l.indexado} /> : <p className="text-sm text-muted">{l.indexado_motivo}</p>}
       </div>
     </Seccion>
@@ -460,53 +362,92 @@ function Contrato({ l }: { l: VistaLeasing }) {
   )
 }
 
-function Leasing({ l, ccl }: { l: VistaLeasing; ccl: CalcVista }) {
-  const sinCuadro = l.cuotas.length === 0
+/** Sin cuadro de marcha, el gráfico y las próximas no tienen de dónde salir: el bloque queda y dice qué falta. */
+function SinCuadro({ titulo, id }: { titulo: string; id: string }) {
   return (
-    <article className="flex min-w-0 flex-col gap-3 md:gap-4" aria-labelledby={`leasing-${l.contrato.id}`}>
-      <Tarjeta className="min-w-0 p-4 md:p-5">
-        <div className="mb-2 flex min-w-0 flex-wrap items-center gap-2">
-          <h2 id={`leasing-${l.contrato.id}`} className="text-base font-semibold text-text md:text-lg">
-            {l.contrato.nombre}
-          </h2>
-          <Chip>{l.contrato.tipo}</Chip>
-          {l.deuda.vigente === 'segun_cuadro' || l.deuda.vigente === 'estimada' ? <Chip>deuda estimada</Chip> : l.deuda.vigente === null ? <Chip>deuda sin dato</Chip> : null}
-        </div>
-        <FrasePasivos partes={l.frase} detalle={l.frase_detalle} titulo={l.contrato.nombre} />
+    <Seccion titulo={titulo} id={id}>
+      <p className="text-sm text-muted">
+        <span className="italic">sin dato</span> · falta el cuadro de marcha.{' '}
+        <Link href="/datos/leasing#cuadro-de-marcha" className={ENLACE}>
+          Importá el cuadro de marcha (CSV) <ArrowRight aria-hidden className="size-4" />
+        </Link>
+      </p>
+    </Seccion>
+  )
+}
+
+const DETALLE_DE: Record<VistaLeasing['contrato']['tipo'], string> = { leasing: 'tu leasing', prestamo: 'tu préstamo', tarjeta: 'tu tarjeta' }
+
+function Leasing({ l, v }: { l: VistaLeasing; v: VistaPasivos }) {
+  const sinCuadro = l.cuotas.length === 0
+  const cclFecha = v.ccl_fecha ? fechaLarga(v.ccl_fecha) : null
+  const idDetalle = `detalle-${l.contrato.id}`
+  return (
+    <article className="flex min-w-0 flex-col gap-5" aria-label={l.contrato.nombre}>
+      <Resumen l={l} />
+      {/* El gráfico principal y las próximas (handoff: 1,4fr y 1fr desde 1280 px, las dos tarjetas del mismo alto). */}
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         {sinCuadro ? (
-          <Link href="/datos/leasing#cuadro-de-marcha" className={`${ENLACE} mt-2`}>
-            Importá el cuadro de marcha (CSV) <ArrowRight aria-hidden className="size-4" />
-          </Link>
-        ) : null}
-        {sinCuadro ? null : (
-          <p className="mt-2 text-xs text-muted">
-            En dólares, lo que falta va al CCL de hoy ({ccl.valor === null ? 'sin dato' : numero(ccl.valor, 2)}): una referencia, no lo que va a costar.
-          </p>
+          <>
+            <SinCuadro titulo="La cuota en pesos y en dólares" id={`cuota-sin-${l.contrato.id}`} />
+            <SinCuadro titulo="Cuadro de marcha · próximas" id={`proximas-sin-${l.contrato.id}`} />
+          </>
+        ) : (
+          <>
+            <GraficoCuota l={l} />
+            <Proximas l={l} ccl={v.ccl} cclFecha={cclFecha} />
+          </>
         )}
-      </Tarjeta>
-      {sinCuadro ? (
-        <div className="grid items-start gap-3 md:gap-4 xl:grid-cols-2">
-          <Deuda l={l} />
-          <Contrato l={l} />
+      </div>
+
+      {/* El detalle: todo lo que la pantalla tenía, con el estilo nuevo (como "El detalle: tu exposición"). */}
+      <section aria-labelledby={idDetalle} className="flex min-w-0 flex-col gap-5">
+        <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-border pt-5">
+          <h2 id={idDetalle} className="text-[15px] font-medium">
+            El detalle: {DETALLE_DE[l.contrato.tipo]}
+          </h2>
+          <p className="flex flex-wrap items-center gap-x-1 text-[13px] text-muted">
+            {cclFecha ? `En dólares, al CCL del ${cclFecha}:` : 'En dólares, al último CCL:'}{' '}
+            <Traza calc={v.ccl} titulo={cclFecha ? `CCL del ${cclFecha}` : 'Último CCL cargado'}>
+              <span className="num">{v.ccl.valor === null ? 'sin dato' : numero(v.ccl.valor, 2)}</span>
+            </Traza>
+            <ChipEtiqueta calc={v.ccl} />
+          </p>
         </div>
-      ) : (
-        <>
-          <Tarjetas l={l} />
-          <div className="grid items-start gap-3 md:gap-4 xl:grid-cols-2">
+        {sinCuadro ? (
+          <div className="grid min-w-0 items-start gap-5 xl:grid-cols-2">
             <Deuda l={l} />
-            <Tasa l={l} />
+            <Contrato l={l} />
           </div>
-          <Apertura l={l} />
-          <Seccion titulo="Cuadro de marcha" id={`cuadro-${l.contrato.id}`}>
-            <CuadroMarcha leasing={{ cuotas: l.cuotas, opcion: l.opcion, tea: l.tea }} />
-          </Seccion>
-          <div className="grid items-start gap-3 md:gap-4 xl:grid-cols-2">
-            <Totales l={l} />
-            <Fiscal l={l} />
-          </div>
-          <Contrato l={l} />
-        </>
-      )}
+        ) : (
+          <>
+            <div className="grid min-w-0 items-start gap-5 xl:grid-cols-2">
+              <Deuda l={l} />
+              <div className="flex min-w-0 flex-col gap-5">
+                <Tasa l={l} />
+                <Costo l={l} />
+              </div>
+            </div>
+            <Seccion titulo="Cuadro de marcha" id={`cuadro-${l.contrato.id}`}>
+              <CuadroMarcha leasing={{ cuotas: l.cuotas, opcion: l.opcion, tea: l.tea }} />
+            </Seccion>
+            <Apertura l={l} />
+            <div className="grid min-w-0 items-start gap-5 xl:grid-cols-2">
+              <Totales l={l} />
+              <Fiscal l={l} />
+            </div>
+            <div className="grid min-w-0 items-start gap-5 xl:grid-cols-2">
+              <Seccion titulo="El leasing en palabras" id={`palabras-${l.contrato.id}`}>
+                <FrasePasivos partes={l.frase} detalle={l.frase_detalle} titulo={l.contrato.nombre} />
+                <p className="mt-2 text-xs text-muted">
+                  En dólares, lo que falta va al CCL {cclFecha ? `del ${cclFecha}` : 'de tu última carga'} (el de arriba): una referencia, no lo que va a costar.
+                </p>
+              </Seccion>
+              <Contrato l={l} />
+            </div>
+          </>
+        )}
+      </section>
     </article>
   )
 }
@@ -525,18 +466,8 @@ export default async function PaginaPasivos({ searchParams }: { searchParams: Pr
     )
   }
   return (
-    <div className="flex min-w-0 flex-col gap-3 md:gap-4">
-      <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h1 className="text-lg font-semibold text-text md:text-xl">Pasivos</h1>
-        <p className="flex flex-wrap items-center gap-x-1 text-xs text-muted">
-          {/* El último CCL cargado, con su fecha: no siempre es de hoy (y si pasaron más de 2 días hábiles, "viejo"). */}
-          {v.ccl_fecha ? `CCL del ${fechaLarga(v.ccl_fecha)}:` : 'CCL:'}{' '}
-          <Traza calc={v.ccl} titulo="Último CCL cargado">
-            <span className="num">{v.ccl.valor === null ? 'sin dato' : numero(v.ccl.valor, 2)}</span>
-          </Traza>
-          <ChipEtiqueta calc={v.ccl} />
-        </p>
-      </div>
+    <div className="flex min-w-0 flex-col gap-5">
+      <Encabezado pregunta="Compromisos · ¿Cuánto me falta pagar?" lectura={lecturaPasivos(v)} />
       {v.leasings.length === 0 ? (
         <Tarjeta className="p-5">
           <p className="text-sm text-muted">{v.aviso}</p>
@@ -545,9 +476,8 @@ export default async function PaginaPasivos({ searchParams }: { searchParams: Pr
           </Link>
         </Tarjeta>
       ) : (
-        v.leasings.map((l) => <Leasing key={l.contrato.id} l={l} ccl={v.ccl} />)
+        v.leasings.map((l) => <Leasing key={l.contrato.id} l={l} v={v} />)
       )}
     </div>
   )
 }
-

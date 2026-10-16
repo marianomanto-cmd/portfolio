@@ -4,27 +4,42 @@ import { controlCripto, avisoCripto, posibleDobleCarga } from './control'
 import { leerNumeroAR } from '../dinero'
 import { pagoUnico, vistaPreviaPago } from './pago'
 import {
+  acotarHorizonte,
   agregarTramo,
   atajosHorizonte,
   claveDeRuta,
   claveRecordada,
   conAjuste,
   conVar,
+  diferenciaConLoPuesto,
   diferencias,
-  elegirDireccion,
+  esTodoIgual,
+  extremosBarra,
+  fraccionBarra,
+  leerPosicion,
   leerVar,
+  limitesBarra,
   mesesHastaFinLeasing,
   nombreVariable,
+  pasoBarra,
   pasoDeslizante,
+  posicionDe,
   recordadosDe,
+  recordadosDeRuta,
   resumenHorizonte,
   rutasDelPanel,
   sacarTramo,
+  sentidoPosicion,
+  sinIgualPosible,
+  textoDeslizante,
   textoIgual,
+  textoPosicion,
+  todoIgualDe,
   valorDeslizante,
+  varDePosicion,
 } from './panel'
 import { proyectar } from './proyeccion'
-import { completarConIgual, supuestosVacios } from './supuestos'
+import { completarConIgual, conArranque, HORIZONTE_ARRANQUE, supuestosDeArranque, supuestosVacios } from './supuestos'
 
 // Todo inventado: la base es la del demo (ejemplo-flujo.ts).
 const vista = ejemploFlujo('completo')
@@ -44,11 +59,7 @@ describe('panel de supuestos', () => {
     expect(leerVar(s, 'devaluacion.5')).toBeNull()
   })
 
-  it('Baja o Sube arrancan sin número (o con el que recordás), Igual no lleva número', () => {
-    expect(elegirDireccion({ dir: null, valor: null }, 'sube', null)).toEqual({ dir: 'sube', valor: null })
-    expect(elegirDireccion({ dir: null, valor: null }, 'sube', '2.5')).toEqual({ dir: 'sube', valor: '2.5' })
-    expect(elegirDireccion({ dir: 'sube', valor: '3.0' }, 'igual', '2.5')).toEqual({ dir: 'igual', valor: null })
-    expect(elegirDireccion({ dir: 'sube', valor: '3.0' }, 'sube', '2.5')).toEqual({ dir: 'sube', valor: '3.0' })
+  it('las claves de lo recordado: minúsculas, sin el tramo', () => {
     expect(claveRecordada('retorno.cedear', 'sube')).toBe('retorno.cedear.sube')
     expect(claveRecordada('dual.TXMJ0', 'baja')).toBe('dual.txmj0.baja')
     expect(claveRecordada('dual.TXMJ0', 'baja')).toMatch(/^[a-z][a-z0-9_.]{0,79}$/)
@@ -99,8 +110,10 @@ describe('panel de supuestos', () => {
     expect(nombreVariable('devaluacion.1', d, base)).toBe('Devaluación (CCL) · desde may-27 hasta oct-27')
   })
 
-  it('atajos del horizonte: 6, 12, 24 y el fin del leasing; ninguno arranca elegido', () => {
+  it('atajos del horizonte: 6, 12, 24 y el fin del leasing; el escenario arranca en 12 (D-164)', () => {
     expect(vista.supuestos_iniciales.horizonte_meses).toBeNull()
+    expect(supuestosDeArranque(base).horizonte_meses).toBe(HORIZONTE_ARRANQUE)
+    expect(HORIZONTE_ARRANQUE).toBe(12)
     const fin = mesesHastaFinLeasing(base)
     expect(fin).toBeGreaterThan(24)
     expect(atajosHorizonte(base).map((a) => a.meses)).toEqual([6, 12, 24, fin])
@@ -117,7 +130,7 @@ describe('panel de supuestos', () => {
     const a = completarConIgual(vista.supuestos_iniciales, base)
     const b = conVar(a, 'devaluacion.0', { dir: 'sube', valor: '2.0' })
     const d = diferencias(a, b, base)
-    expect(d).toEqual(['Devaluación (CCL): Igual · Sube +2,0%/mes'])
+    expect(d).toEqual(['Devaluación (CCL): Igual · Sube +2,0 %/mes'])
     expect(d.join(' ')).not.toMatch(/mejor|conviene|deber/i)
   })
 
@@ -147,7 +160,7 @@ describe('ajuste mensual del ingreso en pesos', () => {
     expect(Number(b.meses[1].ingresos.ars) - Number(a.meses[1].ingresos.ars)).toBeCloseTo(17000, 6)
     expect(Number(b.meses[2].ingresos.ars) - Number(a.meses[2].ingresos.ars)).toBeCloseTo(850000 * (1.02 ** 2 - 1), 6)
     expect(b.meses[0].ingresos.ars).toBe(a.meses[0].ingresos.ars)
-    expect(diferencias(s0, s1, base)).toContain('Ajuste del ingreso en pesos: nominal y nominal · 2,0%/mes y nominal')
+    expect(diferencias(s0, s1, base)).toContain('Ajuste del ingreso en pesos: nominal y nominal · 2,0 %/mes y nominal')
   })
 })
 
@@ -198,5 +211,157 @@ describe('doble carga (Cargar ingreso contra Datos › Movimientos)', () => {
     expect(posibleDobleCarga(movs, { ...ingreso, cuenta_id: null })).toBeNull()
     expect(posibleDobleCarga(movs, { ...ingreso, monto: null })).toBeNull()
     expect(posibleDobleCarga(movs, { fecha: '2026-10-14', sentido: 'gasto', cuenta_id: 2, moneda: 'ARS', monto: '250000' })).toEqual(movs[1])
+  })
+})
+
+describe('la barra de cada variable (D-164): de Baja a Sube, con Igual en el medio', () => {
+  it('va de −el máximo de Baja al máximo de Sube; Igual es el 0', () => {
+    expect(limitesBarra('devaluacion')).toEqual({ min: -15, max: 15 })
+    expect(limitesBarra('inflacion')).toEqual({ min: -5, max: 15 })
+    expect(posicionDe({ dir: 'igual', valor: null })).toBe('0.0')
+    expect(posicionDe({ dir: 'sube', valor: '2' })).toBe('2.0')
+    expect(posicionDe({ dir: 'baja', valor: '1.5' })).toBe('-1.5')
+    expect(posicionDe({ dir: 'sube', valor: null })).toBeNull()
+    expect(posicionDe({ dir: null, valor: null })).toBeNull()
+  })
+
+  it('una posición dice la variable: a la izquierda Baja, a la derecha Sube, el 0 es Igual (sin número)', () => {
+    expect(varDePosicion('0', 'devaluacion')).toEqual({ dir: 'igual', valor: null })
+    expect(varDePosicion('-0.04', 'devaluacion')).toEqual({ dir: 'igual', valor: null })
+    expect(varDePosicion('2.04', 'devaluacion')).toEqual({ dir: 'sube', valor: '2.0' })
+    expect(varDePosicion('-1.55', 'devaluacion')).toEqual({ dir: 'baja', valor: '1.6' })
+    // Fuera de la barra, se acota a sus extremos.
+    expect(varDePosicion('-99', 'inflacion')).toEqual({ dir: 'baja', valor: '5.0' })
+    expect(varDePosicion('99', 'inflacion')).toEqual({ dir: 'sube', valor: '15.0' })
+  })
+
+  it('lo que llega del control se lee con cuidado: un número acotado a 0,1, o null', () => {
+    expect(leerPosicion('2.5', 'devaluacion')).toBe('2.5')
+    expect(leerPosicion(' -1.30000001 ', 'devaluacion')).toBe('-1.3')
+    expect(leerPosicion('abc', 'devaluacion')).toBeNull()
+    expect(leerPosicion('', 'devaluacion')).toBeNull()
+  })
+
+  it('− y + de a 0,1, cruzan Igual y no pasan los extremos; sin elegir cuenta como Igual', () => {
+    expect(pasoBarra('0.0', 0.1, 'devaluacion')).toBe('0.1')
+    expect(pasoBarra('-0.1', 0.1, 'devaluacion')).toBe('0.0')
+    expect(pasoBarra(null, -0.1, 'devaluacion')).toBe('-0.1')
+    expect(pasoBarra('15.0', 0.1, 'devaluacion')).toBe('15.0')
+    expect(pasoBarra('-5.0', -0.1, 'inflacion')).toBe('-5.0')
+    expect(pasoBarra('0.2', 0.1, 'devaluacion')).toBe('0.3')
+  })
+
+  it('dónde cae cada posición en el riel (de 0 a 1), con el 0 de Igual donde está', () => {
+    expect(fraccionBarra('0', -15, 15)).toBe(0.5)
+    expect(fraccionBarra('-15', -15, 15)).toBe(0)
+    expect(fraccionBarra('15', -15, 15)).toBe(1)
+    expect(fraccionBarra('0', -5, 15)).toBe(0.25)
+    expect(fraccionBarra('99', -5, 15)).toBe(1)
+    expect(fraccionBarra('1', 3, 3)).toBe(0)
+  })
+
+  it('el número a la vista, los extremos y qué hace cada lado, en palabras', () => {
+    expect(textoPosicion('2.0', 'devaluacion')).toBe('Sube +2,0 %/mes')
+    expect(textoPosicion('-1.5', 'brecha_cripto')).toBe('Baja −1,5 pts')
+    expect(textoPosicion('0.0', 'devaluacion')).toBe('Igual')
+    expect(textoPosicion(null, 'devaluacion')).toBe('sin elegir')
+    expect(extremosBarra('devaluacion')).toEqual(['Baja −15', 'Sube +15'])
+    expect(extremosBarra('inflacion')).toEqual(['Baja −5', 'Sube +15'])
+    expect(sentidoPosicion('2.0', 'devaluacion')).toBe('el CCL sube')
+    expect(sentidoPosicion('0.0', 'devaluacion')).toBeNull()
+  })
+
+  it('el texto de los deslizantes de una sola dirección (lo que invertís, el ajuste)', () => {
+    expect(textoDeslizante('100', '%')).toBe('100 %')
+    expect(textoDeslizante('2', '%/mes', { signo: true })).toBe('+2,0 %/mes')
+    expect(textoDeslizante('0.0', '%/mes', { signo: true, enCero: 'nominal' })).toBe('nominal')
+    expect(textoDeslizante(null, '%')).toBe('sin número')
+  })
+
+  it('el horizonte: de 1 a 120 meses, entero', () => {
+    expect(acotarHorizonte(0)).toBe(1)
+    expect(acotarHorizonte(121)).toBe(120)
+    expect(acotarHorizonte(12.4)).toBe(12)
+    expect(acotarHorizonte(Number.NaN)).toBe(12)
+  })
+
+  it('lo que recordás de una variable se ofrece como posición de su barra (sin la de ahora ni Igual)', () => {
+    const rec = { 'devaluacion.sube': '2.5', 'devaluacion.baja': '1', 'retorno.cedear.sube': '8' }
+    expect(recordadosDeRuta('devaluacion.0', rec, null)).toEqual([
+      { pos: '-1.0', texto: 'Baja −1,0 %/mes' },
+      { pos: '2.5', texto: 'Sube +2,5 %/mes' },
+    ])
+    expect(recordadosDeRuta('devaluacion.0', rec, '2.5')).toEqual([{ pos: '-1.0', texto: 'Baja −1,0 %/mes' }])
+    expect(recordadosDeRuta('casa', rec, null)).toEqual([])
+  })
+
+  it('sin Igual posible (sin cripto, sin TEM de hoy), la barra no aparece: dice qué falta', () => {
+    expect(sinIgualPosible('brecha_cripto', base)).toBeNull()
+    expect(sinIgualPosible('brecha_cripto', ejemploFlujo('parcial').base!)).toContain('dólar cripto')
+    expect(sinIgualPosible('tem_renovacion', ejemploFlujo('parcial').base!)).toContain('TEM de hoy')
+    expect(sinIgualPosible('devaluacion.0', ejemploFlujo('parcial').base!)).toBeNull()
+  })
+})
+
+describe('el arranque y "Todo igual" (D-164)', () => {
+  it('Flujo arranca todo en Igual y en 12 meses: la proyección y sus gráficos se ven sin tocar nada', () => {
+    const s = supuestosDeArranque(base)
+    expect(s.devaluacion[0]).toMatchObject({ dir: 'igual', valor: null })
+    expect(s.retorno.cedear).toMatchObject({ dir: 'igual', valor: null })
+    expect(s.ingreso_usd.every((t) => t.dir === 'igual')).toBe(true)
+    expect(s.politica.origen).toBe('declarada_14_10')
+    const p = proyectar(base, s)
+    expect(p.estado).toBe('lista')
+    expect(p.meses).toHaveLength(13)
+    expect(esTodoIgual(s)).toBe(true)
+  })
+
+  it('lo que no tiene Igual posible queda sin elegir y dice qué falta (nunca se inventa)', () => {
+    const b = ejemploFlujo('parcial').base!
+    const s = supuestosDeArranque(b)
+    expect(s.brecha_cripto.dir).toBeNull()
+    const p = proyectar(b, s)
+    expect(p.faltan.map((f) => f.variable)).toContain('brecha_cripto')
+  })
+
+  it('un escenario de antes (con algo sin elegir o sin horizonte) arranca en Igual; lo elegido no se toca', () => {
+    const viejo = conVar({ ...vista.supuestos_iniciales, horizonte_meses: null }, 'devaluacion.0', { dir: 'sube', valor: '2.0' })
+    const s = conArranque(viejo, base)
+    expect(s.horizonte_meses).toBe(12)
+    expect(s.devaluacion[0]).toMatchObject({ dir: 'sube', valor: '2.0' })
+    expect(s.retorno.cedear.dir).toBe('igual')
+    // Sube sin número (o con 0) también es Igual.
+    expect(conArranque(conVar(viejo, 'casa', { dir: 'sube', valor: null }), base).casa.dir).toBe('igual')
+    expect(conArranque({ ...viejo, horizonte_meses: 36 }, base).horizonte_meses).toBe(36)
+  })
+
+  it('"Todo igual" pone todas las barras en Igual y el ingreso en pesos nominal, y deja el resto', () => {
+    let s = conVar(supuestosDeArranque(base), 'devaluacion.0', { dir: 'sube', valor: '2.0' })
+    s = conAjuste(s, 0, '3.0')
+    s = { ...s, horizonte_meses: 24, politica: { ...s.politica, pct: '50', origen: 'elegida' } }
+    expect(esTodoIgual(s)).toBe(false)
+    const t = todoIgualDe(s)
+    expect(esTodoIgual(t)).toBe(true)
+    expect(t.devaluacion[0]).toMatchObject({ dir: 'igual', valor: null })
+    expect(t.ingreso_pesos[0].ajuste_mensual).toBeNull()
+    expect(t.horizonte_meses).toBe(24)
+    expect(t.politica.pct).toBe('50')
+    // Un 0 no es un movimiento.
+    expect(esTodoIgual(conVar(supuestosDeArranque(base), 'casa', { dir: 'sube', valor: '0.0' }))).toBe(true)
+  })
+
+  it('¿terminás debajo de lo que pusiste? el financiero menos lo que pusiste, con su traza', () => {
+    const p = proyectar(base, supuestosDeArranque(base))
+    const ult = p.meses[p.meses.length - 1]
+    const d = diferenciaConLoPuesto(ult)
+    expect(Number(d.ars.valor)).toBeCloseTo(Number(ult.financiero.ars) - Number(ult.aportado!.ars), 6)
+    expect(Number(d.usd.valor)).toBeCloseTo(Number(ult.financiero.usd) - Number(ult.aportado!.usd), 6)
+    expect(d.debajo).toBe(Number(d.ars.valor) < 0)
+    expect(d.ars.formula).toContain(' − ')
+    expect(d.ars.insumos).toHaveLength(2)
+    expect(d.ars.etiquetas).toContain('supuesto')
+    const sin = diferenciaConLoPuesto({ ...ult, financiero: { ars: null, usd: null } })
+    expect(sin.debajo).toBeNull()
+    expect(sin.usd.valor).toBeNull()
   })
 })

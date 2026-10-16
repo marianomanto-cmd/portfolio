@@ -13,7 +13,8 @@ import type { Par } from '@/lib/vistas/contratos'
 import type { FilaResultado, GrupoVista, MonedaElegida, TotalesResultado } from '@/lib/vistas/contratos-evolucion'
 import { Grilla, type ColumnaGrilla } from '@/components/grilla'
 import { SegmentadoBotones } from '@/components/pantalla/segmentado'
-import { anchoMontos } from '../_lib/anchos'
+import { useMedia } from '@/components/preferencias'
+import { altoFilaMontos, anchoMontos, anchoTitulo } from '../_lib/anchos'
 import { gruposOrdenados, ORDEN_INICIAL, type ColumnaOrden, type Orden } from '../_lib/orden'
 import { ChipFirmeza, CifraPar, CifraPct } from './cifras'
 
@@ -112,6 +113,8 @@ export function TablaResultados({
 }) {
   const [modo, setModo] = useState<Modo>('partida')
   const [orden, setOrden] = useState<Orden>(ORDEN_INICIAL)
+  // Con el dedo y las dos monedas, cada celda apila dos tocables de 44 px: la fila crece para que no se pisen (D-100).
+  const grueso = useMedia('(pointer: coarse)', false)
   // Se ordena en la moneda que mirás (con las dos, en pesos).
   const k: 'ars' | 'usd' = moneda === 'usd' ? 'usd' : 'ars'
   const agrupado = modo !== 'partida'
@@ -159,8 +162,9 @@ export function TablaResultados({
           id: c.clave,
           titulo: c.nombre,
           tipo: 'numero',
-          // Lo que pide el monto más largo de la columna (subtotales y total incluidos): ninguna cifra se sale de su celda.
-          ancho: anchoMontos([...filasTabla.map((x) => parDe(x, c.clave)), totales[c.clave]], moneda, { signo: true, color: c.color, minimo: moneda === 'ambas' ? 128 : 116 }),
+          // Lo que pide el monto más largo de la columna (subtotales y total incluidos): ninguna cifra se sale de su celda. Y el
+          // título entero: con una moneda, "POR EL PRECIO" no entraba en 116 px ("POR EL PREC…" a 768 px).
+          ancho: anchoMontos([...filasTabla.map((x) => parDe(x, c.clave)), totales[c.clave]], moneda, { signo: true, color: c.color, minimo: Math.max(moneda === 'ambas' ? 128 : 116, anchoTitulo(c.nombre)) }),
           prioridad: c.prioridad,
           orden: ordenable((x) => parDe(x, c.clave)?.[k].valor ?? null),
           celda: (x) => (
@@ -233,7 +237,7 @@ export function TablaResultados({
         nombreFila={nombre}
         ordenInicial={ordenInicial}
         grupo={agrupado ? (x) => (x.tipo === 'grupo' ? x.g.clave : (grupos[modo as 'cuenta' | 'activo'].find((g) => g.claves.includes(x.f.clave))?.clave ?? x.f.clave)) : undefined}
-        altoFila={moneda === 'ambas' ? 56 : 44}
+        altoFila={altoFilaMontos(moneda, grueso)}
         maxFilas={60}
         tarjeta={(x) => <TarjetaFila x={x} moneda={moneda} k={k} />}
       />

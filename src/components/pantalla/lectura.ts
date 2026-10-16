@@ -12,6 +12,8 @@ export interface ParteLectura {
   enfasis?: boolean
   /** Una cifra calculada: se toca y abre su traza; el modo privado la tapa. */
   calc?: CalcVista | null
+  /** Como `calc`, pero la traza se arma recién al tocarla (la proyección de Flujo no arma trazas por mes). */
+  obtener?: () => CalcVista
   /** El título de su traza ("Patrimonio neto · en pesos"). */
   titulo?: string
   moneda?: 'ARS' | 'USD'

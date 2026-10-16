@@ -3,31 +3,35 @@
 // Las tablas del detalle de Evolución en la Grilla común (AG Grid, D-157): el
 // PnL por mes, lo que ya traías al día cero y el futuro mes a mes. Sin orden
 // (van por fecha, o como las arma el motor); debajo de 768 px, tarjetas. Cada
-// cifra abre su traza.
+// cifra abre su traza. Con el dedo y las dos monedas, cada celda apila dos
+// tocables de 44 px: la fila crece para que no se pisen (D-100).
 
 import { useMemo } from 'react'
 import type { DiaCeroVista, FilaDiaCeroVista, MesFuturoVista, MesVista, MonedaElegida } from '@/lib/vistas/contratos-evolucion'
 import { Grilla, type ColumnaGrilla } from '@/components/grilla'
-import { anchoMontos } from '../_lib/anchos'
+import { useMedia } from '@/components/preferencias'
+import { altoFilaMontos, anchoMontos, anchoTitulo, LINEAS_RESULTADO, medidasColumnasMes } from '../_lib/anchos'
 import { ChipEtiquetas, CifraPar } from './cifras'
 
 function NoAplica() {
   return <span className="text-[13px] italic text-muted">no aplica</span>
 }
 
-const RESULTADO = new Set(['activo', 'tc', 'sin_atribuir'])
-
 // ───────────── PnL por mes ─────────────
 
 export function GrillaMeses({ meses, claves, nombres, moneda }: { meses: MesVista[]; claves: string[]; nombres: Record<string, string>; moneda: MonedaElegida }) {
-  const columnas = useMemo<ColumnaGrilla<MesVista>[]>(
-    () => [
+  const grueso = useMedia('(pointer: coarse)', false)
+  const columnas = useMemo<ColumnaGrilla<MesVista>[]>(() => {
+    // El ancho mínimo (la cifra más larga de la columna, o su título) y la prioridad de cada columna
+    // (_lib/anchos): el mes y el resultado partido en activos y dólar entran, con la ficha, a 768 px.
+    const [mes, ...lineas] = medidasColumnasMes(meses, claves, nombres, moneda)
+    return [
       {
         id: 'mes',
         titulo: 'Mes',
-        ancho: 110,
+        ancho: mes.ancho,
         flex: 1,
-        prioridad: 0,
+        prioridad: mes.prioridad,
         altoAuto: true,
         celda: (x) => (
           <span className="flex flex-col">
@@ -36,27 +40,21 @@ export function GrillaMeses({ meses, claves, nombres, moneda }: { meses: MesVist
           </span>
         ),
       },
-      ...claves.map(
-        (c): ColumnaGrilla<MesVista> => ({
+      ...lineas.map(
+        ({ id: c, ancho, prioridad }): ColumnaGrilla<MesVista> => ({
           id: c,
           titulo: nombres[c] ?? c,
           tipo: 'numero',
-          // Lo que pide la cifra más larga de la columna (ninguna se sale de su celda).
-          ancho: anchoMontos(
-            meses.map((x) => x.lineas.find((y) => y.clave === c)?.valor ?? null),
-            moneda,
-            { signo: true, color: RESULTADO.has(c), minimo: 150 },
-          ),
-          prioridad: RESULTADO.has(c) ? 0 : 2,
+          ancho,
+          prioridad,
           celda: (x) => {
             const l = x.lineas.find((y) => y.clave === c)
-            return l ? <CifraPar par={l.valor} moneda={moneda} titulo={`${x.nombre} · ${l.nombre}`} signo color={RESULTADO.has(c)} vertical /> : <NoAplica />
+            return l ? <CifraPar par={l.valor} moneda={moneda} titulo={`${x.nombre} · ${l.nombre}`} signo color={LINEAS_RESULTADO.has(c)} vertical /> : <NoAplica />
           },
         }),
       ),
-    ],
-    [claves, nombres, moneda, meses],
-  )
+    ]
+  }, [claves, nombres, moneda, meses])
   return (
     <Grilla
       titulo="PnL por mes, una columna por línea del puente"
@@ -64,7 +62,7 @@ export function GrillaMeses({ meses, claves, nombres, moneda }: { meses: MesVist
       columnas={columnas}
       idFila={(x) => x.mes}
       nombreFila={(x) => x.nombre}
-      altoFila={moneda === 'ambas' ? 56 : 44}
+      altoFila={altoFilaMontos(moneda, grueso)}
       tarjeta={(x) => (
         <div className="rounded-tarjeta border border-border bg-surface p-4" data-mes={x.mes}>
           <p className="font-medium">
@@ -90,8 +88,10 @@ export function GrillaMeses({ meses, claves, nombres, moneda }: { meses: MesVist
 // ───────────── Lo que ya traías al día cero ─────────────
 
 const nombreDiaCero = (f: FilaDiaCeroVista) => (f.cuenta ? `${f.ticker} · ${f.cuenta}` : f.ticker)
+const TRAIAS = 'Lo que ya traías'
 
 export function GrillaDiaCero({ d, moneda }: { d: DiaCeroVista; moneda: MonedaElegida }) {
+  const grueso = useMedia('(pointer: coarse)', false)
   const columnas = useMemo<ColumnaGrilla<FilaDiaCeroVista>[]>(
     () => [
       {
@@ -116,9 +116,10 @@ export function GrillaDiaCero({ d, moneda }: { d: DiaCeroVista; moneda: MonedaEl
       { id: 'costo', titulo: 'Costo (PPP)', tipo: 'numero', ancho: anchoMontos(d.filas.map((f) => f.costo), moneda, { minimo: 130 }), prioridad: 2, celda: (f) => <CifraPar par={f.costo} moneda={moneda} titulo={`${f.ticker} · costo`} vertical /> },
       {
         id: 'resultado',
-        titulo: 'Lo que ya traías',
+        titulo: TRAIAS,
         tipo: 'numero',
-        ancho: anchoMontos([...d.filas.map((f) => f.resultado), d.total], moneda, { signo: true, color: true, minimo: 130 }),
+        // Con el título entero: "LO QUE YA TRAÍAS" no entraba en 130 px ("LO QUE YA TRA…" con una moneda, a 768 px).
+        ancho: anchoMontos([...d.filas.map((f) => f.resultado), d.total], moneda, { signo: true, color: true, minimo: Math.max(130, anchoTitulo(TRAIAS)) }),
         prioridad: 0,
         celda: (f) => <CifraPar par={f.resultado} moneda={moneda} titulo={`${f.ticker} · lo que ya traías`} signo color vertical />,
         total: () => <CifraPar par={d.total} moneda={moneda} titulo="Lo que ya traías al día cero · total" signo color vertical />,
@@ -133,7 +134,7 @@ export function GrillaDiaCero({ d, moneda }: { d: DiaCeroVista; moneda: MonedaEl
       columnas={columnas}
       idFila={(f) => f.clave}
       nombreFila={nombreDiaCero}
-      altoFila={moneda === 'ambas' ? 56 : 44}
+      altoFila={altoFilaMontos(moneda, grueso)}
       tarjeta={(f) => (
         <div className="rounded-tarjeta border border-border bg-surface p-4">
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
@@ -163,6 +164,7 @@ export function GrillaDiaCero({ d, moneda }: { d: DiaCeroVista; moneda: MonedaEl
 // ───────────── El futuro, mes a mes ─────────────
 
 export function GrillaFuturo({ meses, escenario, moneda }: { meses: MesFuturoVista[]; escenario: string; moneda: MonedaElegida }) {
+  const grueso = useMedia('(pointer: coarse)', false)
   const columnas = useMemo<ColumnaGrilla<MesFuturoVista>[]>(
     () => [
       {
@@ -191,7 +193,7 @@ export function GrillaFuturo({ meses, escenario, moneda }: { meses: MesFuturoVis
       columnas={columnas}
       idFila={(x) => x.mes}
       nombreFila={(x) => x.nombre}
-      altoFila={moneda === 'ambas' ? 56 : 44}
+      altoFila={altoFilaMontos(moneda, grueso)}
       maxFilas={36}
       tarjeta={(x) => (
         <div className="rounded-tarjeta border border-border bg-surface p-4" data-mes-futuro={x.mes}>

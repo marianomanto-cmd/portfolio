@@ -37,6 +37,8 @@ export interface ExcedenteMes {
   sin_declaraciones: boolean
   /** Los leasings sin cuadro de marcha cuya cuota de este mes no se sabe (la cuota y el excedente son sin dato). */
   sin_cuadro: LeasingSinCuadro[]
+  /** El reintegro del IVA y la percepción de tus cuotas del mes, si declaraste en Pasivos que la empresa te lo reintegra; null sin reintegro. */
+  reintegro: DobleCalc | null
 }
 
 const fmt = (x: Decimal, m: 'ARS' | 'USD') => monto(x, m, { decimales: 2 })
@@ -200,6 +202,14 @@ export function excedenteMes(base: BaseProyeccion, mes: Fecha, opciones: { pagad
     })
   }
   const excArs = resta('ars')
+  const reintegroCalc: DobleCalc | null = reintegro.gt(0)
+    ? (() => {
+        const ars = calc(reintegro, `IVA y percepción de tus cuotas del mes = ${fmt(reintegro, 'ARS')}`, [], {
+          explicacion: 'La empresa te reintegra el IVA y la percepción de la cuota (lo declaraste en Pasivos): vuelven al excedente.',
+        })
+        return { ars, usd: aUsd(ars, ccl, 'Reintegro', 'El reintegro en dólares, al CCL de tu última carga.') }
+      })()
+    : null
   return {
     mes,
     ingreso_usd: ingUsd,
@@ -212,5 +222,6 @@ export function excedenteMes(base: BaseProyeccion, mes: Fecha, opciones: { pagad
     reales: { ingresos: realIng.length > 0, gastos: realGas.length > 0 },
     sin_declaraciones,
     sin_cuadro,
+    reintegro: reintegroCalc,
   }
 }

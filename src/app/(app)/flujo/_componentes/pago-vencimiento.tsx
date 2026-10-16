@@ -19,8 +19,8 @@ export function PagoVencimiento({ bono, ccl }: { bono: BonoSinCronograma; ccl: s
   const [fecha, setFecha] = useState(bono.fecha_vencimiento ?? '')
   const previa = vistaPreviaPago(pago.trim() ? leerNumeroAR(pago) : null, bono.vn, bono.ticker, fecha || null, ccl)
   return (
-    <div id={`pago-${bono.ticker}`} className="scroll-mt-4 rounded-lg border border-border p-3">
-      <h3 className="text-sm font-medium text-text">Cargar el pago al vencimiento de {bono.ticker}</h3>
+    <div id={`pago-${bono.ticker}`} className="scroll-mt-24 rounded-item border border-border bg-surface-2 p-4">
+      <h3 className="text-[14px] font-medium text-text">Cargar el pago al vencimiento de {bono.ticker}</h3>
       <p className="mt-0.5 text-xs text-muted">
         {bono.nombre}
         {bono.fecha_vencimiento ? ` · vence el ${fechaCorta(bono.fecha_vencimiento)}` : ''}. Sale del aviso de licitación: cuánto paga por cada VN al vencimiento.

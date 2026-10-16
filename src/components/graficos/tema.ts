@@ -245,7 +245,7 @@ function eje(t: TemaGrafico, e: Opcion, movil: boolean, esX: boolean): Opcion {
  * de arriba. No cambia los datos: solo colores, tooltip, leyenda, ejes,
  * animación y accesibilidad.
  */
-export function conTema(opcion: Opcion, t: TemaGrafico, entorno: { movil: boolean; animar: boolean }): Opcion {
+export function conTema(opcion: Opcion, t: TemaGrafico, entorno: { movil: boolean; animar: boolean; nombre?: string }): Opcion {
   if (tieneTorta(opcion)) throw new Error('Gráfico de torta: están prohibidos. Usá barras (spec §UI).')
   const out: Opcion = { ...opcion }
   delete out.dataZoom // nunca zoom ni scroll horizontal (D-30)
@@ -253,7 +253,9 @@ export function conTema(opcion: Opcion, t: TemaGrafico, entorno: { movil: boolea
   out.animation = entorno.animar && opcion.animation !== false
   if (out.color === undefined) out.color = paletaSeries(t)
   out.textStyle = unir({ color: t.texto, fontFamily: t.fuenteMono, fontSize: 11 }, opcion.textStyle as Opcion | undefined)
-  out.aria = unir({ enabled: true }, opcion.aria as Opcion | undefined)
+  // El nombre para el lector de pantalla es el título que le da la pantalla: sin él, ECharts pisa el
+  // aria-label del gráfico con una descripción en inglés y con los datos crudos (también en modo privado).
+  out.aria = unir({ enabled: true, ...(entorno.nombre ? { label: { description: entorno.nombre } } : {}) }, opcion.aria as Opcion | undefined)
   const vidrio = estiloVidrio(t)
   out.tooltip = {
     ...unir(

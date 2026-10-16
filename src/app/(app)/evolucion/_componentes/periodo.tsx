@@ -30,12 +30,13 @@ export function SelectorPeriodo({ p, demo, fechas, desde, hasta }: { p: Parametr
           oculto: nombrePeriodo(x.periodo),
         }))}
       />
-      <p className="flex flex-wrap items-center gap-x-1.5 text-[12px] text-muted">
+      {/* En el teléfono, "Otro período" va en su renglón: las acciones del encabezado miden su contenido en una línea, y el período con sus fechas y el botón no entraban juntos en 360 px (D-30). */}
+      <p className="flex flex-wrap items-center gap-x-1.5 text-[12px] text-muted max-sm:flex-col max-sm:items-start">
         <span data-periodo>
           {nombrePeriodo(p.periodo)}
           {rango ? ` · ${rango}` : ''}
         </span>
-        <span aria-hidden>·</span>
+        <span aria-hidden className="max-sm:hidden">·</span>
         <button type="button" onClick={() => hoja.current?.showModal()} aria-haspopup="dialog" className="tocable inline-flex items-center gap-0.5 rounded text-[12px] text-muted underline-offset-2 hover:text-text hover:underline">
           Otro período <ChevronDown aria-hidden className="size-3.5" />
         </button>

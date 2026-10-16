@@ -1,13 +1,18 @@
-// Supuestos de un escenario (plan §6 D.1 y D.2; D-08, D-88, D-145, D-147, D-155).
+// Supuestos de un escenario (plan §6 D.1 y D.2; D-08, D-88, D-147, D-155, D-164).
 //
 // Reglas:
-// - Nada arranca elegido: toda variable de mercado empieza con dir null y la
-//   proyección no corre hasta que el dueño la elige (o toca "Completar lo que
-//   falta con Igual", D-145). Lo único precargado es lo que DECLARÓ el dueño el
-//   14/10: su regla de reinversión (todo el excedente, proporcional a la última
-//   carga; los vencimientos, igual) y que la cuota del leasing la paga él (la
-//   resta de su ingreso). Va rotulado "tu regla · 14/10" y se puede cambiar.
-// - Baja o Sube sin valor es "falta": el número lo pone el dueño con el deslizante.
+// - Todo arranca en Igual (D-164, lo pidió el dueño el 15/10: "en flujos y
+//   escenarios quiero ver graficos"): cada variable de mercado, como en la
+//   última carga, y el horizonte en 12 meses, así la proyección y sus gráficos
+//   se ven al abrir. Es un supuesto y va rotulado. Lo que no tiene Igual
+//   posible (la brecha sin el cripto, la TEM de renovación sin la TEM de hoy)
+//   queda sin elegir y dice qué falta: nunca se inventa un número.
+// - Lo otro precargado es lo que DECLARÓ el dueño el 14/10: su regla de
+//   reinversión (todo el excedente, proporcional a la última carga; los
+//   vencimientos, igual) y que la cuota del leasing la paga él (la resta de su
+//   ingreso). Va rotulado "tu regla · 14/10" y se puede cambiar.
+// - Un supuesto sin elegir (un `?s=` o un escenario de antes) arranca en Igual
+//   (conArranque); Baja o Sube sin número, también.
 // - Los valores viajan como texto decimal (D-32). Sin Decimal acá: el esquema
 //   corre igual en el navegador.
 // - Una variable nueva sube `v` (D-08): un escenario guardado con otra versión
@@ -208,15 +213,19 @@ export const esquemaSupuestos = z.object({
   }),
 }) satisfies z.ZodType<Supuestos>
 
-// ───────────── Arranque neutral ─────────────
+// ───────────── El arranque ─────────────
 
 const varVacia = (): Var => ({ dir: null, valor: null })
 const tramoVacio = (): Tramo => ({ dir: null, valor: null, hasta_mes: null })
 const tramoIngreso = (desde_mes: number): TramoIngreso => ({ dir: null, valor: null, desde_mes, crecimiento_anual: null, ajuste_mensual: null })
 
+/** El horizonte con que arranca un escenario (D-164): 12 meses. */
+export const HORIZONTE_ARRANQUE = 12
+
 /**
- * Los supuestos de un escenario nuevo: nada de mercado elegido. Solo la regla
+ * La estructura de un escenario, sin nada de mercado elegido: solo la regla
  * que declaró el dueño (D-155) y que la cuota la paga él; los dos, editables.
+ * La pantalla no arranca de acá sino de supuestosDeArranque (todo en Igual).
  */
 export function supuestosVacios(): Supuestos {
   return {
@@ -265,9 +274,10 @@ export function fechaMes(base: string, n: number): string {
 export const CAMBIO_DE_INGRESO_DECLARADO = '2027-02-01'
 
 /**
- * Supuestos iniciales para una base: los vacíos, más los tramos que ya se
- * saben (el ingreso cambia en feb-2027) y una variable por cada bono con pago
- * a determinar. Todo sin elegir.
+ * La estructura de los supuestos de una base: los vacíos, más los tramos que
+ * ya se saben (el ingreso cambia en feb-2027) y una variable por cada bono con
+ * pago a determinar. Todo sin elegir: el arranque de la pantalla es
+ * supuestosDeArranque.
  */
 export function supuestosIniciales(base: Pick<BaseProyeccion, 'fecha' | 'partidas'>): Supuestos {
   const s: Supuestos = { ...supuestosVacios(), base_mes: mesDe(base.fecha) }
@@ -335,8 +345,9 @@ function falta(v: Var): 'sin_dir' | 'sin_valor' | null {
   return null
 }
 
+// La pantalla arranca todo en Igual (conArranque): esto solo lo ve un escenario armado afuera de ella.
 function textoFalta(nombre: string, f: 'sin_dir' | 'sin_valor'): string {
-  return f === 'sin_dir' ? `${nombre}: elegí Baja, Igual o Sube` : `${nombre}: mové el deslizante para decir cuánto`
+  return f === 'sin_dir' ? `${nombre}: sin elegir (mové su barra o tocá Igual)` : `${nombre}: falta el número (mové su barra)`
 }
 
 /** Qué necesita la base para proyectar (las variables que no se usan no se piden). */
@@ -448,10 +459,17 @@ export function faltantes(base: BaseProyeccion, s: Supuestos): { bloquean: Falta
   return { bloquean, parciales }
 }
 
-/** "Completar lo que falta con Igual" (D-145): lo toca el dueño, nunca se aplica solo. No pisa nada elegido. */
+/**
+ * Lo sin elegir, a Igual (D-164; antes era el botón "Completar lo que falta
+ * con Igual", D-145). No pisa nada elegido: Baja o Sube con su número quedan
+ * como están; sin número (o con 0) son Igual. Lo que no tiene Igual posible
+ * (la brecha sin el cripto de la base, la TEM de renovación sin la TEM de hoy)
+ * queda sin elegir, y faltantes() dice qué falta.
+ */
 export function completarConIgual(s: Supuestos, base: BaseProyeccion): Supuestos {
   const nec = necesidades(base)
-  const igual = <T extends Var>(v: T): T => (v.dir === null || (v.dir !== 'igual' && v.valor === null) ? { ...v, dir: 'igual', valor: null } : v)
+  const igual = <T extends Var>(v: T): T =>
+    v.dir === null || (v.dir !== 'igual' && (v.valor === null || new Decimal(v.valor).isZero())) ? { ...v, dir: 'igual', valor: null } : v
   const out: Supuestos = structuredClone(s)
   out.devaluacion = out.devaluacion.map(igual)
   out.inflacion = out.inflacion.map(igual)
@@ -465,6 +483,28 @@ export function completarConIgual(s: Supuestos, base: BaseProyeccion): Supuestos
   out.casa = igual(out.casa)
   out.camioneta = igual(out.camioneta)
   return out
+}
+
+/**
+ * Un escenario listo para la pantalla (D-164): lo sin elegir, en Igual
+ * (completarConIgual), y el horizonte sin elegir, en 12 meses. Es lo que pasa
+ * con un `?s=` de antes y con un escenario guardado con algo sin elegir:
+ * arrancan en Igual. Lo elegido no se toca.
+ */
+export function conArranque(s: Supuestos, base: BaseProyeccion): Supuestos {
+  const out = completarConIgual(s, base)
+  if (out.horizonte_meses === null) out.horizonte_meses = HORIZONTE_ARRANQUE
+  return out
+}
+
+/**
+ * Con qué arranca Flujo (D-164): todo en Igual (cada variable como en tu
+ * última carga) y 12 meses, con tu regla del 14/10 y la cuota que pagás vos.
+ * Así la proyección y sus gráficos se ven sin tocar nada. Es un supuesto, y
+ * la pantalla lo dice.
+ */
+export function supuestosDeArranque(base: BaseProyeccion): Supuestos {
+  return conArranque(supuestosIniciales(base), base)
 }
 
 /** El efecto con signo de una variable: Baja resta, Sube suma, Igual es 0. null = falta. */
@@ -544,12 +584,22 @@ export function decodificar(t: string | null | undefined): Supuestos | null {
   }
 }
 
-/** El texto que va en el botón: "Sube +2,0%/mes", "Igual", "Baja −10,0%". */
-export function textoBoton(clave: ClaveVariable, dir: Direccion, valor: string | null): string {
-  const m = metaVariable(clave)
+/** La unidad como se escribe al lado del número: "%/mes", "%/año", "%" o "pts". */
+export function unidadCorta(clave: ClaveVariable): string {
+  const u = metaVariable(clave).unidad
+  return u === 'puntos' ? 'pts' : u
+}
+
+/**
+ * El valor de una variable en palabras, como se ve al lado de su barra y en
+ * Comparar: "Igual", "Sube +2,0 %/mes", "Baja −1,5 pts", "Baja −10,0 %/año".
+ * Sin elegir (solo en un escenario de antes, que arranca en Igual): "sin elegir".
+ */
+export function textoValor(clave: ClaveVariable, dir: Direccion | null, valor: string | null): string {
+  if (dir === null) return 'sin elegir'
   if (dir === 'igual') return 'Igual'
   const nombre = dir === 'baja' ? 'Baja' : 'Sube'
-  if (valor === null) return nombre
+  if (valor === null) return `${nombre} (sin número)`
   const n = new Decimal(valor).abs().toFixed(1).replace('.', ',')
-  return `${nombre} ${dir === 'baja' ? '−' : '+'}${n}${m.unidad === 'puntos' ? ' pts' : m.unidad}`
+  return `${nombre} ${dir === 'baja' ? '−' : '+'}${n} ${unidadCorta(clave)}`
 }

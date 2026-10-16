@@ -1,11 +1,13 @@
 'use client'
 
-import { Minus, Plus } from 'lucide-react'
-import { pasoDeslizante, valorDeslizante } from '@/lib/domain/flujo/panel'
+import { pasoDeslizante, textoDeslizante, valorDeslizante } from '@/lib/domain/flujo/panel'
+import { Barra } from './barra'
 
-// El deslizante de una variable (plan §6 D.1): de 0 al máximo de la
-// dirección, de a 0,1, con − y + del mismo paso y el número a la vista. Las
-// cuentas (paso, tope, redondeo) están en panel.ts, con test.
+// El deslizante de una sola dirección (lo que invertís del excedente, el
+// ajuste mensual del ingreso en pesos; plan §6 D.1): la misma barra que las
+// variables (D-164), de 0 al máximo, de a 0,1, con − y + del mismo paso y el
+// número a la vista. Las cuentas (paso, tope, redondeo, el texto) están en
+// panel.ts, con test.
 
 export function Deslizante({
   nombre,
@@ -13,6 +15,7 @@ export function Deslizante({
   max,
   unidad,
   signo,
+  enCero,
   onCambio,
 }: {
   nombre: string
@@ -20,44 +23,34 @@ export function Deslizante({
   max: number
   unidad: string
   signo: '−' | '+'
+  /** Cómo se dice el 0 ("nominal"). */
+  enCero?: string
   onCambio: (v: string) => void
 }) {
-  const texto = valor === null ? 'sin número' : `${signo}${valor.replace('.', ',')}${unidad === 'puntos' ? ' pts' : unidad}`
+  const texto = textoDeslizante(valor, unidad, { signo: signo === '+' && unidad !== '%', enCero })
   return (
-    <div className="mt-2 flex items-center gap-2">
-      <button
-        type="button"
-        className="tocable inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-border text-text hover:bg-surface-2"
-        aria-label={`${nombre}: 0,1 menos`}
-        onClick={() => onCambio(pasoDeslizante(valor, -0.1, max))}
-      >
-        <Minus aria-hidden className="size-4" />
-      </button>
-      <input
-        type="range"
+    <div className="mt-2 flex flex-col gap-1">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[12px] text-muted">{nombre}</span>
+        <output className={`num shrink-0 text-[12px] ${valor === null ? 'italic text-muted' : 'text-text'}`} aria-live="polite">
+          {texto}
+        </output>
+      </div>
+      <Barra
+        nombre={`${nombre}: cuánto`}
         min={0}
         max={max}
-        step={0.1}
-        value={valor ?? '0'}
-        aria-label={`${nombre}: cuánto`}
-        aria-valuetext={texto}
-        className="tocable h-9 min-w-0 flex-1 cursor-pointer accent-[var(--accent)]"
-        onChange={(e) => {
-          const v = valorDeslizante(e.target.value, max)
+        paso={0.1}
+        posicion={valor}
+        texto={texto}
+        etiquetas={{ menos: `${nombre}: 0,1 menos`, mas: `${nombre}: 0,1 más` }}
+        onPosicion={(t) => {
+          const v = valorDeslizante(t, max)
           if (v !== null) onCambio(v)
         }}
+        onMenos={() => onCambio(pasoDeslizante(valor, -0.1, max))}
+        onMas={() => onCambio(pasoDeslizante(valor, 0.1, max))}
       />
-      <button
-        type="button"
-        className="tocable inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-border text-text hover:bg-surface-2"
-        aria-label={`${nombre}: 0,1 más`}
-        onClick={() => onCambio(pasoDeslizante(valor, 0.1, max))}
-      >
-        <Plus aria-hidden className="size-4" />
-      </button>
-      <output className={`num w-[5.5rem] shrink-0 text-right text-sm ${valor === null ? 'text-muted italic' : 'font-medium text-text'}`} aria-live="polite">
-        {texto}
-      </output>
     </div>
   )
 }

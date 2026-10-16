@@ -601,7 +601,9 @@ Detalla D-31 y la visión 4.15. Pantalla `/flujo`.
 - **Dos salidas más, determinísticas:** el mes en que la mediana de 12 meses del resultado sin aportes (en USD) alcanza la cuota, y "¿terminás debajo de lo que pusiste?" (financiero al horizonte contra lo aportado). "No cruza antes del horizonte" es un resultado válido. Con un mes sin dato en esos 12, la cobertura es sin dato con su motivo; con menos de 13 meses de horizonte no se mide (y se dice), y sin cuota que pagues vos no se muestra.
 - **El patrimonio neto completo proyectado** usa la deuda según el cuadro de marcha; mientras falte la apertura de la cuota (amortización), es sin dato con su motivo. La caja del mes no depende de eso: usa la cuota entera.
 
-### D-145 · "Completar lo que falta con Igual": un toque del dueño, nunca un default — P (provisoria, a confirmar)
+### D-145 · "Completar lo que falta con Igual": un toque del dueño, nunca un default — revisada por D-164
+**Revisada por D-164** (rediseño del 15/10): pediste «en flujos y escenarios quiero ver graficos», así que Flujo arranca con todo en Igual y a 12 meses, y cada variable tiene una sola barra. El botón ya no existe. Lo de abajo es como era.
+
 Detalla D-08 y D-88.
 - **Ninguna variable de mercado arranca elegida** (devaluación, inflación, brecha, retornos, TEM de renovación, casa, camioneta) y el horizonte tampoco. Baja o Sube sin número es "falta".
 - **El botón pone Igual solo en lo que no elegiste** y no toca nada más. El horizonte se elige con atajos (6, 12, 24 meses, fin del leasing) o con − y +.
@@ -807,6 +809,7 @@ El 15/10 pediste un diseño nuevo para toda la app: «nuevo diseño de app, impl
 - **Composición en dólares:** cada clase en cada carga del período, al CCL de ese día; en Total suma los bienes. Las deudas no se apilan: la línea del patrimonio ya las resta. Si a una clase le falta el dólar, ese punto es "sin dato", no cero; una clase que ese día no tenías vale 0.
 - **Activo vs. TC:** las ocho partidas con más resultado, con un solo cero; las demás están en "Resultados por activo y cuenta".
 - **La lectura** dice primero si ganaste en pesos y perdiste en dólares (o al revés). Si no, quién puso "la mayor parte" (la más grande de las tres partes, aunque no llegue a la mitad): el dólar, tus activos o lo que todavía no se puede atribuir.
+- **Lo imprescindible del PnL por mes** (16/10, con los arreglos de ancho): el mes, lo que pusieron tus activos y lo que puso el dólar se ven siempre, también a 768 px. El lugar que queda es primero para "sin atribuir" y después para los flujos (aportes y retiros, cuotas, amortización); lo que no entra va al "⋯" de cada fila. Antes, las tres partes del resultado se veían siempre: con el mes y el "⋯" no cabían en los 600 px que la tarjeta le deja a la tabla a 768 px, y había scroll hacia el costado. Con cada columna a la medida de su cifra más larga entran con los números del ejemplo, pero no con resultados de cinco cifras en dólares. Por eso "sin atribuir" deja de ser imprescindible: es lo pendiente al final menos lo pendiente al principio (D-35), cero cuando las dos puntas son cargas completas; la de cada mes sigue en el "⋯" y la del período, en el puente.
 - **Por qué:** el diseño pone el período arriba, en una sola fila, y 1M, 3M, YTD y 12M son los cortes con que se compara un resultado. Ninguna función se pierde.
 - **Descartado:**
   - sacar la semana: sirve para la rutina de todos los días;
@@ -846,6 +849,115 @@ El 15/10 pediste un diseño nuevo para toda la app: «nuevo diseño de app, impl
   - las dos columnas de desglose (activo / TC en pesos y en dólares): no entran con el resto sin scroll horizontal, y la barra con su traza dice lo mismo;
   - la liquidez en un bloque aparte: era una segunda tabla para tres filas.
 - **Falta:** la densidad compacta del handoff (25 filas sin scroll), como preferencia en Ajustes. Hoy son 9 filas y entran enteras.
+
+### D-162 · Pasivos: la tira de cuotas y cuatro cifras arriba, la cuota en pesos y en dólares con las próximas en la Grilla, y el resto en el detalle — P (provisoria, a confirmar)
+- **Qué:** Pasivos sigue la anatomía de D-157 con lo del handoff (capturas 08 y 09), en este orden:
+  1. la pregunta ("Compromisos · ¿Cuánto me falta pagar?") y la lectura;
+  2. la tira de cuotas y, debajo, cuatro cifras: el saldo de capital, lo pagado, lo que falta y la opción de compra;
+  3. la cuota en pesos y en dólares (1,4fr) y el cuadro de marcha de las próximas (1fr), las dos tarjetas del mismo alto;
+  4. "El detalle: tu leasing", con lo que la pantalla ya tenía.
+- **La lectura:** cuántas cuotas pagaste de cuántas y, después, lo primero que corresponda:
+  - una cuota que venció y tu planilla no marca pagada;
+  - cómo cambió la cuota en dólares, solo entre las pagadas con el CCL de su pago ("Cada una te costó *menos* dólares que la anterior", o la última contra la primera);
+  - cuántas faltan y hasta cuándo.
+
+  El handoff dice "te cuesta"; la app dice "te costó", porque habla de cuotas pagadas, cada una con el dólar de su pago. Sin cuadro, dice que falta importarlo; con todo pagado, cuándo es la opción de compra.
+- **La tira:** una celda por cuota, tantas como dice el contrato (o el cuadro, si trae más): 35 en el contrato real, nunca un número fijo (el prototipo dibuja 48). Las pagadas van en tinta, la próxima en sangría con su brillo y las que faltan en hueco. Hay dos estados que el diseño no tiene:
+  - una cuota que venció y la planilla no marca pagada: fondo sangría tenue, con un aviso;
+  - una que el cuadro no trae: punteada, con una nota que lo dice.
+
+  Nunca se dibuja como pagada una cuota que no lo está.
+- **Las cuatro cifras,** cada una en pesos y en dólares, con su traza, su chip y una nota corta, como en el handoff:
+  - **saldo de capital:** la deuda que cuenta en toda la app (D-131): la informada por la leasera; sin ella, la según el cuadro; sin cuadro o sin tasa, la estimada que aprobaste. La nota dice cuál es, y va en sangría clara, como en el diseño;
+  - **pagado:** las cuotas pagadas; en dólares, al CCL de cada pago (sin ese CCL, sin dato);
+  - **falta:** lo nominal de las cuotas que faltan, sin la opción; en dólares, al CCL de hoy (D-163);
+  - **opción de compra:** con su IVA, al final del contrato.
+- **Las próximas** son las seis primeras por pagar, en la Grilla (N° · Fecha · ARS · USD), adentro de la tarjeta como en la captura: sin borde ni radio propios, en mono de 12 px, con filas de 36 px (48 con el dedo, para que cada cifra sea un tocable de 44 px: D-100) y al ras del rótulo. Lo resuelven variables del tema de AG Grid puestas desde la pantalla: la Grilla común no cambia. Los dólares van en su pastilla, como toda cifra en dólares (D-68), aunque la captura los dibuja sin ella.
+- **El detalle,** con el estilo nuevo: la deuda con su origen, la tasa del contrato, el costo contra el bien, el cuadro de marcha entero, cada cuota abierta, los totales, el recupero fiscal y el dólar, el leasing en palabras, el contrato y quién paga. Arriba a la derecha, el CCL con que se pasa a dólares, con su traza y su chip.
+  - El cuadro de marcha entero pasa a la Grilla (D-157). Se filtra por pagar, pagadas o todas, y se lee como la factura o abierta en amortización y gasto. La opción de compra va aparte.
+  - Lo pagado y lo que falta, abiertos en sus partes, también van en la Grilla.
+  - Con el dedo (una tablet), las filas crecen para que ninguna cifra pise a la de abajo (D-100): 72 px en el cuadro, donde cada cifra lleva su chip, y 100 en lo pagado y lo que falta, que lleva dos cifras por celda.
+- **Nada se pierde:**
+  - las cuatro tarjetas de antes (cuotas pagadas, la próxima, lo que falta y el costo contra el bien) quedan en la tira, las cifras, las próximas y "Costo total contra el bien";
+  - la frase pasa a "El leasing en palabras", con su hoja cifra por cifra en el teléfono;
+  - el CCL que estaba arriba de la pantalla pasa al encabezado del detalle.
+- **Por qué:** el diseño contesta "¿cuánto me falta pagar?" de un vistazo, arriba. El detalle conserva todo lo que la pantalla ya hacía.
+- **Descartado:**
+  - una tira de 48 celdas fija, como el prototipo: el contrato real tiene 35;
+  - los dólares de las próximas sin pastilla, como en la captura: rompe D-68;
+  - sacar "Ver como tabla" del gráfico: es la tabla para el lector de pantalla y la tienen todos los gráficos.
+
+### D-163 · En dólares, lo que falta del leasing va al CCL de hoy, no a una senda del dólar — P (provisoria, a confirmar)
+- **Qué pide el handoff:** la línea de la cuota en dólares, punteada después de hoy, "con la senda de CCL del escenario base", y la cifra "Falta" en dólares "proyectada con la senda base".
+- **Qué hace la app:** lo que falta va al CCL de hoy (el de tu última carga), rotulado: "una referencia, no una proyección del dólar". La línea punteada queda plana mientras la cuota en pesos no cambie. Las pagadas van al CCL del día de su pago (D-140) y, sin ese CCL, son un hueco en la línea, nunca un cero.
+- **Por qué:** la app no inventa ni estima tipos de cambio. En Pasivos tampoco hay un escenario elegido: las sendas del dólar son supuestos de Flujo y escenarios, y las elegís ahí. Usar una acá mostraría como dato un supuesto que no elegiste, en una pantalla que no habla de escenarios.
+- **Descartado:**
+  - la senda del escenario abierto en Flujo: depende de lo que estés probando allá, y Pasivos no lo muestra;
+  - proyectar el CCL con la inflación o con una tendencia: sería un tipo de cambio inventado.
+- **Si la querés:** cuánto cuesta en dólares lo que falta con cada escenario cabe en Flujo y escenarios, donde ya están las sendas.
+
+### D-164 · Flujo arranca con todo en Igual y a 12 meses, con una barra por variable (revisa D-145) — P (provisoria, a confirmar)
+Lo pediste el 15/10: «en flujos y escenarios quiero ver graficos» y «seleccionar los valores de las variables con barras».
+- **Qué:** al abrir Flujo, cada variable está en **Igual** (como en tu última carga) y el horizonte en **12 meses**, así que la lectura, la cascada del mes y el patrimonio en dólares se ven sin tocar nada:
+  - las variables de mercado: devaluación, inflación, brecha, retornos y TEM de renovación;
+  - tus bienes: la casa y la camioneta;
+  - los tramos de tu ingreso y los gastos.
+
+  Igual sigue siendo un supuesto, y la lectura lo dice: "Con todo igual, en un año llegás a…".
+- **Una barra por variable:**
+  - va de Baja a Sube, con Igual en el medio (marcado), de a 0,1;
+  - tiene − y + a los costados y el número a la vista ("Sube +2,0 %/mes");
+  - "Volver a Igual" la devuelve de un toque, y "Todo en Igual" las devuelve todas;
+  - se maneja con el teclado (flechas, Inicio y Fin) y el lector de pantalla la lee en palabras;
+  - tus números recordados (D-148) aparecen al lado como botones: un toque la lleva ahí.
+- **Los gráficos cambian en vivo:** la proyección corre en el navegador con cada movimiento.
+  - La lectura y el patrimonio en dólares la siguen en menos de 200 ms con la CPU × 4 (e2e, con el build de producción).
+  - El detalle de abajo (la grilla mes a mes y sus dos gráficos) se pone al día cuando la barra queda quieta 0,9 s. Es lo más pesado de redibujar y, si se dibuja mientras la barra se mueve, demora lo de arriba.
+  - La dirección (`?s=`) se escribe cuando la barra queda quieta 0,6 s: una sola entrada de historial por movimiento.
+- **"Todo igual" de referencia:** cuando movés algo, el patrimonio en dólares suma la línea del mismo escenario con todas las barras en Igual.
+- **Lo que no tiene Igual posible no tiene barra:** la brecha sin el cripto, o la TEM de renovación sin la TEM de hoy. En su lugar, dice qué falta.
+- **Un escenario guardado de antes** (o una dirección vieja) lee en Igual lo que había dejado sin elegir, y sin horizonte, en 12 meses.
+- **Lo precargado no cambia:** tu regla de reinversión del 14/10 y "la cuota la pagás vos" (D-155).
+- **Por qué:** con D-145, Flujo abría sin gráficos: había que tocar "Completar lo que falta con Igual" y después elegir un horizonte.
+- **Descartado:**
+  - Baja · Igual · Sube en botones más un deslizante aparte: son dos controles para lo que la barra hace en uno;
+  - arrancar en los 36 meses del diseño: es su número de ejemplo. Con 12, la lectura dice "en un año" y la grilla mes a mes entra entera. El horizonte se cambia de un toque (6, 12 o 24 meses, o el fin del leasing).
+
+### D-165 · Sin Monte Carlo, el patrimonio en dólares es un solo camino: el rango es "sin dato" y la probabilidad pasa a "¿terminás debajo de lo que pusiste?" (detalla D-144) — P (provisoria, a confirmar)
+- **Qué:** el bloque del diseño queda en su lugar y con su estilo, sin abanico:
+  - la línea del escenario en oro, de 2,5 px: la de la mediana del diseño;
+  - "lo que pusiste" en gris, rayada 4 4: el capital aportado del diseño;
+  - "Todo igual" de referencia (D-164).
+- **Las tres cifras de abajo:**
+  1. el financiero al horizonte, en lugar de la mediana, con su traza;
+  2. "Rango p5 – p95": *sin dato* · llega con Monte Carlo: hoy es un solo camino;
+  3. "¿Terminás debajo de lo que pusiste?": Sí o No, con cuánto. Es la salida determinística de D-144 y va en lugar de la probabilidad.
+- **El rótulo lo dice:** "Patrimonio financiero en dólares · 12 meses · un camino". En el diseño dice "· Monte Carlo".
+- **Es el financiero:** la proyección es de lo invertible (D-03). La casa y la camioneta van en el detalle, en "Neto sin la camioneta".
+- **Sin eje de montos, como en el diseño:** los montos están en el tooltip, en la tabla del gráfico y en las cifras de abajo.
+- **Por qué:** D-144 deja Monte Carlo para la fase 3. "Sin dato, nunca cero" vale también para un percentil: un abanico sin Monte Carlo sería un rango inventado.
+- **Descartado:**
+  - una banda con un ± fijo: no sale de ningún cálculo;
+  - sacar el bloque: el diseño lo pone en el centro de la pantalla, y su lugar avisa lo que falta.
+
+### D-166 · Flujo: arriba lo del diseño, debajo las barras y abajo el detalle de siempre; Cargar ingreso y Cargar gasto van al mes en curso — P (provisoria, a confirmar)
+- **Qué:** Flujo sigue la anatomía de D-157 (handoff, captura 10):
+  1. **La pregunta y la lectura:** "Futuro · ¿Cuánto me sobra y adónde me lleva?" y una frase con cuánto te sobra este mes y adónde llegás al horizonte con el escenario elegido ("Este mes te sobran $ … Con todo igual, en un año llegás a *US$ …* en lo financiero."). Cada cifra abre su traza.
+  2. **La cascada del mes:** Ingresos USD × cripto → Pesos fijos → Gastos fijos → Cuota leasing → Excedente, y el reintegro del IVA si lo declaraste. Sale de lo declarado y de tu última carga, así que no depende de los supuestos. El nombre de cada paso abre la traza de su cifra.
+  3. **El patrimonio en dólares** (D-165), con la pastilla de escenarios: Igual y tus guardados. Un guardado al que le moviste una barra dice "con tus cambios".
+
+  Debajo van **tus supuestos, una barra por variable** (D-164). Después, **el detalle**:
+  - la proyección mes a mes: las cajas al horizonte, el flujo y el patrimonio proyectados y la grilla;
+  - tus escenarios guardados;
+  - el mes en curso;
+  - el calendario y proyectado contra real;
+  - lo que cargaste, tus ingresos y gastos declarados y los pagos al vencimiento que faltan.
+- **Cargar ingreso y Cargar gasto** pasan del encabezado al mes en curso ("Octubre, con los datos de hoy"), que es lo que cambian. Sin cargas, van en "Lo que cargaste". Siguen también en Hoy (Próximos 30 días) y en `/flujo/cargar`, que toma la anatomía: la pregunta, "Cargar *ingreso*" y la pastilla Ingreso · Gasto.
+- **Con qué datos se armó el mes** (la fecha de tu carga, el CCL y el cripto, cada uno con su traza) va en el mes en curso. Antes estaba en el encabezado; la barra superior también los muestra.
+- **Por qué:** el diseño pone arriba la pregunta del mes y la del futuro. Lo que la pantalla tenía y el diseño no muestra va abajo, sin perder nada (D-156).
+- **Descartado:**
+  - Cargar ingreso y Cargar gasto a la derecha del encabezado: el diseño no tiene nada ahí;
+  - las barras en una columna al costado de los gráficos: el diseño reparte ese ancho entre la cascada y el patrimonio.
 
 ## Propuestas que la 1a implementa en forma provisoria
 
