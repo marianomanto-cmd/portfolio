@@ -99,13 +99,21 @@ function TarjetaLote({ l, accion }: { l: Lote; accion: Accion }) {
   )
 }
 
+/**
+ * La fecha (que nombra la fila), las cargas y el lote con Revertir son lo
+ * imprescindible: van a la vista desde 768 px, donde la grilla tiene 642 px
+ * (625 con una barra de scroll clásica). Sus mínimos suman 575 y, con la ⋯,
+ * 623. El tiempo activo es lo que pasa a la ficha (⋯): los cuatro mínimos
+ * suman 800, como antes, así que aparece desde unos 925 px de ventana (con la
+ * barra lateral angosta) y en un ancho medio, como 900, sigue en la ficha.
+ */
 export function TablaRegistro({ lotes, accion }: { lotes: Lote[]; accion: Accion }) {
   const columnas = useMemo<ColumnaGrilla<Lote>[]>(
     () => [
       {
         id: 'fecha',
         titulo: 'Datos del',
-        ancho: 170,
+        ancho: 140,
         prioridad: 0,
         altoAuto: true,
         orden: (l) => l.creado,
@@ -123,7 +131,7 @@ export function TablaRegistro({ lotes, accion }: { lotes: Lote[]; accion: Accion
       {
         id: 'cargas',
         titulo: 'Cargas',
-        ancho: 280,
+        ancho: 225,
         flex: 3,
         prioridad: 0,
         altoAuto: true,
@@ -133,7 +141,8 @@ export function TablaRegistro({ lotes, accion }: { lotes: Lote[]; accion: Accion
         id: 'tiempo',
         titulo: 'Tiempo activo',
         tipo: 'numero',
-        ancho: 130,
+        // Más de lo que pide su cifra: lo que las otras tres cedieron para entrar a 768 px (ver arriba).
+        ancho: 225,
         prioridad: 2,
         altoAuto: true,
         orden: (l) => resumenLote(l).activoMs,
@@ -145,7 +154,8 @@ export function TablaRegistro({ lotes, accion }: { lotes: Lote[]; accion: Accion
       {
         id: 'lote',
         titulo: 'Lote',
-        ancho: 220,
+        // Lo pide el botón "Revertir el lote", que no se corta: 176 px, más 24 de relleno y borde de la celda.
+        ancho: 210,
         flex: 1.2,
         prioridad: 0,
         altoAuto: true,

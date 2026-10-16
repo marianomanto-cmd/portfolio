@@ -193,8 +193,23 @@ export async function revisarLayout(page: Page, grueso: boolean): Promise<string
  * su lugar y cada columna a la vista termina antes del borde de la grilla.
  * Solo las grillas que se ven (debajo de 768 px son tarjetas). Una línea por
  * problema, con el nombre de la grilla.
+ *
+ * Una grilla dibuja un esqueleto mientras mide su lugar y arma AG Grid. En una
+ * pantalla con varias (Evolución tiene cuatro) y con la máquina cargada, eso
+ * puede tardar más que el asiento de esperarHidratacion: antes de revisar se
+ * espera, hasta 10 s, a que todas las que se ven estén dibujadas. Una que en
+ * ese tiempo sigue en esqueleto es un problema ("no se dibujó").
  */
 export async function revisarGrillas(page: Page): Promise<string[]> {
+  const dibujadas = () =>
+    Array.from(document.querySelectorAll<HTMLElement>('[data-grilla]')).every(
+      (g) => getComputedStyle(g).display === 'none' || g.getBoundingClientRect().width === 0 || g.querySelector('.ag-root-wrapper') !== null,
+    )
+  if (!(await page.evaluate(dibujadas))) {
+    await page.waitForFunction(dibujadas, null, { timeout: 10_000 }).catch(() => undefined)
+    // Recién dibujada, la grilla todavía acomoda sus columnas al ancho medido.
+    await page.waitForTimeout(250)
+  }
   return page.evaluate(() => {
     const out: string[] = []
     for (const g of Array.from(document.querySelectorAll<HTMLElement>('[data-grilla]'))) {

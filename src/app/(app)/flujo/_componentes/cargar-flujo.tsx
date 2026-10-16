@@ -14,12 +14,16 @@ import { avisoCripto, posibleDobleCarga, type MovimientoParaControl } from '@/li
 import { fechaCorta } from '@/lib/domain/fechas'
 import { loteDelEnvio, type LoteEnvio } from '@/app/(app)/datos/_lib/envio'
 import { TextoConMontos } from '@/components/monto'
+import { clasesBoton } from '@/components/ui'
 import { cargarFlujoReal, type EstadoFlujo } from '../acciones'
 
 const INICIAL: EstadoFlujo = { ok: null, mensaje: null, errores: {}, vez: 0 }
 
-const OPCION = 'tocable flex min-h-11 cursor-pointer items-center justify-center rounded-lg border px-3 text-sm font-medium has-[:checked]:border-accent has-[:checked]:bg-accent-soft has-[:checked]:text-accent has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent'
-const CAMPO = 'tocable min-h-11 w-full min-w-0 rounded-lg border border-border bg-surface px-3 text-base text-text md:text-sm'
+// Las opciones son pastillas (sistema visual, D-157): la elegida, en surface-3 con borde de tinta; el foco, con su anillo.
+const OPCION =
+  'tocable flex min-h-11 cursor-pointer items-center justify-center rounded-full border px-3 text-center text-[14px] leading-tight text-muted transition-colors hover:border-text hover:text-text has-[:checked]:border-text has-[:checked]:bg-surface-3 has-[:checked]:text-text has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[var(--focus)]'
+const CAMPO = 'tocable min-h-11 w-full min-w-0 rounded-item border border-border-strong bg-surface-2 px-3 text-base text-text placeholder:text-faint md:text-sm'
+const ROTULO = 'text-[13px] text-muted'
 
 function Error({ texto, id }: { texto?: string; id: string }) {
   return texto ? (
@@ -115,10 +119,10 @@ function Formulario({
       <input type="hidden" name="sentido" value={sentido} />
 
       <fieldset>
-        <legend className="text-sm font-medium text-text">Concepto</legend>
+        <legend className={ROTULO}>Concepto</legend>
         <div className="mt-1 grid grid-cols-2 gap-2">
           {conceptos.map((c) => (
-            <label key={c.valor} className={`${OPCION} border-border bg-surface text-text`}>
+            <label key={c.valor} className={`${OPCION} border-border-strong`}>
               <input type="radio" name="concepto" value={c.valor} className="sr-only" aria-describedby={e.concepto ? 'error-concepto' : undefined} />
               {c.texto}
             </label>
@@ -129,7 +133,7 @@ function Formulario({
 
       <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
         <div className="min-w-0">
-          <label htmlFor="monto" className="text-sm font-medium text-text">
+          <label htmlFor="monto" className={ROTULO}>
             Monto
           </label>
           <input
@@ -147,10 +151,10 @@ function Formulario({
           <Error id="error-monto" texto={e.monto} />
         </div>
         <fieldset className="min-w-0">
-          <legend className="text-sm font-medium text-text">Moneda</legend>
+          <legend className={ROTULO}>Moneda</legend>
           <div className="mt-1 grid grid-cols-2 gap-2">
             {(['USD', 'ARS'] as const).map((m) => (
-              <label key={m} className={`${OPCION} min-w-16 border-border bg-surface text-text`}>
+              <label key={m} className={`${OPCION} min-w-16 border-border-strong font-mono`}>
                 <input type="radio" name="moneda" value={m} className="sr-only" onChange={() => setMoneda(m)} />
                 {m === 'USD' ? 'US$' : '$'}
               </label>
@@ -162,7 +166,7 @@ function Formulario({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="min-w-0">
-          <label htmlFor="fecha" className="text-sm font-medium text-text">
+          <label htmlFor="fecha" className={ROTULO}>
             Fecha
           </label>
           <input id="fecha" name="fecha" type="date" value={fecha} onChange={(ev) => setFecha(ev.target.value)} max={hoy} className={`${CAMPO} mt-1`} aria-invalid={Boolean(e.fecha)} />
@@ -171,10 +175,10 @@ function Formulario({
       </div>
 
       <fieldset>
-        <legend className="text-sm font-medium text-text">{ingreso ? '¿A qué cuenta entró?' : '¿De qué cuenta salió?'}</legend>
+        <legend className={ROTULO}>{ingreso ? '¿A qué cuenta entró?' : '¿De qué cuenta salió?'}</legend>
         <div className="mt-1 grid grid-cols-2 gap-2 sm:grid-cols-4">
           {[...cuentas.map((c) => ({ valor: String(c.id), texto: c.nombre })), { valor: 'afuera', texto: 'Afuera' }].map((c) => (
-            <label key={c.valor} className={`${OPCION} border-border bg-surface text-text`}>
+            <label key={c.valor} className={`${OPCION} border-border-strong`}>
               <input type="radio" name="cuenta" value={c.valor} className="sr-only" onChange={() => setCuenta(c.valor)} />
               {c.texto}
             </label>
@@ -187,7 +191,7 @@ function Formulario({
         </p>
         <Error id="error-cuenta" texto={e.cuenta} />
         {doble ? (
-          <p role="status" className="mt-2 rounded-lg border border-warn/40 bg-warn-soft p-2 text-sm text-text">
+          <p role="status" className="mt-2 rounded-item border border-warn/40 bg-warn-soft p-2 text-sm text-text">
             Ojo: el {fechaCorta(doble.fecha)} ya cargaste en Datos › Movimientos {sentido === 'ingreso' ? 'un aporte igual a' : 'un retiro igual de'} {nombreCuenta}. Si es el mismo,
             no lo cargues de nuevo: contaría dos veces.
           </p>
@@ -195,21 +199,21 @@ function Formulario({
       </fieldset>
 
       {conCripto ? (
-        <fieldset className="rounded-lg border border-border bg-surface-2 p-3">
-          <legend className="px-1 text-sm font-medium text-text">¿Vendiste los dólares al cripto?</legend>
+        <fieldset className="rounded-item border border-border bg-surface-2 p-3">
+          <legend className="px-1 text-[13px] text-text">¿Vendiste los dólares al cripto?</legend>
           <p className="text-xs text-muted">
             Los dos o ninguno.{criptoHoy ? <> El cripto de tu última carga: <TextoConMontos texto={`$ ${criptoHoy}`} />.</> : null}
           </p>
           <div className="mt-2 grid gap-3 sm:grid-cols-2">
             <div className="min-w-0">
-              <label htmlFor="cripto" className="text-sm text-text">
+              <label htmlFor="cripto" className={ROTULO}>
                 Dólar cripto que usaste
               </label>
               <input id="cripto" name="cripto" inputMode="decimal" autoComplete="off" placeholder="Ej.: 1.541,00" value={cripto} onChange={(ev) => setCripto(ev.target.value)} className={`${CAMPO} mt-1`} aria-invalid={Boolean(e.cripto)} />
               <Error id="error-cripto" texto={e.cripto} />
             </div>
             <div className="min-w-0">
-              <label htmlFor="pesos" className="text-sm text-text">
+              <label htmlFor="pesos" className={ROTULO}>
                 Pesos que recibiste
               </label>
               <input id="pesos" name="pesos" inputMode="decimal" autoComplete="off" placeholder="Ej.: 5.855.800" value={pesos} onChange={(ev) => setPesos(ev.target.value)} className={`${CAMPO} mt-1`} aria-invalid={Boolean(e.pesos)} />
@@ -225,18 +229,18 @@ function Formulario({
       ) : null}
 
       <div>
-        <label htmlFor="notas" className="text-sm font-medium text-text">
-          Notas <span className="font-normal text-muted">(opcional)</span>
+        <label htmlFor="notas" className={ROTULO}>
+          Notas <span className="text-faint">(opcional)</span>
         </label>
         <input id="notas" name="notas" maxLength={500} autoComplete="off" className={`${CAMPO} mt-1`} />
       </div>
 
-      <button type="submit" disabled={enviando} className="tocable inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-accent px-4 text-[15px] font-medium text-on-accent hover:bg-accent-strong disabled:opacity-60 sm:w-auto">
+      <button type="submit" disabled={enviando} className={`${clasesBoton('primario', 'md')} w-full sm:w-auto`}>
         {enviando ? 'Guardando…' : ingreso ? 'Guardar el ingreso' : 'Guardar el gasto'}
       </button>
 
       {estado.mensaje ? (
-        <div id="mensaje-cargar" role="status" className={`rounded-lg border p-3 text-sm ${estado.ok ? 'border-border bg-surface-2 text-text' : 'border-negative/40 bg-negative-soft text-text'}`}>
+        <div id="mensaje-cargar" role="status" className={`rounded-item border p-3 text-sm ${estado.ok ? 'border-border bg-surface-2 text-text' : 'border-negative/40 bg-negative-soft text-text'}`}>
           <p>
             <TextoConMontos texto={estado.mensaje} />
           </p>

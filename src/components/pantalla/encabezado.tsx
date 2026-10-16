@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Traza } from '@/components/traza'
+import { Traza, TrazaBase } from '@/components/traza'
 import type { ParteLectura } from './lectura'
 
 /**
@@ -53,18 +53,39 @@ export function Encabezado({
   )
 }
 
+/** La puntuación que sigue a una cifra ("$ 2.916.600." o "US$ 87.587,"): va pegada a ella, nunca sola al principio del renglón. */
+const PUNTUACION = /^[.,;:…)]+/
+
 /** Las partes de la lectura: texto, la cifra con su traza (tapada en el modo privado) y el énfasis. */
 export function Lectura({ partes }: { partes: readonly ParteLectura[] }) {
   return (
     <>
       {partes.map((p, i) => {
-        const contenido = p.calc ? (
+        const anterior = partes[i - 1]
+        // La puntuación que ya se pegó a la cifra de antes no se repite.
+        const quitada = anterior && (anterior.calc || anterior.obtener) && !p.calc && !p.obtener ? (PUNTUACION.exec(p.texto)?.[0] ?? '') : ''
+        const siguiente = partes[i + 1]
+        const pegada = (p.calc || p.obtener) && siguiente && !siguiente.calc && !siguiente.obtener ? (PUNTUACION.exec(siguiente.texto)?.[0] ?? '') : ''
+        const cifra = p.calc ? (
           <Traza calc={p.calc} titulo={p.titulo ?? p.texto} moneda={p.moneda}>
             <span className="monto">{p.texto}</span>
           </Traza>
-        ) : (
-          p.texto
-        )
+        ) : p.obtener ? (
+          <TrazaBase obtener={p.obtener} titulo={p.titulo ?? p.texto} moneda={p.moneda}>
+            <span className="monto">{p.texto}</span>
+          </TrazaBase>
+        ) : null
+        if (cifra && pegada) {
+          // La cifra y su puntuación, en un solo renglón (la puntuación, sin el énfasis).
+          return (
+            <span key={i} className="whitespace-nowrap">
+              {p.enfasis ? <em>{cifra}</em> : cifra}
+              {pegada}
+            </span>
+          )
+        }
+        const contenido = cifra ?? p.texto.slice(quitada.length)
+        if (contenido === '') return null
         return p.enfasis ? <em key={i}>{contenido}</em> : <span key={i}>{contenido}</span>
       })}
     </>

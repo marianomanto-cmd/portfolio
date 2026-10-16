@@ -17,7 +17,7 @@ import {
   rebasar,
   supuestosIniciales,
   supuestosVacios,
-  textoBoton,
+  textoValor,
 } from './supuestos'
 import { temImplicitaValor } from './tem'
 import type { BaseProyeccion, CuotaBase, PartidaBase, RecurrenteBase, Supuestos } from './tipos'
@@ -216,10 +216,13 @@ describe('supuestos', () => {
     expect(decodificar('no-es-base64-json')).toBeNull()
   })
 
-  it('el número va en el botón', () => {
-    expect(textoBoton('devaluacion', 'sube', '2')).toBe('Sube +2,0%/mes')
-    expect(textoBoton('retorno.cedear', 'baja', '10')).toBe('Baja −10,0%/año')
-    expect(textoBoton('devaluacion', 'igual', null)).toBe('Igual')
+  it('el valor de una variable en palabras, como se ve al lado de su barra', () => {
+    expect(textoValor('devaluacion', 'sube', '2')).toBe('Sube +2,0 %/mes')
+    expect(textoValor('retorno.cedear', 'baja', '10')).toBe('Baja −10,0 %/año')
+    expect(textoValor('brecha_cripto', 'baja', '1.5')).toBe('Baja −1,5 pts')
+    expect(textoValor('devaluacion', 'igual', null)).toBe('Igual')
+    expect(textoValor('devaluacion', null, null)).toBe('sin elegir')
+    expect(textoValor('devaluacion', 'sube', null)).toBe('Sube (sin número)')
   })
 })
 
@@ -392,7 +395,7 @@ describe('proyección', () => {
     const b = baseChica({ bienes: [{ id: 3, nombre: 'Casa', tipo: 'inmueble', moneda: 'USD', valor: '180000', pasivo_id: null }] })
     const s = supuestosIniciales(b)
     const { parciales } = faltantes(b, s)
-    expect(parciales.map((f) => f.texto)).toEqual(['Casa: elegí Baja, Igual o Sube; sin eso, el patrimonio neto proyectado queda sin dato'])
+    expect(parciales.map((f) => f.texto)).toEqual(['Casa: sin elegir (mové su barra o tocá Igual); sin eso, el patrimonio neto proyectado queda sin dato'])
     expect(faltantes(b, completarConIgual(s, b)).parciales).toEqual([])
   })
 

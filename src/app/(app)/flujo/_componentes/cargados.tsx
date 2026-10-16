@@ -11,7 +11,7 @@ import type { FilaCargada } from '@/lib/vistas/contratos-flujo'
 import { Chip, ParMonto } from '@/components/ui'
 import { anularCargado, deshacerCargado } from '../acciones'
 
-const BOTON = 'tocable inline-flex min-h-9 items-center justify-center rounded-lg border border-border bg-surface px-3 text-sm font-medium text-text hover:bg-surface-2 disabled:opacity-60'
+const BOTON = 'tocable inline-flex min-h-9 items-center justify-center rounded-full border border-border-strong px-3 text-[13px] text-text transition-colors hover:border-text disabled:opacity-60'
 
 const nombreConcepto = (f: FilaCargada) =>
   f.sentido === 'ingreso' ? (f.concepto === 'mensual' ? 'Ingreso mensual' : 'Ingreso extraordinario') : f.concepto === 'mensual' ? 'Gasto fijo del mes' : 'Gasto extraordinario'
@@ -31,7 +31,7 @@ export function Cargados({ filas, limite }: { filas: FilaCargada[]; limite?: num
       if (r.ok) router.refresh()
     })
 
-  if (!filas.length) return <p className="text-sm text-muted">Todavía no cargaste ningún ingreso ni gasto.</p>
+  if (!filas.length) return <p className="text-[13px] text-muted">Todavía no cargaste ningún ingreso ni gasto.</p>
 
   return (
     <div>
@@ -40,11 +40,11 @@ export function Cargados({ filas, limite }: { filas: FilaCargada[]; limite?: num
           {mensaje.texto}
         </p>
       ) : null}
-      <ul className="divide-y divide-border rounded-lg border border-border" data-lista="cargados">
+      <ul className="divide-y divide-border rounded-item border border-border" data-lista="cargados">
         {visibles.map((f) => (
           <li key={f.id} className={`flex flex-wrap items-start justify-between gap-2 p-3 ${f.anulado ? 'opacity-60' : ''}`} data-cargado={f.id}>
             <div className="min-w-0">
-              <p className="text-sm font-medium text-text">
+              <p className="text-[14px] text-text">
                 {nombreConcepto(f)} <span className="font-normal text-muted">· {fechaCorta(f.fecha)}</span>
               </p>
               <p className="mt-0.5 text-xs text-muted">

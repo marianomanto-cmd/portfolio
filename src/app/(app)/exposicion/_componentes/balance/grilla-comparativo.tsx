@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { fechaCorta } from '@/lib/domain/fechas'
 import type { ComparativoVista, LineaComparativa } from '@/lib/vistas/contratos-balance'
 import { Grilla, type ColumnaGrilla } from '@/components/grilla'
+import { useMedia } from '@/components/preferencias'
 import { Chip } from '@/components/ui'
 import { Cifra } from './cifra'
 import { Diferencia, ParComparado } from './comparativo-cifras'
@@ -11,6 +12,12 @@ import { Diferencia, ParComparado } from './comparativo-cifras'
 // El comparativo en pantalla: la Grilla común (AG Grid, D-157), sin orden (es
 // un estado contable: los renglones van en su orden). Debajo de 768 px, una
 // tarjeta por renglón con las dos fechas y la diferencia.
+//
+// Las cuatro columnas son lo imprescindible y van a la vista desde 768 px: a
+// esa ventana la grilla tiene 642 px (625 con una barra de scroll clásica), y
+// sus mínimos suman 625. Cada cifra, 150: entra "+$ 1.234.567.890" (123 px más
+// 24 de relleno y borde). El renglón, 175, se lleva lo que sobra; si su chip no
+// entra al lado del nombre, baja de renglón (la fila crece: altoAuto).
 
 function Renglon({ l }: { l: LineaComparativa }) {
   return (
@@ -52,13 +59,16 @@ function TarjetaRenglon({ l, fecha, anterior }: { l: LineaComparativa; fecha: st
 export function GrillaComparativo({ c, fecha }: { c: ComparativoVista; fecha: string }) {
   const columnas = useMemo<ColumnaGrilla<LineaComparativa>[]>(
     () => [
-      { id: 'renglon', titulo: 'Renglón', ancho: 200, flex: 1.6, prioridad: 0, altoAuto: true, celda: (l) => <Renglon l={l} /> },
+      { id: 'renglon', titulo: 'Renglón', ancho: 175, flex: 1.6, prioridad: 0, altoAuto: true, celda: (l) => <Renglon l={l} /> },
       { id: 'actual', titulo: `Al ${fechaCorta(fecha)}`, tipo: 'numero', ancho: 150, prioridad: 0, celda: (l) => <ParComparado l={l} cual="actual" fecha={fecha} /> },
       { id: 'anterior', titulo: `Al ${fechaCorta(c.fecha)}`, tipo: 'numero', ancho: 150, prioridad: 0, celda: (l) => <ParComparado l={l} cual="anterior" fecha={c.fecha} /> },
       { id: 'diferencia', titulo: 'Diferencia', tipo: 'numero', ancho: 150, prioridad: 0, celda: (l) => <ParComparado l={l} cual="diferencia" fecha={fecha} /> },
     ],
     [c.fecha, fecha],
   )
+  // Cada celda lleva dos cifras, una arriba de la otra: con el dedo (una tablet), cada una es un
+  // tocable de 44 px y la fila mide 100 (como Posiciones y Pasivos, D-100), para que no se pisen.
+  const grueso = useMedia('(pointer: coarse)', false)
   return (
     <Grilla
       titulo={`Comparativo del balance al ${fechaCorta(fecha)} y al ${fechaCorta(c.fecha)}, en pesos y en dólares`}
@@ -66,7 +76,7 @@ export function GrillaComparativo({ c, fecha }: { c: ComparativoVista; fecha: st
       columnas={columnas}
       idFila={(l) => l.clave}
       nombreFila={(l) => l.nombre}
-      altoFila={56}
+      altoFila={grueso ? 100 : 56}
       maxFilas={40}
       tarjeta={(l) => <TarjetaRenglon l={l} fecha={fecha} anterior={c.fecha} />}
     />

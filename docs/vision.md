@@ -589,6 +589,8 @@ Desde la importación, los niveles no se editan: cambiar uno crea una versión n
 
 **Para qué:** el leasing como un contrato vivo, en pesos y en dólares (spec §5).
 
+**Desde el rediseño (15/10/2026, D-162 y D-163):** arriba, la pregunta ("¿Cuánto me falta pagar?") y la lectura; la tira de cuotas (una celda por cuota del contrato: pagadas, la próxima y las que faltan) con cuatro cifras debajo: el saldo de capital (la deuda que cuenta), lo pagado, lo que falta y la opción de compra. Después, la cuota en pesos y en dólares, cada una con su eje (en dólares, sólida hasta hoy al CCL de cada pago y punteada después al CCL de hoy, nunca a una senda del dólar), y las próximas seis cuotas en la grilla común. Todo lo demás (la deuda con su origen, la tasa, el costo contra el bien, el cuadro de marcha entero en la grilla, cada cuota abierta, los totales, el recupero fiscal, la frase y quién paga) va abajo, en el detalle. Lo que sigue es la versión anterior.
+
 **Frase** (licuación y pagado en USD son ilustrativos: dependen de la historia del CCL en cada pago):
 > Leasing de la camioneta: **cuota 14 de 48**. La cuota fija es de $1.150.000: hoy son US$ 743, y la cuota 1 eran US$ 912. Faltan $39,1 M nominales (34 cuotas), que hoy son US$ 25.255. Capital pendiente informado por la leasera: $21,4 M (es lo que netea en Exposición). Desde la cuota 1, el CCL **licuó US$ 6.830** de tu deuda. **La paga la empresa** (registrado en cada cuota pagada).
 

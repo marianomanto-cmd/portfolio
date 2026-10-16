@@ -12,14 +12,21 @@
 //   vidrio, la paleta del sistema y los colorTema(…) de la opción resueltos
 //   con el tema vigente. Se vuelve a dibujar al cambiar el tema, la paleta o
 //   el ancho; sin animación con "reducir movimiento".
+// - Una opción nueva se dibuja sobre el mismo gráfico (setOption), sin
+//   desarmarlo: así sigue en vivo a una barra de Flujo (< 200 ms). Con
+//   `fusionar`, la opción nueva (los mismos componentes, otros datos) se
+//   fusiona con la anterior y solo se reemplazan las series: no se rehacen los
+//   ejes, la leyenda ni el tooltip.
+// - `pie` va a la izquierda de "Ver como tabla", en el mismo renglón (una
+//   leyenda corta).
 // - Alto fijo (uno para el teléfono y otro desde 768 px): nunca empuja la
 //   pantalla ni deja scroll horizontal.
 // - La misma información va en una tabla para el lector de pantalla, y "Ver
-//   como tabla" la muestra a la vista.
+//   como tabla" la muestra a la vista. El nombre del gráfico es su título.
 // - El modo privado lo resuelve la opción (sin montos en ejes, etiquetas ni
 //   tooltip); el test de interacción lo controla en cada pantalla.
 
-import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { conTema, leerTema } from './tema'
 
 export interface TablaGrafico {
@@ -39,10 +46,18 @@ export interface PropsGrafico {
   /** Tocar una barra o un punto (por ejemplo, para abrir su traza). */
   alTocar?: (indice: { serie: number; dato: number }) => void
   className?: string
+  /**
+   * Una opción nueva se fusiona con la anterior (solo se reemplazan las
+   * series) en lugar de dibujarse de cero. Para un gráfico que sigue en vivo a
+   * un control y conserva sus componentes (Flujo). Sin la prop, como siempre.
+   */
+  fusionar?: boolean
+  /** A la izquierda de "Ver como tabla", en el mismo renglón: una leyenda corta. Sin la prop, como siempre. */
+  pie?: ReactNode
 }
 
 type Instancia = {
-  setOption: (o: Record<string, unknown>, opciones?: { notMerge?: boolean }) => void
+  setOption: (o: Record<string, unknown>, opciones?: { notMerge?: boolean; replaceMerge?: string[] }) => void
   resize: () => void
   dispose: () => void
   on: (evento: string, fn: (p: { seriesIndex?: number; dataIndex?: number }) => void) => void
@@ -78,9 +93,14 @@ function echarts() {
 const MOVIL = '(max-width: 767.98px)'
 const SIN_MOVIMIENTO = '(prefers-reduced-motion: reduce)'
 
-export function Grafico({ opcion, alto = { movil: 240, escritorio: 320 }, titulo, tabla, alTocar, className = '' }: PropsGrafico) {
+export function Grafico({ opcion, alto = { movil: 240, escritorio: 320 }, titulo, tabla, alTocar, className = '', fusionar = false, pie }: PropsGrafico) {
   const ref = useRef<HTMLDivElement>(null)
   const tocar = useRef(alTocar)
+  const fusion = useRef(fusionar)
+  // La opción vigente y cómo dibujarla: el gráfico se arma una vez y cada opción nueva se dibuja encima.
+  const vigente = useRef(opcion)
+  const nombre = useRef(titulo)
+  const redibujar = useRef<(() => void) | null>(null)
   const [verTabla, setVerTabla] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const idTabla = useId()
@@ -89,6 +109,13 @@ export function Grafico({ opcion, alto = { movil: 240, escritorio: 320 }, titulo
     tocar.current = alTocar
   }, [alTocar])
 
+  useLayoutEffect(() => {
+    vigente.current = opcion
+    nombre.current = titulo
+    fusion.current = fusionar
+    redibujar.current?.()
+  }, [opcion, titulo, fusionar])
+
   useEffect(() => {
     const el = ref.current
     if (!el) return
@@ -96,16 +123,18 @@ export function Grafico({ opcion, alto = { movil: 240, escritorio: 320 }, titulo
     let chart: Instancia | null = null
     const limpiar: (() => void)[] = []
 
-    const dibujar = () => {
+    // Con `fusionar`, una opción nueva se fusiona (solo cambian las series); el tema, el ancho y la primera vez, de cero.
+    const pintar = (fusionarAhora: boolean) => {
       if (!chart) return
       const entorno = { movil: window.matchMedia(MOVIL).matches, animar: !window.matchMedia(SIN_MOVIMIENTO).matches }
       try {
-        chart.setOption(conTema(opcion, leerTema(), entorno), { notMerge: true })
+        chart.setOption(conTema(vigente.current, leerTema(), { ...entorno, nombre: nombre.current }), fusionarAhora ? { notMerge: false, replaceMerge: ['series'] } : { notMerge: true })
         setError(null)
       } catch (e) {
         setError(e instanceof Error ? e.message : 'No se pudo dibujar el gráfico.')
       }
     }
+    const dibujar = () => pintar(false)
 
     echarts()
       .then((ec) => {
@@ -113,6 +142,10 @@ export function Grafico({ opcion, alto = { movil: 240, escritorio: 320 }, titulo
         chart = ec.init(ref.current, null, { renderer: 'svg' })
         chart.on('click', (p) => {
           if (typeof p.seriesIndex === 'number' && typeof p.dataIndex === 'number') tocar.current?.({ serie: p.seriesIndex, dato: p.dataIndex })
+        })
+        redibujar.current = () => pintar(fusion.current)
+        limpiar.push(() => {
+          redibujar.current = null
         })
         dibujar()
         // Ancho: se redibuja con el contenedor (también cambia de teléfono a escritorio).
@@ -146,7 +179,7 @@ export function Grafico({ opcion, alto = { movil: 240, escritorio: 320 }, titulo
       for (const f of limpiar) f()
       chart?.dispose()
     }
-  }, [opcion])
+  }, [])
 
   const estilo = { '--alto-movil': `${alto.movil}px`, '--alto-escritorio': `${alto.escritorio}px` } as CSSProperties
 
@@ -161,13 +194,14 @@ export function Grafico({ opcion, alto = { movil: 240, escritorio: 320 }, titulo
         className="h-[var(--alto-movil)] w-full min-w-0 overflow-hidden md:h-[var(--alto-escritorio)]"
       />
       {error ? <p className="mt-1 text-sm text-muted">{error}</p> : null}
-      <figcaption className="mt-1 flex justify-end">
+      <figcaption className={pie ? 'mt-1 flex flex-wrap items-center justify-between gap-x-3' : 'mt-1 flex justify-end'}>
+        {pie ? <div className="min-w-0">{pie}</div> : null}
         <button
           type="button"
           onClick={() => setVerTabla((v) => !v)}
           aria-expanded={verTabla}
           aria-controls={idTabla}
-          className="tocable inline-flex min-h-11 items-center rounded-lg px-2 text-[13px] text-muted transition-colors hover:text-text lg:min-h-9"
+          className={`tocable inline-flex min-h-11 items-center rounded-lg px-2 text-[13px] text-muted transition-colors hover:text-text lg:min-h-9${pie ? ' ml-auto' : ''}`}
         >
           {verTabla ? 'Ocultar la tabla' : 'Ver como tabla'}
         </button>

@@ -49,12 +49,16 @@ El diseño nuevo que pediste el 15/10 («nuevo diseño de app, implementalo»), 
   - Con el dedo (una tablet), el encabezado y cada fila miden 44 px.
   - En el teléfono sigue en tarjetas.
 - **Registro, Datos, Ajustes, Cargar, la entrada, "No encontré esa página" y la pantalla de error** toman los colores y las fuentes nuevos, sin otros cambios. En Datos › Catálogo, el punto de cada activo es su color en los gráficos: el que elegiste o, si no elegiste, el de su familia (antes quedaba vacío).
+- **Arreglos de ancho** (los encontró el test de layout entero, D-30, en anchos que no se habían probado):
+  - **Registro, a 768 px:** la fecha, las cargas y el lote con "Revertir el lote" quedan a la vista, y el tiempo activo va al botón "⋯" de la fila. Antes el lote quedaba afuera y la grilla tenía scroll hacia el costado. Cambian los anchos mínimos de las columnas, no lo que muestran: el tiempo activo sigue a la vista desde el mismo ancho que antes (unos 925 px de ventana).
+  - **Datos › Catálogo, entre 768 y 1023 px:** el nombre de un activo baja de renglón si no entra. En un solo renglón, el nombre más largo sacaba la tabla de su tarjeta (7 px, con los datos de ejemplo).
 - **Para quien construye pantallas:**
   - componentes comunes con su uso escrito arriba de cada uno: `Encabezado` (la pregunta y la lectura), `CifraClave`, `Tarjeta`, `Rotulo`, `Boton`, `Badge` y la `Grilla` (AG Grid Community 36.2.0, la única forma de dibujar una tabla);
   - las funciones puras de la lectura, la paleta y el chip, con test.
 - **Pruebas:**
   - el test de layout elige el tema como lo elegís vos, desde Ajustes;
   - también falla si una grilla tiene scroll horizontal adentro;
+  - antes de revisar las grillas espera, hasta 10 s, a que estén todas dibujadas: con varias en la pantalla y la máquina cargada, alguna seguía en esqueleto y se leía "no se dibujó" (pasó una vez en Evolución a 2560 px). Una que no se dibuja en ese tiempo sigue fallando;
   - recorre `/mapa`;
   - las de interacción prueban la barra de abajo, la hoja "Más", Cargar y su tecla, el Mapa, la redirección de `/patrimonio` y la grilla del Registro con la CSP de producción.
 - **Dependencias** (versiones exactas): `ag-grid-community` y `ag-grid-react` 36.2.0, `@fontsource-variable/newsreader` y `@fontsource-variable/jetbrains-mono` 5.3.0.
@@ -109,6 +113,9 @@ Exposición toma la anatomía del diseño y recibe el Balance (D-156, D-158):
 - Toda cifra en pesos y en dólares, con su traza. El modo privado tapa los montos, también en los gráficos, y deja los porcentajes.
 - **El rótulo adentro de cada tramo** (el ticker, "LIQ", el % de la apertura) va en la tinta que se lee sobre su color, con contraste AA: casi negra sobre los colores claros y clara sobre los oscuros (un bien "sin moneda elegida", un bono de color oscuro).
 - **Arreglo en la Grilla (común):** apretar una cifra de una fila que asoma por abajo de la pantalla no abría su traza: la grilla le daba el foco a la celda, la página subía entre el apretar y el soltar y el clic se perdía. Ahora el clic en una cifra (o en un botón) de la celda lo maneja la cifra; el teclado sigue igual.
+- **Arreglos de ancho** (los encontró el test de layout entero, D-30, en anchos que no se habían probado):
+  - **A 768 px, el comparativo del balance entra entero:** el renglón, las dos fechas y la diferencia, sin scroll hacia el costado adentro de la grilla. Antes, la diferencia quedaba afuera. Lo que cambia es el ancho mínimo del renglón (175 px en lugar de 200), que sigue llevándose lo que sobra; las cifras conservan el suyo. Si al lado del nombre no entra el chip ("estimado"), el chip baja de renglón.
+  - **Con el dedo** (una tablet, a 768 y a 1024 px), las filas del comparativo miden 100 px: cada celda lleva dos cifras, los pesos arriba y los dólares abajo, y cada una es un tocable de 44 px (D-100). Antes, la de abajo se pisaba con la de arriba de la fila siguiente.
 - **Por dentro:**
   - `src/lib/vistas/armar-exposicion.ts`: las barras por activo, el neto de cada carga en dólares y las posiciones más grandes. Agrupa las partidas de la foto, cada una con su traza, sin calcular nada nuevo;
   - las funciones de la pantalla en `exposicion/_lib/` (lectura, largo y corto, apertura, neto en el tiempo, filas del estado de situación), puras y con test;
@@ -129,12 +136,54 @@ Evolución y PnL toma la anatomía del diseño (D-159):
 - Lo que elegís sigue en la dirección, y el último período queda recordado en el dispositivo (HO-7), también YTD y 12M.
 - **Por dentro:** `armar-evolucion.ts` suma YTD y 12M, el CCL al inicio del período y la composición en dólares (estricta: si a una clase le falta el dólar, "sin dato"); la lectura, las cifras clave y las barras de activo vs. TC son funciones puras con test (`evolucion/_lib/`). Sin migraciones.
 - **Pruebas:** `tests/e2e/evolucion.spec.ts` prueba la pastilla y "Otro período" (también en el teléfono), las cuatro cifras clave, el resultado por partida y la Grilla; el test de layout recorre 12M y YTD.
+- **Arreglos de ancho** (el test de layout completo, D-30, fallaba a 360 y a 768 px, y con el dedo a 768 y a 1024):
+  - **360 px:** el período con sus fechas y "Otro período" no entraban en un renglón: estiraban la página (scroll hacia el costado) y la barra de abajo quedaba afuera. En el teléfono, "Otro período" va en su renglón, debajo de las fechas.
+  - **El PnL por mes a 768 px** tenía scroll hacia el costado, con el botón "⋯" afuera. Ahora el mes, lo que pusieron tus activos y lo que puso el dólar se ven siempre; el lugar que queda es primero para "sin atribuir" y después para aportes y retiros, cuotas y amortización, y lo que no entra va al "⋯" de cada fila (D-159). Cada columna mide lo que pide su cifra más larga o su título (antes, 150 px fijos, que no alcanzaban para "Cuotas del leasing").
+  - **Títulos enteros:** con una sola moneda, "Por el precio" (resultados por activo y cuenta) y "Lo que ya traías" (día cero) ya no se cortan con "…".
+  - **Con el dedo** (una tablet) **y las dos monedas**, las filas de las cuatro tablas miden 100 px, como en Posiciones y Pasivos: cada cifra es un tocable de 44 px, y las dos de cada celda pisaban las de la fila de arriba y la de abajo (D-100).
+  - **Por dentro:** las medidas son funciones puras con test (`evolucion/_lib/anchos.ts`: el ancho de un título, las columnas del PnL por mes y el alto de las filas). Lo común no cambia.
 
 #### Pasivos
-_Lo suma quien rediseña Pasivos._
+Pasivos toma la anatomía del diseño (D-162, D-163):
+
+- **La pregunta y la lectura:** "Compromisos · ¿Cuánto me falta pagar?" y una frase con un solo énfasis: cuántas cuotas pagaste de cuántas y, después, lo que corresponda primero: una cuota vencida que tu planilla no marca pagada, cómo cambió la cuota en dólares ("Cada una te costó *menos* dólares que la anterior", solo con el CCL de cada pago) o cuántas te faltan y hasta cuándo. Sin cuadro de marcha, dice que falta importarlo.
+- **La tira de cuotas:** una celda por cuota del contrato (35: sale del contrato y del cuadro de marcha, nunca es fija). Las pagadas van en tinta, la próxima en sangría con su brillo y las que faltan en hueco; arriba, el leasing y la próxima ("Próxima: cuota 15 · 1 de noviembre"). Una cuota vencida que tu planilla no marca pagada y una que el cuadro no trae se distinguen, y lo dice una nota. Con el mouse encima, cada celda dice qué cuota es y cuándo vence.
+- **Cuatro cifras debajo de la tira,** cada una en pesos y en dólares, con su traza y su chip:
+  - **saldo de capital:** la deuda que cuenta en toda la app (la informada por la leasera; si no, la según el cuadro; si no, la estimada), en sangría clara;
+  - **pagado:** en dólares, al CCL de cada pago;
+  - **falta:** nominal, sin la opción; en dólares, al CCL de hoy;
+  - **opción de compra:** con IVA, al final del contrato.
+- **La cuota en pesos y en dólares:** una línea por moneda, cada una con su eje: los pesos en tinta; los dólares en oro, sólida hasta hoy (al CCL de cada pago) y punteada después (al CCL de hoy: una referencia, no una proyección del dólar, D-163). Lo pasado lleva un tinte y la línea de hoy va en sangría. Una cuota pagada sin el CCL de su pago es un hueco, nunca un cero.
+- **Cuadro de marcha · próximas:** las seis próximas cuotas en la Grilla (N° · Fecha · ARS · USD), adentro de la tarjeta, como en el diseño, con el CCL con que se pasan a dólares. En el teléfono, una tarjeta por cuota.
+- **El detalle: tu leasing**, con el CCL de los dólares arriba a la derecha. Es todo lo que la pantalla tenía, con el estilo nuevo:
+  - la deuda con su origen, la tasa del contrato y el costo contra el bien;
+  - **el cuadro de marcha entero, ahora en la Grilla:** por pagar, pagadas o todas, y cada cuota como la factura o abierta en amortización y gasto. La opción de compra va aparte, y en el teléfono sigue en tarjetas;
+  - cada cuota abierta, en barras (el eje, compacto como el de la cuota: "$ 900k", ya no "$ 900,0k") y en la tabla de lo pagado y lo que falta por parte (también en la Grilla);
+  - los totales, el recupero fiscal y el dólar, el leasing en palabras (con su hoja cifra por cifra en el teléfono), el contrato, quién paga la cuota y si la empresa te reintegra el IVA.
+- **Con el dedo** (una tablet), las filas de las tres tablas crecen para que cada cifra sea un tocable de 44 px sin pisar la de abajo (D-100): 48 px en las próximas, 72 en el cuadro de marcha y 100 en lo pagado y lo que falta, que lleva dos cifras por celda.
+- **Nada se perdió:** las cuatro tarjetas de antes (cuotas pagadas, la próxima cuota, lo que falta y el costo contra el bien) quedan en la tira, las cuatro cifras, las próximas y "Costo total contra el bien"; la frase pasa a "El leasing en palabras" y el CCL de arriba, al encabezado del detalle.
+- **Por dentro:** la lectura, la tira, las cuatro cifras, las notas y las opciones de los gráficos son funciones puras con test (`pasivos/_lib/pantalla.ts` y `graficos.ts`). La página tiene su prueba renderizada en el servidor. Ni la vista (`armar-pasivos.ts`) ni la base cambian, y no hay migraciones. La Grilla común tampoco cambia: la tabla de las próximas pierde su marco con variables del tema de AG Grid puestas desde la pantalla.
+- **Pruebas:** `tests/e2e/pasivos.spec.ts` prueba la anatomía (la lectura, la tira de 35, las cuatro cifras, el gráfico y las próximas en la Grilla), el cuadro entero en la Grilla con sus filtros y, a 1440 px, las medidas del diseño: la tira y las cifras arriba del pliegue, la fila del medio a 1,4 : 1 y del mismo alto, y las próximas sin marco propio. Siguen las trazas, el "sin dato" que nunca es $ 0,00, el teléfono y el modo privado.
 
 #### Flujo y escenarios
-_Lo suma quien rediseña Flujo y escenarios._
+Flujo y escenarios toma la anatomía del diseño (D-164 a D-166):
+
+- **La pregunta y la lectura:** "Futuro · ¿Cuánto me sobra y adónde me lleva?" y una frase con cuánto te sobra este mes y adónde llegás con el escenario elegido (con números inventados: "Este mes te sobran $ 2.916.600. Con todo igual, en un año llegás a *US$ 94.167* en lo financiero."). Cada cifra abre su traza. Si falta un dato, lo dice con palabras.
+- **Los gráficos se ven al abrir** (lo pediste el 15/10: «en flujos y escenarios quiero ver graficos»): todo arranca en Igual, como en tu última carga, y a 12 meses (D-164, revisa D-145). Ya no hay que tocar "Completar lo que falta con Igual".
+- **La cascada del mes:** Ingresos USD × cripto → Pesos fijos → Gastos fijos → Cuota leasing → Excedente. El monto va arriba de cada barra ("4,83 M") y el nombre abajo, que abre su cuenta. Sale de lo declarado y de tu última carga: no depende de tus supuestos.
+- **El patrimonio en dólares**, con la pastilla de escenarios (Igual y tus guardados): la línea del escenario, "Todo igual" de referencia y lo que pusiste. Abajo, el financiero al horizonte, el rango p5 – p95 ("sin dato · llega con Monte Carlo") y "¿terminás debajo de lo que pusiste?" en lugar de la probabilidad: sin Monte Carlo no se inventan percentiles (D-165).
+- **Una barra por variable** («y seleccionar los valores de las variables con barras»): de Baja a Sube con Igual en el medio, el número a la vista, − y + de a 0,1 y "Volver a Igual" de un toque. Al moverla, la lectura y el patrimonio en dólares cambian en vivo; el detalle de abajo se pone al día cuando la soltás.
+- **El detalle**, con el estilo nuevo: la proyección mes a mes (la grilla, en pesos o en dólares, y sus dos gráficos), tus escenarios guardados, el mes en curso, el calendario, proyectado contra real, lo que cargaste y tus ingresos y gastos declarados.
+- **Cargar ingreso y Cargar gasto** pasan al mes en curso ("Octubre, con los datos de hoy"), junto con la fecha de tu carga, el CCL y el cripto con que se armó (D-166). `/flujo/cargar` toma la anatomía: la pregunta, "Cargar *ingreso*", la pastilla Ingreso · Gasto y las opciones en pastillas.
+- **El modo privado** tapa todos los montos, también la línea de con qué CCL se armó el mes (antes se leía).
+- **Arreglos:**
+  - "Ver como tabla" de la cascada ya no se pisa con los nombres de los pasos;
+  - los extremos de cada barra ("Baja −15", "Sube +15") llegan a AA en el oscuro;
+  - mover una barra no redibuja el panel entero ni rehace el gráfico, y el detalle de abajo no se dibuja mientras la barra se mueve: la lectura y el patrimonio en dólares la siguen en menos de 200 ms con la CPU × 4 (antes, entre 380 y 660 ms en el e2e);
+  - comparar escenarios abre la traza de cada uno con sus supuestos tal como se proyectan (antes, los de antes del arranque en Igual).
+- **Gráfico (común):** dos props opcionales. `fusionar`: una opción nueva se fusiona con la anterior (solo cambian las series). `pie`: una leyenda corta en el renglón de "Ver como tabla". Sin ellas, todo queda como antes.
+- **Por dentro:** la cascada (`flujo/_lib/cascada.ts`, con test propio), la lectura y las opciones de los gráficos (`flujo/_lib/`), la barra y el arranque en Igual (`lib/domain/flujo/panel.ts` y `supuestos.ts`), todas funciones puras con test. Sin migraciones.
+- **Pruebas:** `tests/e2e/flujo.spec.ts` prueba que los gráficos se ven al abrir, la barra (teclado, +, la lectura en vivo, recargar y Volver a Igual), la pastilla de escenarios, los 44 px, el rendimiento y el modo privado (también con escenarios guardados).
 
 ### 2026-10-15 — Entrega 4: Balance, Evolución y PnL, Pasivos, Flujo y escenarios
 Lo que pediste el 14/10: tu estado de situación patrimonial con la casa, el resultado del período, el leasing cuota por cuota y el flujo de fondos proyectado con escenarios, conectados entre sí y con Hoy. Las decisiones de esta entrega son la revisión de D-131 y D-132 a D-155, todas provisorias (`docs/decisiones.md`).

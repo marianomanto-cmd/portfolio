@@ -1,14 +1,14 @@
-// Piezas puras del panel de supuestos (plan §6 D.1; D-08, D-145, D-155): el
-// texto exacto de "Igual" de cada variable, el deslizante (de a 0,1, dentro de
-// su rango), los atajos del horizonte, los cambios a los supuestos (siempre
-// una copia nueva), los valores recordados y lo que cambia entre dos
-// escenarios. Sin React y sin Decimal en lo que cruza: lo usan el panel, la
-// pantalla y Evolución (que abre el mismo panel), y sus tests.
+// Piezas puras del panel de supuestos (plan §6 D.1; D-08, D-155, D-164): el
+// texto exacto de "Igual" de cada variable, la barra (de Baja a Sube con Igual
+// en el medio, de a 0,1, dentro de su rango), los atajos del horizonte, los
+// cambios a los supuestos (siempre una copia nueva), los valores recordados,
+// "Todo igual" y lo que cambia entre dos escenarios. Sin React y sin Decimal
+// en lo que cruza: lo usan el panel, la pantalla y Evolución, y sus tests.
 
 import { calc, sinDato, vista, type Calc, type CalcVista, type Etiqueta, type Insumo } from '../calc'
 import { CERO, Decimal, monto, numero, porcentaje } from '../dinero'
 import { nombreMes } from './proyeccion'
-import { indiceMes, metaVariable, type ClaveVariable } from './supuestos'
+import { HORIZONTE_ARRANQUE, indiceMes, metaVariable, necesidades, textoValor, type ClaveVariable } from './supuestos'
 import type { BaseProyeccion, Direccion, MesProyectado, Proyeccion, Supuestos, Tramo, TramoIngreso, Var } from './tipos'
 
 /** Dónde vive una variable en los supuestos: 'devaluacion.0', 'ingreso_usd.1', 'retorno.cedear', 'dual.TXMJ0', 'casa'… */
@@ -91,18 +91,121 @@ export function claveRecordada(ruta: RutaVar, dir: Exclude<Direccion, 'igual'>):
   return `${claveDeRuta(ruta)}.${dir}`.toLowerCase()
 }
 
-/**
- * Tocar Baja, Igual o Sube. Igual no lleva número. Baja o Sube arrancan con el
- * último número que elegiste para esa variable (D-08), o sin número: el
- * deslizante lo pone el dueño, nada se elige solo.
- */
-export function elegirDireccion(v: Var, dir: Direccion, recordado: string | null): Var {
-  if (dir === 'igual') return { dir, valor: null }
-  if (v.dir === dir) return v
-  return { dir, valor: recordado }
+// ───────────── La barra de una variable (D-164) ─────────────
+//
+// Una sola barra por variable, de Baja a Sube, con Igual en el 0: la posición
+// es el efecto con signo (Baja −1,5 = "-1.5", Igual = "0.0", Sube +2 = "2.0"),
+// de a 0,1, entre −el máximo de Baja y el máximo de Sube (los de siempre, de
+// metaVariable). La escala es lineal: con rangos distintos (la inflación baja
+// hasta 5 y sube hasta 15), Igual no cae en el centro geométrico, cae donde
+// está el 0, marcado.
+
+/** Los extremos de la barra de una variable: [−máximo de Baja, máximo de Sube]. */
+export function limitesBarra(clave: ClaveVariable): { min: number; max: number } {
+  const m = metaVariable(clave)
+  return { min: -m.max.baja, max: m.max.sube }
 }
 
-/** El deslizante: de a 0,1, entre 0 y el máximo de la dirección. */
+/** Una posición acotada a la barra y redondeada a 0,1, como texto ("-1.5", "0.0", "2.0"). */
+function acotar(x: Decimal, clave: ClaveVariable): string {
+  const { min, max } = limitesBarra(clave)
+  const r = Decimal.min(new Decimal(max), Decimal.max(new Decimal(min), x)).toDecimalPlaces(1)
+  return r.isZero() ? '0.0' : r.toFixed(1)
+}
+
+/** La posición de una variable en su barra; null = sin elegir (Baja o Sube sin número, o nada). */
+export function posicionDe(v: Var): string | null {
+  if (v.dir === 'igual') return '0.0'
+  if (v.dir === null || v.valor === null) return null
+  const x = new Decimal(v.valor).abs().toDecimalPlaces(1)
+  if (x.isZero()) return '0.0'
+  return (v.dir === 'baja' ? x.negated() : x).toFixed(1)
+}
+
+/** La variable que dice una posición de la barra: el 0 es Igual; a la izquierda, Baja; a la derecha, Sube. */
+export function varDePosicion(pos: string, clave: ClaveVariable): Var {
+  const x = new Decimal(acotar(new Decimal(pos), clave))
+  if (x.isZero()) return { dir: 'igual', valor: null }
+  return x.isNegative() ? { dir: 'baja', valor: x.abs().toFixed(1) } : { dir: 'sube', valor: x.toFixed(1) }
+}
+
+/** La posición tal como llega del control (texto "2.5" o "-1.3"): acotada y a 0,1; null si no es un número. */
+export function leerPosicion(texto: string, clave: ClaveVariable): string | null {
+  const t = texto.trim()
+  if (!/^-?\d+(\.\d+)?$/.test(t)) return null
+  return acotar(new Decimal(t), clave)
+}
+
+/** − y + de la barra: un paso de 0,1 (cruzan Igual: de Baja 0,1, un + es Igual). Sin elegir cuenta como Igual. */
+export function pasoBarra(pos: string | null, delta: number, clave: ClaveVariable): string {
+  return acotar(new Decimal(pos ?? '0').plus(delta), clave)
+}
+
+/** Dónde cae una posición en la barra, de 0 (el extremo izquierdo) a 1 (el derecho): para dibujar el riel. */
+export function fraccionBarra(pos: string, min: number, max: number): number {
+  if (!(max > min)) return 0
+  const f = new Decimal(pos).minus(min).div(max - min)
+  return Decimal.min(1, Decimal.max(0, f)).toNumber()
+}
+
+/** El texto de una posición: "Igual", "Sube +2,0 %/mes", "Baja −1,5 pts". */
+export function textoPosicion(pos: string | null, clave: ClaveVariable): string {
+  if (pos === null) return 'sin elegir'
+  const v = varDePosicion(pos, clave)
+  return textoValor(clave, v.dir, v.valor)
+}
+
+/** Los extremos de la barra, en palabras cortas: ["Baja −15", "Sube +15"]. */
+export function extremosBarra(clave: ClaveVariable): [string, string] {
+  const m = metaVariable(clave)
+  return [`Baja −${numero(String(m.max.baja), 0)}`, `Sube +${numero(String(m.max.sube), 0)}`]
+}
+
+/** Qué hace la dirección de una posición, en palabras ("el CCL sube"); en Igual, nada. */
+export function sentidoPosicion(pos: string | null, clave: ClaveVariable): string | null {
+  if (pos === null) return null
+  const v = varDePosicion(pos, clave)
+  if (v.dir === 'igual') return null
+  const m = metaVariable(clave)
+  return v.dir === 'baja' ? m.baja : m.sube
+}
+
+/**
+ * Las variables sin Igual posible (D-144, D-164): la brecha sin el cripto de
+ * tu última carga y la TEM de renovación sin la TEM de hoy de tus letras. Sin
+ * barra: dicen qué falta. null = tiene Igual.
+ */
+export function sinIgualPosible(ruta: RutaVar, base: BaseProyeccion): string | null {
+  const nec = necesidades(base)
+  const clave = claveDeRuta(ruta)
+  if (clave === 'brecha_cripto' && !nec.brecha_hoy) return 'Sin dato: falta el dólar cripto de tu última carga. Cargalo en tu próxima carga y esta barra aparece.'
+  if (clave === 'tem_renovacion' && !nec.tem_hoy)
+    return 'Sin dato: falta el pago al vencimiento de tus letras para saber la TEM de hoy (cargalo abajo). Mientras tanto, lo que va a letras queda sin dato.'
+  return null
+}
+
+/** Los números que recordás de esta variable (valores_recordados, D-148 y D-164), como posiciones de su barra, sin la de ahora. */
+export function recordadosDeRuta(ruta: RutaVar, recordados: Record<string, string>, ahora: string | null): { pos: string; texto: string }[] {
+  const clave = claveDeRuta(ruta)
+  const out: { pos: string; texto: string }[] = []
+  for (const dir of ['baja', 'sube'] as const) {
+    const r = recordados[claveRecordada(ruta, dir)]
+    if (r === undefined || !/^\d+(\.\d+)?$/.test(r)) continue
+    const x = new Decimal(r)
+    if (x.isZero()) continue
+    const pos = acotar(dir === 'baja' ? x.negated() : x, clave)
+    if (pos !== ahora && pos !== '0.0') out.push({ pos, texto: textoPosicion(pos, clave) })
+  }
+  return out
+}
+
+/** El horizonte: de 1 a 120 meses, entero (los atajos, la barra, − y +). */
+export function acotarHorizonte(n: number): number {
+  if (!Number.isFinite(n)) return HORIZONTE_ARRANQUE
+  return Math.min(120, Math.max(1, Math.round(n)))
+}
+
+/** El deslizante de una sola dirección (lo que invertís, el ajuste mensual): de a 0,1, entre 0 y su máximo. */
 export function pasoDeslizante(valor: string | null, delta: number, max: number): string {
   const x = new Decimal(valor ?? '0').plus(delta)
   const acotado = Decimal.min(new Decimal(max), Decimal.max(CERO, x))
@@ -113,6 +216,16 @@ export function pasoDeslizante(valor: string | null, delta: number, max: number)
 export function valorDeslizante(texto: string, max: number): string | null {
   if (!/^\d+(\.\d+)?$/.test(texto.trim())) return null
   return pasoDeslizante(texto.trim(), 0, max)
+}
+
+/** El texto de un deslizante de una sola dirección: "+2,0 %/mes", "100 %"; en 0, `enCero` si se pasa ("nominal"). */
+export function textoDeslizante(valor: string | null, unidad: string, opciones: { signo?: boolean; enCero?: string } = {}): string {
+  if (valor === null) return 'sin número'
+  const x = new Decimal(valor)
+  if (x.isZero() && opciones.enCero) return opciones.enCero
+  // Lo que invertís va en % entero si lo es ("100 %"); el resto, con su décima, como las barras ("+2,0 %/mes").
+  const n = numero(x, unidad === '%' && x.isInteger() ? 0 : 1)
+  return `${opciones.signo && !x.isZero() ? '+' : ''}${n} ${unidad === 'puntos' ? 'pts' : unidad}`
 }
 
 const fmtTc = (x: Decimal) => `$ ${numero(x, 2)}`
@@ -172,7 +285,7 @@ export function textoIgual(ruta: RutaVar, base: BaseProyeccion): string {
   }
 }
 
-/** Los atajos del horizonte: los elige el dueño (ninguno arranca elegido). */
+/** Los atajos del horizonte (el escenario arranca en 12 meses, D-164). */
 export function atajosHorizonte(base: BaseProyeccion): { meses: number; texto: string }[] {
   const out = [
     { meses: 6, texto: '6 meses' },
@@ -303,7 +416,11 @@ export function sacarTramo(s: Supuestos, variable: 'ingreso_usd' | 'ingreso_peso
   return out
 }
 
-/** Los valores para "Guardar" (valores_recordados): el número de cada deslizante movido, por variable y dirección. */
+/**
+ * Los valores para "Guardar" (valores_recordados, D-148 y D-164): el número de
+ * cada barra movida, por variable y dirección (sin el signo). En Igual no se
+ * recuerda nada. La barra los ofrece como "Tus últimos números".
+ */
 export function recordadosDe(s: Supuestos): Record<string, string> {
   const out: Record<string, string> = {}
   const ver = (ruta: RutaVar, v: Var | null) => {
@@ -319,16 +436,63 @@ export function recordadosDe(s: Supuestos): Record<string, string> {
   return out
 }
 
+// ───────────── "Todo igual" (D-164) ─────────────
+
+/** Una variable con efecto: Baja o Sube con un número distinto de 0 (lo sin elegir no tiene efecto que mostrar). */
+const movida = (v: Var) => (v.dir === 'baja' || v.dir === 'sube') && v.valor !== null && !new Decimal(v.valor).isZero()
+
+/** Todas las variables con barra del escenario (cada tramo es una). */
+function variablesDe(s: Supuestos): Var[] {
+  return [
+    ...s.devaluacion,
+    ...s.inflacion,
+    s.brecha_cripto,
+    ...s.ingreso_usd,
+    ...s.ingreso_pesos,
+    s.gastos,
+    s.retorno.cedear,
+    s.retorno.accion_local,
+    s.retorno.liquidez_pesos,
+    s.tem_renovacion,
+    ...Object.values(s.dual),
+    s.casa,
+    s.camioneta,
+  ]
+}
+
+/** ¿Están todas las barras en Igual (y el ingreso en pesos sin ajuste)? Entonces no hay "Todo igual" que mostrar aparte. */
+export function esTodoIgual(s: Supuestos): boolean {
+  return !variablesDe(s).some(movida) && !s.ingreso_pesos.some((t) => t.ajuste_mensual !== null && t.ajuste_mensual !== undefined && !new Decimal(t.ajuste_mensual).isZero())
+}
+
+/**
+ * "Todo igual" (D-164): el mismo escenario con todas las barras en Igual y el ingreso
+ * en pesos sin ajuste (nominal). Lo demás no cambia: el horizonte, los tramos,
+ * tu regla de reinversión, quién paga la cuota y el reintegro. Es la línea de
+ * referencia de "Patrimonio proyectado" y lo que pone "Todo en Igual". Lo sin
+ * Igual posible queda como estaba.
+ */
+export function todoIgualDe(s: Supuestos): Supuestos {
+  const igual = <T extends Var>(v: T): T => (v.dir === null ? v : { ...v, dir: 'igual', valor: null })
+  const out: Supuestos = structuredClone(s)
+  out.devaluacion = out.devaluacion.map(igual)
+  out.inflacion = out.inflacion.map(igual)
+  out.brecha_cripto = igual(out.brecha_cripto)
+  out.ingreso_usd = out.ingreso_usd.map(igual)
+  out.ingreso_pesos = out.ingreso_pesos.map((t) => ({ ...igual(t), ajuste_mensual: null }))
+  out.gastos = igual(out.gastos)
+  out.retorno = { cedear: igual(out.retorno.cedear), accion_local: igual(out.retorno.accion_local), liquidez_pesos: igual(out.retorno.liquidez_pesos) }
+  out.tem_renovacion = igual(out.tem_renovacion)
+  for (const t of Object.keys(out.dual)) out.dual[t] = igual(out.dual[t])
+  out.casa = igual(out.casa)
+  out.camioneta = igual(out.camioneta)
+  return out
+}
+
 /** Lo que cambia entre dos escenarios, en palabras (Comparar muestra solo esto). Sin valorar: no dice cuál es "mejor". */
 export function diferencias(a: Supuestos, b: Supuestos, base: Pick<BaseProyeccion, 'fecha'>): string[] {
   const out: string[] = []
-  const desc = (v: Var | null, ruta: RutaVar) => {
-    if (!v || v.dir === null) return 'sin elegir'
-    if (v.dir === 'igual') return 'Igual'
-    const meta = metaVariable(claveDeRuta(ruta))
-    if (v.valor === null) return v.dir === 'baja' ? 'Baja (sin número)' : 'Sube (sin número)'
-    return `${v.dir === 'baja' ? 'Baja −' : 'Sube +'}${numero(new Decimal(v.valor).abs(), 1)}${meta.unidad === 'puntos' ? ' pts' : meta.unidad}`
-  }
+  const desc = (v: Var | null, ruta: RutaVar) => (v ? textoValor(claveDeRuta(ruta), v.dir, v.valor) : 'sin elegir')
   const rutas = new Set<RutaVar>()
   const agregar = (s: Supuestos) => {
     s.devaluacion.forEach((_, i) => rutas.add(`devaluacion.${i}`))
@@ -345,7 +509,7 @@ export function diferencias(a: Supuestos, b: Supuestos, base: Pick<BaseProyeccio
     const y = desc(leerVar(b, r), r)
     if (x !== y) out.push(`${nombreVariable(r, a.ingreso_usd.length >= b.ingreso_usd.length ? a : b, base)}: ${x} · ${y}`)
   }
-  const ajustes = (x: Supuestos) => x.ingreso_pesos.map((t) => (t.ajuste_mensual ? `${numero(t.ajuste_mensual, 1)}%/mes` : 'nominal')).join(' y ')
+  const ajustes = (x: Supuestos) => x.ingreso_pesos.map((t) => (t.ajuste_mensual && !new Decimal(t.ajuste_mensual).isZero() ? `${numero(t.ajuste_mensual, 1)} %/mes` : 'nominal')).join(' y ')
   if (ajustes(a) !== ajustes(b)) out.push(`Ajuste del ingreso en pesos: ${ajustes(a)} · ${ajustes(b)}`)
   if (a.horizonte_meses !== b.horizonte_meses) out.push(`Horizonte: ${a.horizonte_meses ?? 'sin elegir'} · ${b.horizonte_meses ?? 'sin elegir'} meses`)
   if (a.politica.pct !== b.politica.pct || a.politica.regla !== b.politica.regla) {
@@ -403,4 +567,31 @@ export function resumenHorizonte(p: Proyeccion): ResumenHorizonte | null {
       usd: sumaMeses(meses, (m) => m.invertido.usd, 'USD', 'Invertido', etiquetas),
     },
   }
+}
+
+/**
+ * "¿Terminás debajo de lo que pusiste?" (D-144), con su traza: el financiero
+ * al horizonte menos lo que pusiste (el financiero de tu carga más lo
+ * invertido, menos lo retirado), en pesos y en dólares. `debajo` es null si
+ * falta alguno de los dos.
+ */
+export function diferenciaConLoPuesto(m: MesProyectado): { debajo: boolean | null; ars: CalcVista; usd: CalcVista } {
+  const una = (k: 'ars' | 'usd'): Calc => {
+    const moneda = k === 'ars' ? 'ARS' : 'USD'
+    const f = D(m.financiero[k])
+    const a = m.aportado ? D(m.aportado[k]) : null
+    const insumos: Insumo[] = [
+      { nombre: `Patrimonio financiero de ${nombreMes(m.mes)}`, valor: m.financiero[k], unidad: moneda },
+      { nombre: `Lo que pusiste hasta ${nombreMes(m.mes)} (tu financiero de la carga + lo invertido − lo retirado)`, valor: m.aportado?.[k] ?? null, unidad: moneda },
+    ]
+    const etiquetas: Etiqueta[] = ['supuesto']
+    const explicacion = 'Sale del escenario: es una proyección con tus supuestos, no un pronóstico ni una recomendación.'
+    if (f === null) return sinDato(m.motivos?.financiero ?? `Falta el patrimonio financiero de ${nombreMes(m.mes)}.`, insumos, { etiquetas, explicacion })
+    if (a === null) return sinDato(m.motivos?.aportado ?? `Falta lo que pusiste hasta ${nombreMes(m.mes)}.`, insumos, { etiquetas, explicacion })
+    const d = f.minus(a)
+    return calc(d, `${monto(f, moneda, { decimales: 2 })} − ${monto(a, moneda, { decimales: 2 })} = ${monto(d, moneda, { decimales: 2, signo: true })}`, insumos, { etiquetas, explicacion })
+  }
+  const ars = una('ars')
+  const usd = una('usd')
+  return { debajo: ars.valor === null ? null : (ars.valor as Decimal).lt(0), ars: vista(ars), usd: vista(usd) }
 }

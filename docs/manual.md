@@ -413,7 +413,7 @@ La camioneta nunca se suma sin su deuda: lo que entra es **tu parte**, lo que va
 
 **El estado de situación patrimonial:** ACTIVO (lo financiero y tus bienes), PASIVO y PATRIMONIO NETO, cada renglón en pesos, en dólares y en **% del activo**. Lo financiero se ve **por cuenta** (IEB › SPY…), **por instrumento** (SPY, todas las cuentas juntas; los saldos, por moneda) o **por clase**. Cada bien dice su valuación, su fuente y su fecha. Desde 768 px es una tabla con sus tres grupos; en el teléfono, una lista de tarjetas que se abren con un toque (IEB ▸, Galicia ▸, Bienes ▸).
 
-**Comparativo:** tu balance de la fecha elegida al lado del de otra fecha de carga (por defecto, tu primera carga; **"Comparar con"** para elegir otra), renglón por renglón, en pesos y en dólares, con la diferencia (en el teléfono, en tarjetas). La diferencia no es lo que ganaste: incluye lo que pusiste o sacaste. Lo que ganaste o perdiste está en Evolución y PnL.
+**Comparativo:** tu balance de la fecha elegida al lado del de otra fecha de carga (por defecto, tu primera carga; **"Comparar con"** para elegir otra), renglón por renglón, en pesos y en dólares, con la diferencia (en el teléfono, en tarjetas). Desde 768 px es una tabla con las cuatro columnas a la vista; con el dedo (una tablet), sus filas son más altas: cada cifra se toca sin pisar la de abajo. La diferencia no es lo que ganaste: incluye lo que pusiste o sacaste. Lo que ganaste o perdiste está en Evolución y PnL.
 
 **Indicadores del balance:** **solvencia** (cuántas veces lo que tenés cubre lo que debés), **endeudamiento** (qué parte de tu patrimonio neto debés) e **inmovilización** (qué parte de tu activo está en bienes). Cada uno muestra su cuenta al tocarlo; no dicen si está bien o mal (D-133).
 
@@ -465,25 +465,43 @@ Debajo dice cuál es y de qué fecha a qué fecha. **Otro período** tiene la ú
 - **Quién sumó y quién restó:** cada partida, partida en precio (sólido) y dólar (rayado). Tocá una barra para ver su cálculo.
 - **Resultados por activo y cuenta:** el resultado del período y sus partes, lo **realizado** (lo que vendiste o cobraste, menos lo que te había costado) y lo **no realizado** (lo que seguís teniendo). Arriba elegís verlo por partida, **por cuenta** (IEB, Galicia…) o **por activo** (el mismo título en dos cuentas, junto), y lo ordenás por cualquier columna (tocando su título o con "Ordenar por"). En el teléfono son tarjetas. La liquidez "no aplica": no tiene costo.
 - **Tu patrimonio en el tiempo** y el capital aportado: lo que queda entre las dos líneas es lo que ganaste o perdiste. Un punto hueco quiere decir que ese día algún precio o saldo era viejo. Con "Ambas" monedas podés verlas juntas, en índice 100 (las dos arrancan en 100 el día cero).
-- **PnL por mes:** cada mes es la suma exacta de sus días, en una tabla que se ordena por columna (en el teléfono, tarjetas).
+- **PnL por mes:** cada mes es la suma exacta de sus días, en una tabla que se ordena por columna (en el teléfono, tarjetas). Si no entran todas las columnas, el mes, lo que pusieron tus activos y lo que puso el dólar se ven siempre; el lugar que queda es primero para "sin atribuir" y después para aportes y retiros, cuotas y amortización. Lo que no entra va al botón **"⋯"** de cada fila.
 - **Estado de resultados:** ingresos − gastos − costo del leasing = ahorro; + inversiones + revaluación de bienes + licuación de la deuda = variación explicada; la diferencia con la variación real es "no explicado" (consumo que no cargaste, plata que quedó afuera…). Los gastos fijos declarados llevan el chip "declarado": no son gastos reales.
 - **El futuro:** con un escenario de Flujo (el que estás probando o, si llegás por el menú, el último que guardaste), la curva sigue punteada desde hoy y abajo va el PnL proyectado por mes, todo con el chip "supuesto". Con más de un escenario guardado, **"Ver con: «…»"** cambia el que se muestra. "Ajustar supuestos" te lleva a Flujo con ese escenario abierto: sus supuestos, y "Guardar cambios" lo actualiza (no crea otro).
 
-Tocá cualquier cifra para ver su fórmula y de dónde sale. Con el modo privado se tapan los montos, también en los gráficos.
+Tocá cualquier cifra para ver su fórmula y de dónde sale. Con el modo privado se tapan los montos, también en los gráficos. Con el dedo (una tablet) y las dos monedas, las filas de las tablas son más altas: cada cifra se toca sin pisar la de al lado.
 
 ### 4.10 Pasivos
 
-Contesta: **¿cuánto pagué del leasing, cuánto falta, cuánto es en dólares y cuánto cuesta contra lo que vale la camioneta?** Toda cifra está en pesos y en dólares y abre su traza.
+Contesta: **¿cuánto pagué del leasing, cuánto falta, cuánto es en dólares y cuánto cuesta contra lo que vale la camioneta?** Toda cifra está en pesos y en dólares y abre su traza. Se lee como toda pantalla (D-157, D-162): la pregunta, la respuesta, las cifras, el gráfico y, al final, el detalle.
 
-**Lo que ves, de arriba abajo:**
-- **La frase:** cuántas cuotas pagaste, la próxima (fecha, cuánto, cuánto es hoy en dólares) y lo que falta, con lo supuesto o a confirmar dicho en palabras. Si una cuota ya venció y tu planilla no la marca pagada, lo dice (y la tarjeta de la próxima cuota también): si ya se debitó, importá la planilla actualizada. En el teléfono, "Ver cada cifra de la frase" abre cada cifra en pesos y en dólares, y tocándola ves de dónde sale.
-- **Cuatro tarjetas:** cuotas pagadas, la próxima cuota, lo que falta pagar (canon según contrato, y aparte IVA, seguro y percepción) y el costo total contra el valor del bien.
+**Arriba, la pregunta y la lectura:** "Compromisos · ¿Cuánto me falta pagar?" y una frase que la contesta (números inventados):
+
+> Pagaste 14 de 35 cuotas. Te faltan ***21***, hasta el 1 de julio de 2028.
+
+Antes que lo que falta, dice lo que importa más: si una cuota ya venció y tu planilla no la marca pagada (si ya se debitó, importá la planilla actualizada) o, cuando cargaste el CCL de cada pago, cómo cambió la cuota en dólares ("Cada una te costó *menos* dólares que la anterior", o la última contra la primera).
+
+**La tira de cuotas:** un cuadradito por cuota del contrato, de la 1 a la última: en tinta las pagadas, en sangría la próxima y huecas las que faltan. Arriba dice qué leasing es y cuántas cuotas tiene; a la derecha, la próxima y cuándo vence. Pasá el mouse por un cuadradito y te dice qué cuota es y cuándo vence. Una cuota vencida que tu planilla no marca pagada va en sangría tenue, con un aviso; una que el cuadro de marcha no trae va punteada, y una nota te dice que importes la planilla completa.
+
+**Cuatro cifras,** debajo de la tira, en pesos y en dólares:
+- **Saldo de capital:** la deuda que cuenta, la misma en toda la app (ver "La deuda, con su origen", abajo). La nota dice cuál es: la que informó la leasera, la según el cuadro de marcha o la estimada que aprobaste (con el chip "estimado").
+- **Pagado:** lo que pagaste en las cuotas pagadas; en dólares, al CCL de cada pago (si no los cargaste, "sin dato" y dónde se cargan).
+- **Falta:** lo que falta pagar en pesos nominales, sin la opción de compra; en dólares, al CCL de hoy, que es una referencia.
+- **Opción de compra:** con su IVA, al final del contrato.
+
+**La cuota en pesos y en dólares:** una línea por moneda, cada una con su eje (pesos a la izquierda, dólares a la derecha, en oro). La de dólares es sólida hasta hoy, con cada cuota al CCL del día de su pago, y punteada después, al CCL de hoy: no es una proyección del dólar (D-163). Lo que ya pasó tiene un tinte y la línea de hoy va en sangría. Una cuota pagada sin el CCL de su pago deja un hueco, nunca un cero. "Ver como tabla" muestra los números.
+
+**Cuadro de marcha · próximas:** las seis próximas cuotas, con su fecha, en pesos y en dólares (al CCL de hoy: el de cada una se fija el día que la pagás). En el teléfono, una tarjeta por cuota.
+
+**Abajo, "El detalle: tu leasing"**, con el CCL que se usa para los dólares arriba a la derecha (tocalo y ves de dónde sale), tiene todo lo que sigue:
 - **La deuda, con su origen:** el **valor de cancelación** que informa la leasera, la deuda **según el cuadro de marcha** (lo que vale, al cierre de tu última carga, lo que falta de canon y opción, a la tasa del contrato: baja con cada cuota que pagás y entre cuotas sube un poco, por el interés que corre) y la **estimada** que aprobaste. Cuenta una sola, la misma en toda la app (Hoy, Balance, Exposición, Evolución y Flujo): la informada; sin ella, la según el cuadro; sin cuadro o sin la tasa del contrato, la estimada (D-131). Las dos últimas llevan el chip "estimado". Todo va al cierre de tu última carga, como el Balance: si cargás el valor de cancelación con la fecha de hoy y todavía no hiciste la carga del día, se ve aparte ("cuenta desde tu próxima carga") y entra en tu patrimonio con esa carga; mientras tanto, el Balance te lo recuerda en lugar de pedirte que lo cargues. "Lo que falta pagar" va al lado y nunca se resta: trae intereses e impuestos.
 - **La tasa del contrato:** la TEA (y su TEM) que iguala lo financiado con los cánones y la opción. Si dice "sin dato · Completar el contrato", le falta el monto financiado neto o la fecha de desembolso (la entrega del bien): cargalos en Datos › Leasing.
-- **Cada cuota, abierta:** la **amortización** es lo único que baja la deuda y suma a tu patrimonio; el **interés**, el **IVA**, el **seguro**, la **percepción** y los **cargos** son gasto. Lo ves en barras por cuota, en el cuadro ("Abierta: amortización y gasto") y en los totales de lo que pagaste y lo que falta. La amortización y el interés salen de la tasa: llevan "estimado".
-- **El cuadro de marcha:** las pagadas plegadas ("14 pagadas ▸"), las próximas 6 a la vista y el resto plegado; en el teléfono, una tarjeta por cuota. "Pagada · fecha sin dato" quiere decir que la planilla no trae la fecha del débito. En dólares, una pagada va al CCL del día de su pago (si no lo cargaste, "sin dato") y una pendiente al CCL de hoy, rotulado.
-- **Totales, recupero fiscal y dólar:** lo pagado, lo que falta por fuente, el IVA y la percepción (crédito fiscal de la sociedad: gasto tuyo mientras no te los reintegre), la opción de compra con su IVA, "cuánto menos pagaste en dólares" y la cuota en pesos contra la cuota en dólares, que aparece cuando hay dos cuotas con el CCL del pago.
-- **Quién paga:** "¿Quién paga la cuota? Vos · La empresa" y "¿La empresa te reintegra el IVA? Sí · No". Un toque guarda. Mientras no digas quién paga, la app toma que la pagás vos (lo que dijiste el 14/10); el reintegro del IVA, mientras no lo digas, no se supone.
+- **El costo total contra el bien:** lo pagado, lo que falta, la opción y los cargos, en pesos nominales, y cuántas veces es el valor del bien del contrato y lo que vale hoy.
+- **El cuadro de marcha:** todas las cuotas en una tabla: arriba elegís **Por pagar** (el de entrada), **Pagadas** o **Todas**, y cómo ver cada cuota: **La factura** (canon, seguro, IVA, percepción, subtotal y total, el estado, el CCL del pago, el total en dólares y la fuente) o **Amortización y gasto**. Las columnas que no entran en el ancho van al botón "⋯" de cada fila; la opción de compra va abajo, aparte. Con el dedo (una tablet), las filas son más altas: cada cifra se toca sin pisar la de abajo. En el teléfono, una tarjeta por cuota. "Pagada · fecha sin dato" quiere decir que la planilla no trae la fecha del débito. En dólares, una pagada va al CCL del día de su pago (si no lo cargaste, "sin dato") y una pendiente al CCL de hoy, rotulado.
+- **Cada cuota, abierta:** la **amortización** es lo único que baja la deuda y suma a tu patrimonio; el **interés**, el **IVA**, el **seguro**, la **percepción** y los **cargos** son gasto. Lo ves en barras por cuota, en el cuadro ("Amortización y gasto") y en la tabla de lo que pagaste y lo que falta, parte por parte. La amortización y el interés salen de la tasa: llevan "estimado".
+- **Totales, recupero fiscal y dólar:** lo pagado, lo que falta (canon según contrato, y aparte IVA, seguro y percepción) y por fuente, el IVA y la percepción (crédito fiscal de la sociedad: gasto tuyo mientras no te los reintegre), los cargos extra, la opción de compra con su IVA, "cuánto menos pagaste en dólares" y la cuota en pesos contra la cuota en dólares, que aparece cuando hay dos cuotas con el CCL del pago.
+- **El leasing en palabras:** la frase de siempre: cuántas cuotas pagaste, la próxima (fecha, cuánto, cuánto es hoy en dólares) y lo que falta, con lo supuesto o a confirmar dicho en palabras. En el teléfono, "Ver cada cifra de la frase" abre cada cifra en pesos y en dólares, y tocándola ves de dónde sale.
+- **El contrato y quién paga:** "¿Quién paga la cuota? Vos · La empresa" y "¿La empresa te reintegra el IVA? Sí · No". Un toque guarda. Mientras no digas quién paga, la app toma que la pagás vos (lo que dijiste el 14/10); el reintegro del IVA, mientras no lo digas, no se supone. Debajo, las fechas del contrato, el bien que financia con su valuación y los cargos extra.
 
 **Las etiquetas del leasing:** `proyectado` (una cuota sin factura todavía), `supuesto` y `a confirmar` (como los marca tu planilla: SUPUESTO y CONFIRMAR), `estimado` (la deuda según el cuadro o la que aprobaste, y la amortización y el interés). Una cifra que suma alguna de ellas la lleva.
 
@@ -498,9 +516,47 @@ Contesta: **¿cuánto pagué del leasing, cuánto falta, cuánto es en dólares 
 
 ### 4.11 Flujo y escenarios
 
-Contesta: **¿cuánto me sobra por mes para invertir y adónde me lleva cada escenario?** Se abre desde la barra (Contexto › Flujo y escenarios) o en `/flujo`. Todo sale de tu **última carga**: el día que cargás de nuevo, el punto de partida se mueve solo.
+Contesta: **¿cuánto me sobra por mes y adónde me lleva?** Está en la barra lateral, en Compromisos y futuro › Flujo y escenarios (en el teléfono, en "Más"), o en `/flujo`. Todo sale de tu **última carga**: el día que cargás de nuevo, el punto de partida se mueve solo.
 
-**Cargar ingreso y Cargar gasto.** Cuando te entra plata, tocá **Cargar ingreso** (arriba en Flujo, en Hoy y en el menú de Cargar; también en `/flujo/cargar`). Son diez segundos:
+**Arriba, lo que ves al abrir.** No hace falta tocar nada: todo arranca en **Igual** (como en tu última carga) y a **12 meses** (D-164).
+- **La lectura:** cuánto te sobra este mes y adónde llegás con el escenario elegido (números inventados): "Este mes te sobran $ 2.916.600. Con todo igual, en un año llegás a ***US$ 94.167*** en lo financiero." Tocá cada cifra para ver de dónde sale.
+- **La cascada del mes** ("Octubre · de ingreso a excedente"): tus ingresos en dólares vendidos al cripto, los pesos fijos, los gastos fijos, la cuota del leasing y lo que sobra. El monto va arriba de cada barra; tocá el nombre de abajo para ver su cuenta. Sale de lo declarado y de tu última carga: no cambia con tus supuestos.
+- **El patrimonio en dólares:** tu patrimonio financiero mes a mes con el escenario elegido, lo que pusiste (tu financiero de la carga más lo invertido) y, cuando movés algo, la línea "Todo igual" de referencia. Arriba a la derecha está la pastilla de escenarios: **Igual** y los que guardaste; un toque abre uno. Abajo, tres cifras:
+  - tu financiero al horizonte;
+  - el rango p5 – p95, que dice *sin dato*: llega con Monte Carlo, y hoy es un solo camino (D-165);
+  - **¿terminás debajo de lo que pusiste?**, con cuánto.
+
+**Tus supuestos, una barra por variable.** Cada variable tiene **una barra de Baja a Sube, con Igual en el medio**: la devaluación, la inflación, la brecha del cripto, los retornos, la TEM de renovación, tu ingreso por tramos, los gastos, la casa y la camioneta. Debajo del nombre dice qué es *Igual* con tus datos de hoy.
+- Movela con el dedo, el mouse o las flechas, o tocá − y + (de a 0,1). El número se ve al lado ("Sube +2,0 %/mes").
+- La lectura y el patrimonio en dólares cambian en vivo. El detalle de abajo se pone al día cuando la soltás.
+- **Volver a Igual** la devuelve de un toque, y **Todo en Igual**, todas.
+- **Tu ingreso va por tramos:** "desde ahora" y "desde feb-27" ya están armados, en Igual. El de pesos, además, puede **ajustarse todos los meses** (de 0 a 15 %/mes). "Otro tramo" suma uno y "Sacar este tramo" lo saca. Cuando sepas el monto nuevo, declaralo en *Tus ingresos y gastos* con **Cambia desde…**.
+- **El horizonte** se elige con atajos (6, 12, 24 meses o el fin del leasing) o con − y +.
+- **Tu regla** del 14/10 (rotulada "tu regla · 14/10"): todo lo que sobra cada mes (ingresos − gastos fijos − la cuota entera del leasing) se invierte repartido como tu última carga, y lo que vence se reinvierte igual. Si un mes no alcanza, sale de tus pesos, y si se terminan, el mes dice "no se cubre". La podés cambiar (otro %, todo a una clase) y volver a la tuya.
+- **¿Quién paga la cuota?** y **¿la empresa te reintegra el IVA?** también se eligen acá (si lo declaraste en Pasivos, manda eso). Sin reintegro elegido, no se cuenta ninguno: lo que sale de tu cuenta es la cuota entera.
+- Una variable que no tiene Igual posible (la brecha sin el cripto de tu carga, la TEM de renovación sin letras) no tiene barra: dice qué falta.
+- En el teléfono, al bajar a tus supuestos, una franja fija arriba te muestra el excedente y el financiero mientras tocás.
+
+**Abajo, el detalle:**
+- **La proyección, mes a mes.** Un solo camino con tus supuestos (no es un pronóstico ni una recomendación):
+  - el excedente acumulado, tu patrimonio financiero y el neto sin la camioneta al horizonte;
+  - si terminás debajo de lo que pusiste, y en qué mes el resultado de tus inversiones alcanzaría la cuota;
+  - el flujo mes a mes (lo proyectado va rayado, con la línea de hoy) y el patrimonio proyectado, en pesos o en dólares;
+  - el **mes a mes**, en una tabla (tarjetas en el teléfono) con dos vistas: *La plata del mes* (ingresos, gastos, cuota, lo que vence y el excedente) y *Patrimonio y resultado* (lo invertido, lo que cambió por precio y por el dólar, el financiero y el neto sin la camioneta).
+
+  Cada cifra abre su cuenta al tocarla. El patrimonio neto con la camioneta usa cuánto de cada cuota baja la deuda (la amortización que calcula Pasivos a la tasa del contrato); sin el cuadro de marcha o sin esa tasa, queda sin dato.
+- **Guardar y comparar.** Mientras probás, todo queda en la dirección: si recargás no perdés nada y *Atrás* vuelve a lo anterior.
+  - **Guardar como…** le pone nombre, y **Abrir** lo trae (o tocalo en la pastilla de arriba).
+  - Si le movés una barra a uno abierto, dice "con tus cambios", y **Guardar cambios en «…»** lo actualiza.
+  - **Archivar** lo saca de la lista sin borrarlo.
+  - Marcá dos o tres y se **comparan**: tres cajas por escenario, el patrimonio de cada uno con un trazo distinto y solo los supuestos que cambian.
+  - El último número de cada barra queda recordado: la próxima vez aparece al lado, a un toque.
+- **El mes en curso** ("Octubre, con los datos de hoy"): una frase con lo que declaraste (lo que ingresa, con los dólares al cripto de tu última carga; los gastos fijos; la cuota del leasing que pagás vos; y el reintegro del IVA y la percepción, si declaraste que la empresa te lo reintegra), el **excedente invertible** en pesos y en dólares, y con qué carga, CCL y cripto se armó. Acá están **Cargar ingreso** y **Cargar gasto**. Si falta algo (el cripto, tus ingresos), en lugar del número dice qué falta.
+- **El calendario de la plata.** Los próximos 12 meses con lo que ya se sabe, sin supuestos: lo declarado, las cuotas del leasing (con sus chips: *supuesto*, *a confirmar*, *proyectado*) y lo que vence de tus bonos y letras. Si a una letra le falta el pago al vencimiento, tocá **Cargar el pago al vencimiento**: la fecha, cuánto paga por VN (está en el aviso de licitación) y de dónde lo sacaste. Te muestra cuánto cobrarías con lo que tenés hoy.
+- **Proyectado contra real.** Cada mes nace proyectado y se vuelve real con lo que cargás: ingreso, gastos y cuota, con el desvío. Los gastos reales son "sin dato" salvo los que cargás con Cargar gasto.
+- **Tus ingresos y gastos declarados.** Abajo de todo: **Declarar un ingreso o un gasto** (con desde cuándo, y cada cuánto si no es mensual), **Cambia desde…** (cierra el anterior el día antes y abre el nuevo), **Termina…** y **Anular** (para un error).
+
+**Cargar ingreso y Cargar gasto.** Cuando te entra plata, tocá **Cargar ingreso**: está en el mes en curso de Flujo, en Hoy (Próximos 30 días) y en la pantalla de Cargar, y también en `/flujo/cargar`. Son diez segundos:
 1. El **concepto**, obligatorio: *Ingreso mensual* (el que se compara con lo declarado) o *Ingreso extraordinario* (va aparte y no cambia tu proyección).
 2. El **monto** y la **moneda** (US$ o $). La fecha es hoy; la podés cambiar.
 3. **A qué cuenta entró:** IEB, Galicia, Mercado Pago o *Afuera*. Si entró a una de tus cuentas, queda grabado también como aporte: tu próxima carga no lo va a leer como ganancia de tus inversiones.
@@ -510,27 +566,9 @@ Si ese mismo día ya cargaste en Datos › Movimientos un aporte igual a esa cue
 
 *Cargar gasto* es lo mismo, con *Gasto fijo del mes* o *Gasto extraordinario*, y "¿de qué cuenta salió?". Abajo está **Lo que cargaste**: **Deshacer** revierte la carga entera, como en Registro (solo la última de esa cuenta), y **Anular** es para lo que fue afuera. Las dos quedan en la auditoría.
 
-**El mes en curso.** Arriba, una frase con lo que declaraste: lo que ingresa (los dólares, al cripto de tu última carga), los gastos fijos y la cuota del leasing que pagás vos (+ el reintegro del IVA y la percepción, si declaraste que la empresa te lo reintegra), y el **excedente invertible**, en pesos y en dólares. Tocá cualquier cifra para ver de dónde sale. Si falta algo (el cripto, tus ingresos), en lugar del número dice qué falta.
-
-**El calendario de la plata.** Los próximos 12 meses con lo que ya se sabe, sin supuestos: lo declarado, las cuotas del leasing (con sus chips: *supuesto*, *a confirmar*, *proyectado*) y lo que vence de tus bonos y letras. Si a una letra le falta el pago al vencimiento, tocá **Cargar el pago al vencimiento**: la fecha, cuánto paga por VN (está en el aviso de licitación) y de dónde lo sacaste. Te muestra cuánto cobrarías con lo que tenés hoy.
-
-**Escenarios.** A la derecha (abajo en el teléfono, con una franja fija arriba que te muestra el excedente y el financiero mientras tocás) están **tus supuestos**, variable por variable: **Baja · Igual · Sube**. Debajo de cada una dice qué es *Igual* con tus datos de hoy. Con Baja o Sube aparece el deslizante, con − y + de a 0,1, y el número va también en el botón ("Sube +2,0%/mes").
-- **Nada arranca elegido**, salvo **tu regla** del 14/10 (rotulada "tu regla · 14/10"): todo lo que sobra cada mes (ingresos − gastos fijos − la cuota entera del leasing) se invierte repartido como tu última carga, y lo que vence se reinvierte igual. Si un mes no alcanza, sale de tus pesos, y si se terminan, el mes dice "no se cubre". La podés cambiar (otro %, todo a una clase) y volver a la tuya.
-- **Tu ingreso va por tramos:** "desde ahora" y "desde feb-27" ya están armados, sin elegir. El de pesos, además, puede **ajustarse todos los meses** (de 0 a 15 %/mes). Cuando sepas el monto nuevo, declaralo en *Tus ingresos y gastos* con **Cambia desde…**.
-- Para proyectar faltan las variables que tu cartera usa y el **horizonte** (6, 12, 24 meses o el fin del leasing). Si querés arrancar con todo quieto, tocá **Completar lo que falta con Igual**: completa solo lo que no elegiste.
-- **¿Quién paga la cuota?** y **¿la empresa te reintegra el IVA?** también se eligen acá (si lo declaraste en Pasivos, manda eso). Sin reintegro elegido, no se cuenta ninguno: lo que sale de tu cuenta es la cuota entera.
-
-**La proyección.** Un solo camino con tus supuestos (no es un pronóstico ni una recomendación): el excedente acumulado, tu patrimonio financiero y el neto sin la camioneta al horizonte; si terminás debajo de lo que pusiste; en qué mes el resultado de tus inversiones alcanzaría la cuota; el flujo mes a mes (lo proyectado va rayado, con la línea de hoy) y el patrimonio proyectado, en pesos o en dólares; y el **mes a mes** (tarjetas en el teléfono) en dos vistas: *La plata del mes* (ingresos, gastos, cuota, lo que vence y el excedente) y *Patrimonio y resultado* (lo invertido, lo que cambió por precio y por el dólar, el financiero y el neto sin la camioneta). Cada cifra abre su cuenta al tocarla. El patrimonio neto con la camioneta usa cuánto de cada cuota baja la deuda (la amortización que calcula Pasivos a la tasa del contrato); sin el cuadro de marcha o sin esa tasa, queda sin dato.
-
-**Guardar y comparar.** Mientras probás, todo queda en la dirección: si recargás no perdés nada y *Atrás* vuelve a lo anterior. **Guardar como…** le pone nombre; **Abrir** lo trae; **Archivar** lo saca de la lista sin borrarlo. Marcá dos o tres y se **comparan**: tres cajas por escenario, el patrimonio de cada uno con un trazo distinto y solo los supuestos que cambian. El último número de cada deslizante queda recordado para la próxima vez.
-
-**Proyectado contra real.** Cada mes nace proyectado y se vuelve real con lo que cargás: ingreso, gastos y cuota, con el desvío. Los gastos reales son "sin dato" salvo los que cargás con Cargar gasto.
-
-**Tus ingresos y gastos declarados.** Abajo de todo: **Declarar un ingreso o un gasto** (con desde cuándo, y cada cuánto si no es mensual), **Cambia desde…** (cierra el anterior el día antes y abre el nuevo), **Termina…** y **Anular** (para un error).
-
 **Mientras falte un dato.** Arriba, **"Faltan N datos"** los lista con su botón: el pago al vencimiento de cada letra, el cripto y, si no importaste el cuadro de marcha (o le faltan cuotas), **"Importar el cuadro de marcha"**, que lleva a Datos › Leasing. Sin el cuadro, la cuota de cada mes dice *sin dato* (y el excedente también): no se cuenta como $ 0. Si falta el pago al vencimiento de una letra, la proyección igual te muestra la plata de cada mes; lo que depende de esa letra (tu patrimonio financiero y el neto) queda *sin dato* hasta que lo cargues, y el pie de tus supuestos lo dice con palabras.
 
-En el **modo privado** se tapan todos los montos, también en los gráficos y en sus tablas.
+En el **modo privado** se tapan todos los montos, también en los gráficos, en sus tooltips y en sus tablas.
 
 ## 5. El Día cero, paso a paso
 
