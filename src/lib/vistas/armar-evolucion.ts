@@ -7,7 +7,7 @@
 import { calc, deCalc, sinDato, vista, type Calc, type CalcVista, type DobleCalc, type Etiqueta } from '@/lib/domain/calc'
 import { Decimal, monto, porcentaje } from '@/lib/domain/dinero'
 import { conjuntoFeriados, fechaCorta, sumarDias } from '@/lib/domain/fechas'
-import { foto, indexar } from '@/lib/domain/foto'
+import { cclA, foto, indexar, sumaCalc, type ItemFoto } from '@/lib/domain/foto'
 import type { FlujoReal, ProyeccionVista, RecurrenteBase } from '@/lib/domain/flujo/tipos'
 import type { AperturaCuota, Cuota } from '@/lib/domain/pasivos/tipos'
 import {
@@ -32,8 +32,10 @@ import {
 import type { Fecha, Hechos, Moneda } from '@/lib/domain/tipos'
 import { fechasDeCarga } from '@/lib/domain/variacion'
 import { frase } from './armar'
+import { COLOR_CLASE, NOMBRE_CLASE } from './colores'
 import type { Par } from './contratos'
 import type {
+  ClaseComposicion,
   ContribuyenteVista,
   FilaResultado,
   FuturoVista,
@@ -42,6 +44,7 @@ import type {
   MesFuturoVista,
   ParametrosEvolucion,
   PuenteVista,
+  PuntoComposicion,
   VistaEvolucion,
 } from './contratos-evolucion'
 
@@ -106,6 +109,11 @@ export function resolverPeriodo(fechas: Fecha[], p: ParametrosEvolucion): { desd
       return { desde: desdeCorte(mesesAtras(ultima, 1)), hasta: ultima, aviso: null }
     case '3m':
       return { desde: desdeCorte(mesesAtras(ultima, 3)), hasta: ultima, aviso: null }
+    case '12m':
+      return { desde: desdeCorte(mesesAtras(ultima, 12)), hasta: ultima, aviso: null }
+    case 'ytd':
+      // En lo que va del año: desde el cierre del año anterior (la última carga hasta el 31/12), o desde el día cero si la historia empieza este año.
+      return { desde: desdeCorte(`${Number(ultima.slice(0, 4)) - 1}-12-31`), hasta: ultima, aviso: null }
     case 'elegir': {
       const ok = p.desde && p.hasta && fechas.includes(p.desde) && fechas.includes(p.hasta) && p.desde < p.hasta
       if (ok) return { desde: p.desde, hasta: p.hasta, aviso: null }
@@ -222,6 +230,41 @@ export function futuroVista(pv: ProyeccionVista, s: string | null, guardados: { 
   }
 }
 
+// ───────────── La composición en dólares (rediseño 15/10) ─────────────
+
+/** De abajo hacia arriba en el área apilada: la liquidez abajo, después lo de pesos, lo dolarizado y los bienes arriba. */
+const ORDEN_CLASES = ['liquidez', 'fci', 'lecap', 'bono', 'accion_local', 'cedear', 'vehiculo', 'inmueble', 'otro']
+
+/**
+ * Lo que vale cada clase en dólares en cada fecha de carga del período (la
+ * suma de sus partidas, estricta: si falta una, "sin dato"). En Financiero,
+ * títulos y liquidez; en Total, también los bienes. Las deudas no: el
+ * patrimonio de la vista (la serie) es el que las resta. Una clase que ese día
+ * no tenías vale 0 (no es un dato que falta: no había nada).
+ */
+export function composicionUsd(h: Hechos, fechas: readonly Fecha[], hoy: Fecha, vistaSel: ParametrosEvolucion['vista'], ix = indexar(h)): { clases: ClaseComposicion[]; puntos: PuntoComposicion[] } {
+  const ultima = fechas.at(-1)
+  const vistas = new Set<string>()
+  const porFecha = fechas.map((d) => {
+    const f = foto(h, d, { hoy: d === ultima ? hoy : d, ix, traza: false })
+    const items = f.items.filter((i) => i.clase !== 'pasivo' && (vistaSel === 'total' || i.clase !== 'bien'))
+    const grupos = new Map<string, ItemFoto[]>()
+    for (const i of items) grupos.set(i.tipo, [...(grupos.get(i.tipo) ?? []), i])
+    const usd: Record<string, string | null> = {}
+    for (const [t, is] of grupos) {
+      vistas.add(t)
+      usd[t] = sumaCalc(is.map((i) => ({ nombre: i.nombre, calc: i.valor_usd })), 'USD', '').valor?.toFixed() ?? null
+    }
+    return { fecha: d, usd }
+  })
+  const orden = (k: string) => (ORDEN_CLASES.includes(k) ? ORDEN_CLASES.indexOf(k) : ORDEN_CLASES.length)
+  const claves = [...vistas].sort((a, b) => orden(a) - orden(b) || a.localeCompare(b))
+  return {
+    clases: claves.map((k) => ({ clave: k, nombre: NOMBRE_CLASE[k] ?? k, color: COLOR_CLASE[k] ?? '#8C8696' })),
+    puntos: porFecha.map((p) => ({ fecha: p.fecha, usd: Object.fromEntries(claves.map((k) => [k, k in p.usd ? p.usd[k] : '0'])) })),
+  }
+}
+
 // ───────────── La vista ─────────────
 
 export function armarEvolucion(h: Hechos, hoy: Fecha, p: ParametrosEvolucion, e: EntradasEvolucion = SIN_ENTRADAS): VistaEvolucion {
@@ -245,7 +288,23 @@ export function armarEvolucion(h: Hechos, hoy: Fecha, p: ParametrosEvolucion, e:
   }
   if (!desde || !hasta) {
     const n = vista(sinDato('Todavía no hay cargas.'))
-    return { ...base, estado: 'sin_cargas', ccl: n, fecha_ccl: null, inicio: null, actual: null, frase: null, puente: null, serie: [], aportado: [], al_dia_cero: null, sensibilidad: null, resultados: null }
+    return {
+      ...base,
+      estado: 'sin_cargas',
+      ccl: n,
+      fecha_ccl: null,
+      ccl_desde: null,
+      composicion: { clases: [], puntos: [] },
+      inicio: null,
+      actual: null,
+      frase: null,
+      puente: null,
+      serie: [],
+      aportado: [],
+      al_dia_cero: null,
+      sensibilidad: null,
+      resultados: null,
+    }
   }
   const ix = indexar(h)
   const fUlt = foto(h, hasta, { hoy, ix })
@@ -267,6 +326,15 @@ export function armarEvolucion(h: Hechos, hoy: Fecha, p: ParametrosEvolucion, e:
   const comunes = {
     ccl: vista(fUlt.ccl),
     fecha_ccl: fUlt.fecha_ccl,
+    // El CCL de esa fecha, sin "viejo": es el de un día del pasado, no el que se usa hoy.
+    ccl_desde: vista(cclA(ix, desde).calc),
+    composicion: composicionUsd(
+      h,
+      fechas.filter((d) => d >= desde && d <= hasta),
+      hoy,
+      p.vista,
+      ix,
+    ),
     inicio: par(patrimonio(h, fIni, p.vista)),
     actual: par(patrimonio(h, fUlt, p.vista)),
     serie: serieEvolucion(h, p.vista, hoy, { ix }),

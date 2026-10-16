@@ -12,7 +12,7 @@ import { compacto, monto } from '@/lib/domain/dinero'
 import { colorTema } from '@/components/graficos/tema'
 import type { Moneda } from '@/lib/domain/tipos'
 import type { Par } from '@/lib/vistas/contratos'
-import type { ContribuyenteVista, FuturoVista, LineaPuenteVista, MesVista, PuntoSerieVista } from '@/lib/vistas/contratos-evolucion'
+import type { ContribuyenteVista, FuturoVista, LineaPuenteVista, MesVista, PuntoSerieVista, VistaEvolucion } from '@/lib/vistas/contratos-evolucion'
 
 type Opcion = Record<string, unknown>
 export interface Tabla {
@@ -139,7 +139,8 @@ export function opcionPuente(lineas: LineaPuenteVista[], m: Moneda, privado: boo
         stack: 'puente',
         stackStrategy: 'all',
         barMaxWidth: 48,
-        label: { show: !privado, position: 'top', fontSize: 10, formatter: (p: { dataIndex: number }) => etiquetaBarra(conSigno[p.dataIndex] ?? null, m, privado) },
+        // En la tinta del tema y sin contorno: el contorno por defecto de ECharts las volvía borrosas sobre el fondo oscuro.
+        label: { show: !privado, position: 'top', fontSize: 10, color: colorTema('texto'), textBorderWidth: 0, formatter: (p: { dataIndex: number }) => etiquetaBarra(conSigno[p.dataIndex] ?? null, m, privado) },
         data: tramo,
       },
     ],
@@ -369,6 +370,88 @@ export function opcionMeses(meses: MesVista[], m: Moneda, privado: boolean, c: C
   const tabla: Tabla = {
     columnas: ['Mes', ...presentes.map((s) => s.nombre)],
     filas: meses.map((x) => [`${x.nombre}${x.parcial ? ` (${x.parcial})` : ''}`, ...presentes.map((s) => cifraTexto(valor(x, s.clave), m, privado, true))]),
+  }
+  return { opcion, tabla }
+}
+
+// ───────────── Composición en dólares (rediseño 15/10, handoff captura 07) ─────────────
+
+/** Lo dolarizado se ve un poco más fuerte que lo demás (handoff: CEDEARs .7, el resto .55). */
+const OPACIDAD: Record<string, number> = { cedear: 0.7 }
+
+/**
+ * Composición en dólares, área apilada (handoff, captura 07): lo que vale cada
+ * clase en cada fecha de carga del período, apilado (la liquidez abajo, lo
+ * dolarizado arriba), y tu patrimonio de la vista en una línea rayada. Sin
+ * rótulos en el eje vertical (como el diseño): los montos están en el
+ * tooltip, en "Ver como tabla" y en las cifras de arriba. Un "sin dato" es un
+ * hueco; en el modo privado, ni el tooltip ni la tabla dicen montos.
+ */
+export function opcionComposicion(comp: VistaEvolucion['composicion'], serie: PuntoSerieVista[], privado: boolean): { opcion: Opcion; tabla: Tabla } {
+  const puntos = comp.puntos
+  const fechas = puntos.map((p) => p.fecha)
+  const desde = fechas[0]
+  const hasta = fechas.at(-1)
+  const largo = Boolean(desde && hasta && (Date.parse(hasta) - Date.parse(desde)) / DIA_MS > 92)
+  const etiquetas = fechas.map((f) => (largo ? `${MESES[Number(f.slice(5, 7)) - 1]}-${f.slice(2, 4)}` : corta(f)))
+  const neto = new Map(serie.map((p) => [p.fecha, p.usd]))
+  const uno = puntos.length === 1
+  const opcion: Opcion = {
+    grid: { left: 8, right: 8, top: 12, bottom: 8 },
+    xAxis: {
+      type: 'category',
+      data: etiquetas,
+      boundaryGap: uno,
+      axisLabel: largo ? { interval: (i: number) => i === 0 || etiquetas[i] !== etiquetas[i - 1] } : {},
+      splitLine: { show: false },
+    },
+    yAxis: { type: 'value', axisLabel: { show: false }, splitLine: { show: false } },
+    tooltip: {
+      trigger: 'axis',
+      formatter: (ps: { dataIndex: number }[] | { dataIndex: number }) => {
+        const i = (Array.isArray(ps) ? ps[0] : ps)?.dataIndex ?? 0
+        const p = puntos[i]
+        if (!p) return ''
+        return [
+          corta(p.fecha),
+          ...[...comp.clases].reverse().map((c) => `${c.nombre}: ${cifraTexto(p.usd[c.clave] ?? null, 'USD', privado)}`),
+          `Tu patrimonio: ${cifraTexto(neto.get(p.fecha) ?? null, 'USD', privado)}`,
+        ].join('<br/>')
+      },
+    },
+    series: [
+      ...comp.clases.map((c) => ({
+        type: 'line',
+        name: c.nombre,
+        stack: 'composicion',
+        data: puntos.map((p) => num(p.usd[c.clave] ?? null)),
+        connectNulls: false,
+        // Con una sola carga no hay área: un punto lleno del color de la clase.
+        showSymbol: uno,
+        symbol: 'circle',
+        symbolSize: 8,
+        lineStyle: { width: 0 },
+        itemStyle: { color: c.color },
+        areaStyle: { color: c.color, opacity: OPACIDAD[c.clave] ?? 0.55 },
+        emphasis: { disabled: true },
+      })),
+      {
+        type: 'line',
+        name: 'Tu patrimonio',
+        data: puntos.map((p) => num(neto.get(p.fecha) ?? null)),
+        connectNulls: false,
+        showSymbol: uno,
+        symbol: 'circle',
+        symbolSize: 6,
+        z: 3,
+        lineStyle: { width: 2, type: [5, 4], color: colorTema('texto') },
+        itemStyle: { color: colorTema('texto') },
+      },
+    ],
+  }
+  const tabla: Tabla = {
+    columnas: ['Fecha', ...[...comp.clases].reverse().map((c) => c.nombre), 'Tu patrimonio'],
+    filas: puntos.map((p) => [corta(p.fecha), ...[...comp.clases].reverse().map((c) => cifraTexto(p.usd[c.clave] ?? null, 'USD', privado)), cifraTexto(neto.get(p.fecha) ?? null, 'USD', privado)]),
   }
   return { opcion, tabla }
 }

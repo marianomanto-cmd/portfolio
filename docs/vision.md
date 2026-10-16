@@ -146,6 +146,8 @@ Historial: sin correcciones · [Corregir un insumo]
 
 **Para qué:** contestar en 10 segundos tres preguntas: ¿cuánto tengo?, ¿qué pasó y por qué? y, desde la fase 4, ¿tengo que hacer algo?
 
+**Desde el rediseño (15/10/2026, D-160):** en la compu, cuatro filas: la pregunta con la fecha, la lectura y el patrimonio neto (partido en financiero, bienes y pasivos); la variación del día, la exposición neta al peso y el excedente del mes; el patrimonio neto en el tiempo y Próximos 30 días, con Atención debajo; y qué tenés y qué debés. La frase completa, quién movió y el cuadre van abajo, en el detalle. En el teléfono, arriba del pliegue sigue lo de esta sección: la lectura en lugar de la frase, y el patrimonio neto y el financiero en una sola tarjeta. Lo que sigue es la versión anterior.
+
 **Desktop a 1280 px, como queda al cerrar la 1b:**
 
 ```
@@ -372,6 +374,8 @@ Los controles se vuelven a evaluar cuando cambia un hecho anterior (D-38): si co
 ### 4.5 Cartera (`/cartera`) · 1a, y ficha de activo · 1b
 
 **Para qué:** la tabla densa del spec en doble moneda, con el desglose activo/TC.
+
+**Desde el rediseño (15/10/2026, D-161):** se llama Posiciones. Arriba, la lectura y cuatro cifras clave; la tabla es la grilla común con las columnas Activo · Cantidad · PPC ARS · PPC USD · Precio · Valor · Result. ARS · Result. USD · Activo · TC · % cartera · Días. El desglose activo/TC es una barra con su traza en las dos monedas, la liquidez va en la misma tabla y lo que no entra en el ancho va a "⋯". Lo que sigue es la versión anterior.
 
 **Desktop desde 1280 px** (columnas del spec, ordenables, totales fijos abajo):
 

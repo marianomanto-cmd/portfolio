@@ -1,6 +1,9 @@
-// El Balance en modo demo (PORTFOLIO_DEMO=1), con los hechos inventados del
-// Apéndice B de docs/vision.md (D-24), por el mismo armador que usa la app.
-// Cada estado (?demo=…) cambia lo mínimo de esos hechos para mostrar un caso:
+// Exposición y su balance en modo demo (PORTFOLIO_DEMO=1), con los hechos
+// inventados del Apéndice B de docs/vision.md (D-24), por los mismos armadores
+// que usa la app. Desde el rediseño (D-156) el Balance vive en /exposicion: los
+// dos salen de los mismos hechos, así el neto de arriba y el balance de abajo
+// usan la misma deuda. Cada estado (?demo=…) cambia lo mínimo de esos hechos
+// para mostrar un caso:
 //
 // - (ninguno) · estimada: la deuda del leasing es un estimado que aprobaste,
 //   como hoy en producción. La cifra grande es "Patrimonio neto · deuda del
@@ -20,7 +23,9 @@ import { Decimal, monto, numero } from '@/lib/domain/dinero'
 import { cclA, indexar } from '@/lib/domain/foto'
 import type { Fecha, Hechos } from '@/lib/domain/tipos'
 import { armarBalance, type ExtrasBalance, type PedidoBalance } from './armar-balance'
+import { armarExposicionPantalla } from './armar-exposicion'
 import type { VistaBalance } from './contratos-balance'
+import type { VistaExposicionPantalla } from './contratos-exposicion'
 import { HOY_EJEMPLO, hechosEjemplo, hechosVacios } from './ejemplo'
 
 export const VARIANTES_BALANCE = ['estimada', 'un-dia', 'completo', 'segun-cuadro', 'sin-deuda', 'sin-valuacion', 'sin-bienes', 'viejo', 'vacio'] as const
@@ -124,34 +129,53 @@ function referenciaEjemplo(h: Hechos): ExtrasBalance['referencia'] {
   }
 }
 
-export function ejemploBalance(v: VarianteBalance, pedido: PedidoBalance = {}): VistaBalance {
+/**
+ * Los hechos de cada estado del demo, con su "hoy" y lo que aporta Pasivos. Los
+ * usan el Balance y la Exposición que lo contiene (D-156): los dos muestran el
+ * mismo estado, con la misma deuda.
+ */
+export function hechosBalance(v: VarianteBalance): { h: Hechos; hoy: Fecha; extras: ExtrasBalance } {
   const base = hechosEjemplo()
   switch (v) {
     case 'vacio':
-      return armarBalance(hechosVacios(), HOY_EJEMPLO, pedido)
+      return { h: hechosVacios(), hoy: HOY_EJEMPLO, extras: {} }
     case 'un-dia':
-      return armarBalance(soloElDiaCero(conDeudaEstimada(base)), HOY_EJEMPLO, pedido)
+      return { h: soloElDiaCero(conDeudaEstimada(base)), hoy: HOY_EJEMPLO, extras: {} }
     case 'completo': {
       const h: Hechos = {
         ...base,
         pasivo_saldos: [{ pasivo_id: 1, fecha: '2026-10-13', capital_pendiente: D(20_600_000), naturaleza: 'informado', fuente: 'la leasera, por correo (ejemplo inventado)', carga_id: 33 }],
       }
-      return armarBalance(h, HOY_EJEMPLO, pedido, { referencia: referenciaEjemplo(h) })
+      return { h, hoy: HOY_EJEMPLO, extras: { referencia: referenciaEjemplo(h) } }
     }
     case 'segun-cuadro': {
       const h = conDeudaEstimada(base)
-      return armarBalance(h, HOY_EJEMPLO, pedido, { segunCuadro: segunCuadroEjemplo(h), referencia: referenciaEjemplo(h) })
+      const segun = segunCuadroEjemplo(h)
+      // Como en producción (hechos-vista.ts): el motor también usa la deuda según el cuadro, así Exposición y el Balance dicen lo mismo.
+      const conCuadro: Hechos = { ...h, deuda_segun_cuadro: (pasivo_id, fecha) => segun?.(fecha).get(pasivo_id)?.ars ?? null }
+      return { h: conCuadro, hoy: HOY_EJEMPLO, extras: { segunCuadro: segun, referencia: referenciaEjemplo(h) } }
     }
     case 'sin-deuda':
-      return armarBalance({ ...base, pasivo_saldos: [] }, HOY_EJEMPLO, pedido)
+      return { h: { ...base, pasivo_saldos: [] }, hoy: HOY_EJEMPLO, extras: {} }
     case 'sin-valuacion':
-      return armarBalance({ ...conDeudaEstimada(base), valuaciones: base.valuaciones.filter((x) => x.bien_id !== 1) }, HOY_EJEMPLO, pedido)
+      return { h: { ...conDeudaEstimada(base), valuaciones: base.valuaciones.filter((x) => x.bien_id !== 1) }, hoy: HOY_EJEMPLO, extras: {} }
     case 'sin-bienes':
-      return armarBalance({ ...conDeudaEstimada(base), bienes: [], valuaciones: [] }, HOY_EJEMPLO, pedido)
+      return { h: { ...conDeudaEstimada(base), bienes: [], valuaciones: [] }, hoy: HOY_EJEMPLO, extras: {} }
     case 'viejo':
-      return armarBalance(conDeudaEstimada(base), '2026-10-21', pedido)
+      return { h: conDeudaEstimada(base), hoy: '2026-10-21', extras: {} }
     case 'estimada':
     default:
-      return armarBalance(conDeudaEstimada(base), HOY_EJEMPLO, pedido)
+      return { h: conDeudaEstimada(base), hoy: HOY_EJEMPLO, extras: {} }
   }
+}
+
+export function ejemploBalance(v: VarianteBalance, pedido: PedidoBalance = {}): VistaBalance {
+  const { h, hoy, extras } = hechosBalance(v)
+  return armarBalance(h, hoy, pedido, extras)
+}
+
+/** La Exposición del demo, con los mismos hechos que el Balance de ese estado (?demo=…). */
+export function ejemploExposicionPantalla(modo: 'financiero' | 'total', v: VarianteBalance = 'estimada'): VistaExposicionPantalla {
+  const { h, hoy } = hechosBalance(v)
+  return armarExposicionPantalla(h, hoy, modo)
 }

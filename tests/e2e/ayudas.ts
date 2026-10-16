@@ -139,7 +139,8 @@ export async function revisarLayout(page: Page, grueso: boolean): Promise<string
     // Texto cortado dentro de un control.
     for (const el of controles) {
       for (const d of [el, ...Array.from(el.querySelectorAll('*'))]) {
-        if (!visible(d)) continue
+        // El texto solo para el lector de pantalla (.sr-only, 1 px a propósito) no se corta: no se ve.
+        if (ignorar(d) || !visible(d)) continue
         const cs = getComputedStyle(d)
         const recorta = cs.overflowX === 'hidden' || cs.overflowX === 'clip' || cs.textOverflow === 'ellipsis'
         if (recorta && d.scrollWidth > d.clientWidth + 1) {

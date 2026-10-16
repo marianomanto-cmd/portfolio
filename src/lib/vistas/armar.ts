@@ -8,6 +8,7 @@ import { conjuntoFeriados, diaSemana, diasEntre, diasHabilesEntre, esHabil, esVi
 import { financieros, foto, indexar, sumaCalc, type Foto, type ItemFoto } from '@/lib/domain/foto'
 import { cantidadCalc, costoCalc, ppcCalc } from '@/lib/domain/posiciones'
 import type { Fecha, Hechos, Moneda } from '@/lib/domain/tipos'
+import { balanceHoy, cclPeriodo, faltanParaElTotal, SIN_LEASING } from './armar-hoy'
 import { COLOR_CLASE, COLOR_GEO, COLOR_MONEDA, COLOR_SIN_ELEGIR, NOMBRE_CLASE, NOMBRE_GEO } from './colores'
 import {
   EXPLICACION_INFERIDO,
@@ -80,21 +81,7 @@ const EXPL_TOT = {
   USD: 'Patrimonio financiero + bienes (casa, auto) − deudas (la del leasing: la informada, la según el cuadro de marcha o la estimada), en dólares.',
 }
 
-const SIN_LEASING = 'Todavía no cargaste el leasing: lo cargás en Datos › Leasing.'
-
-/**
- * Lo que el patrimonio total necesita y todavía no cargaste (D-03): sin eso,
- * el total es "sin dato" con la suma parcial a la vista (D-65), nunca el
- * financiero presentado como total ni una deuda de $ 0.
- */
-function faltanParaElTotal(h: Hechos): { nombre: string; calc: Calc }[] {
-  const out: { nombre: string; calc: Calc }[] = []
-  // Un bien dado de baja (activo_bool = false) se cargó: sin bienes activos, el total es el financiero − deudas.
-  if (h.bienes.length === 0)
-    out.push({ nombre: 'Tus bienes (casa, auto)', calc: sinDato('Todavía no cargaste tus bienes (casa, auto): los cargás en Datos › Bienes.') })
-  if (h.pasivos.length === 0) out.push({ nombre: 'Capital pendiente del leasing', calc: sinDato(SIN_LEASING) })
-  return out
-}
+// SIN_LEASING y faltanParaElTotal (lo que le falta al patrimonio total) viven en ./armar-hoy.
 
 // ───────────── Hoy ─────────────
 
@@ -138,6 +125,9 @@ export function armarHoy(h: Hechos, hoy: Fecha): VistaHoy {
         : null,
     movimientos: v ? movimientos(v) : [],
     cuadre: v ? cuadreVista(v, h, hoy) : { ars_ok: null, usd_ok: null, detalle: 'Hace falta una segunda carga para el cuadre.', diferencia: null },
+    // Rediseño (15/10): de qué está hecho el patrimonio neto y cuánto se movió el CCL en el período de la frase.
+    balance: f1 ? balanceHoy(h, f1) : null,
+    ccl_periodo: v && d0 && d1 ? cclPeriodo(v.ccl0, v.ccl1, d0, d1) : null,
   }
 }
 
@@ -241,6 +231,7 @@ export function frase(v: Variacion, h: Hechos, d0: Fecha, d1: Fecha, feriados: S
       sin_atribuir: null,
       solo_tipos_de_cambio: false,
       sin_ccl_nuevo: sinCclNuevo,
+      faltan: faltan.map((x) => x.nombre),
     }
   }
   const partes: ParteFrase[] = [
@@ -631,7 +622,7 @@ export function armarCartera(h: Hechos, hoy: Fecha): VistaCartera {
   const d1 = fechas.at(-1) ?? null
   const vacio = sinDato('Todavía no hay cargas.')
   if (!d1) {
-    return { fecha_datos: null, ccl: vista(vacio), fecha_ccl: null, filas: [], totales: { valor: par(vacio, vacio), resultado: par(vacio, vacio), costo: par(vacio, vacio) } }
+    return { hoy, fecha_datos: null, ccl: vista(vacio), fecha_ccl: null, filas: [], totales: { valor: par(vacio, vacio), resultado: par(vacio, vacio), costo: par(vacio, vacio) } }
   }
   const ix = indexar(h)
   const f = foto(h, d1, { hoy, ix })
@@ -652,6 +643,7 @@ export function armarCartera(h: Hechos, hoy: Fecha): VistaCartera {
       m === 'ARS' ? 'Resultado de tus títulos desde la compra, en pesos, sumado fila por fila (la liquidez no tiene costo).' : 'Resultado de tus títulos desde la compra, en dólares (cada compra a su CCL), sumado fila por fila.',
     )
   return {
+    hoy,
     fecha_datos: d1,
     ccl: vista(f.ccl),
     fecha_ccl: f.fecha_ccl,

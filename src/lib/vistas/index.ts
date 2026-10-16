@@ -6,9 +6,12 @@ import 'server-only'
 import { hoyCordoba } from '@/lib/domain/fechas'
 import { modoDemo } from '@/lib/server/sesion'
 import { leerTodo } from '@/lib/server/supabase'
-import { armarCartera, armarExposicion, armarHoy, armarRegistro } from './armar'
-import type { VistaCartera, VistaExposicion, VistaHoy, VistaRegistro } from './contratos'
-import { ejemploCartera, ejemploExposicion, ejemploHoy, ejemploRegistro } from './ejemplo'
+import { armarCartera, armarHoy, armarRegistro } from './armar'
+import { armarExposicionPantalla } from './armar-exposicion'
+import type { VistaCartera, VistaHoy, VistaRegistro } from './contratos'
+import type { VistaExposicionPantalla } from './contratos-exposicion'
+import { ejemploCartera, ejemploHoy, ejemploRegistro } from './ejemplo'
+import { ejemploExposicionPantalla, varianteBalance } from './ejemplo-balance'
 import { leerHechosVista } from './hechos-vista'
 
 export async function vistaHoy(): Promise<VistaHoy> {
@@ -21,9 +24,13 @@ export async function vistaCartera(): Promise<VistaCartera> {
   return armarCartera(await leerHechosVista(), hoyCordoba())
 }
 
-export async function vistaExposicion(modo: 'financiero' | 'total'): Promise<VistaExposicion> {
-  if (modoDemo()) return ejemploExposicion(modo)
-  return armarExposicion(await leerHechosVista(), hoyCordoba(), modo)
+/**
+ * Exposición (con el balance adentro desde el rediseño, D-156). En modo demo,
+ * `demo` elige el mismo estado que el balance de abajo (?demo=…).
+ */
+export async function vistaExposicion(modo: 'financiero' | 'total', demo: unknown = null): Promise<VistaExposicionPantalla> {
+  if (modoDemo()) return ejemploExposicionPantalla(modo, varianteBalance(demo))
+  return armarExposicionPantalla(await leerHechosVista(), hoyCordoba(), modo)
 }
 
 type Fila = Record<string, string | number | boolean | null>

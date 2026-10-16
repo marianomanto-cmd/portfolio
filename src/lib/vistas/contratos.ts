@@ -5,6 +5,7 @@
 
 import type { CalcVista } from '@/lib/domain/calc'
 import type { Fecha, Geografia, Moneda, TipoActivo } from '@/lib/domain/tipos'
+import type { BalanceHoy, CclPeriodo } from './contratos-hoy'
 
 /** Toda cifra existe en las dos monedas. */
 export interface Par {
@@ -59,6 +60,8 @@ export interface FraseDelDia {
   solo_tipos_de_cambio: boolean
   /** La carga de hoy no tiene CCL tipeado: no se atribuye nada (decisión A). */
   sin_ccl_nuevo: boolean
+  /** Las partidas que le faltan a la variación (D-65): con alguna, la variación es "sin dato". */
+  faltan?: string[]
 }
 
 export interface TarjetaPatrimonio {
@@ -117,6 +120,10 @@ export interface VistaHoy {
      */
     diferencia?: Par | null
   }
+  /** Rediseño (15/10): activos, bienes y pasivos del patrimonio neto, y los tramos de "Qué tenés y qué debés". null sin cargas. */
+  balance?: BalanceHoy | null
+  /** El CCL de las dos puntas del período de la frase y cuánto cambió ("Del CCL (+1,08%)"). null sin dos cargas. */
+  ccl_periodo?: CclPeriodo | null
 }
 
 export interface MovimientoActivo {
@@ -172,6 +179,8 @@ export interface FilaCartera {
 }
 
 export interface VistaCartera {
+  /** El día de hoy (Córdoba): de cuándo es un precio viejo ("precio de hace 3 días"). */
+  hoy?: Fecha
   fecha_datos: Fecha | null
   ccl: CalcVista
   fecha_ccl: Fecha | null

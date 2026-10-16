@@ -56,7 +56,7 @@
 
 import { Ellipsis, X } from 'lucide-react'
 import { AgGridReact, type CustomCellRendererProps } from 'ag-grid-react'
-import type { CellKeyDownEvent, ColDef, GetRowIdParams, GridApi, GridReadyEvent, IRowNode, PostSortRowsParams, RowClassParams, SuppressKeyboardEventParams } from 'ag-grid-community'
+import type { CellKeyDownEvent, ColDef, GetRowIdParams, GridApi, GridReadyEvent, IRowNode, PostSortRowsParams, RowClassParams, SuppressKeyboardEventParams, SuppressMouseEventHandlingParams } from 'ag-grid-community'
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useMedia } from '@/components/preferencias'
 import { Aviso } from '@/components/ui'
@@ -141,6 +141,20 @@ function suprimirTeclado(p: SuppressKeyboardEventParams): boolean {
   return false
 }
 
+/**
+ * Un clic en un control de la celda (la cifra con su traza, un botón) lo
+ * maneja el control, no la grilla. Si no, al apretar, la grilla le da el foco
+ * a la celda sin preventScroll: una fila que asoma por abajo de la pantalla
+ * sube entre el mousedown y el mouseup, y el clic no llega a la cifra (su
+ * traza no se abría). El teclado sigue igual (Enter entra, Escape vuelve).
+ */
+function mouseEnUnControl(p: SuppressMouseEventHandlingParams): boolean {
+  const t = p.event.target as HTMLElement | null
+  const celda = t?.closest?.('.ag-cell')
+  const control = t?.closest?.(FOCO)
+  return Boolean(celda && control && control !== celda && celda.contains(control))
+}
+
 /** Enter sobre una celda: el foco pasa a lo que tiene adentro (la cifra con su traza). */
 function alApretarTecla(ev: CellKeyDownEvent) {
   const e = ev.event as KeyboardEvent | null | undefined
@@ -176,7 +190,9 @@ export function Grilla<T>(p: PropsGrilla<T>) {
   useLayoutEffect(() => {
     const el = contenedor.current
     if (!escritorio || !el) return
-    const medir = () => setAncho(Math.floor(el.clientWidth))
+    // El borde de la grilla (wrapperBorder del tema: 1 px de cada lado) no es lugar para
+    // columnas: sin restarlo, columnas que suman justo el ancho del contenedor desbordan 2 px.
+    const medir = () => setAncho(Math.max(0, Math.floor(el.clientWidth) - 2))
     medir()
     const ro = new ResizeObserver(medir)
     ro.observe(el)
@@ -262,6 +278,7 @@ export function Grilla<T>(p: PropsGrilla<T>) {
         suppressMovable: true,
         resizable: false,
         suppressKeyboardEvent: suprimirTeclado,
+        cellRendererParams: { suppressMouseEventHandling: mouseEnUnControl },
       }
     })
     if (ocultas.length) {
@@ -277,6 +294,7 @@ export function Grilla<T>(p: PropsGrilla<T>) {
         suppressMovable: true,
         resizable: false,
         suppressKeyboardEvent: suprimirTeclado,
+        cellRendererParams: { suppressMouseEventHandling: mouseEnUnControl },
       })
     }
     return defs

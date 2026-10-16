@@ -312,7 +312,7 @@ Detalla D-20 y D-21.
 
 ### D-113 · Interfaz de la 1a — D
 - **La frase en el teléfono** se lee de corrido, y "Ver la frase completa y cada cifra" abre una hoja con cada número en su renglón tocable. Los números dentro del texto no llegan a 44 px sin romper el renglón (D-30).
-- **Cartera, prioridad de columnas (D-68):** además del orden de la visión, una red de seguridad oculta columnas del final si con los datos reales igual no entran. La tabla tiene 13 columnas. A 1280 px con la barra lateral expandida entran 7, y a 1600 px, 10; las otras van al detalle de la fila. Colapsando la barra entran más. Todas entran desde unos 1910 px (1730 px con la barra colapsada). (Corregido el 14/10: antes decía 11 columnas, todas desde 1600 px.)
+- **Cartera, prioridad de columnas (D-68):** además del orden de la visión, una red de seguridad oculta columnas del final si con los datos reales igual no entran. La tabla tiene 13 columnas. A 1280 px con la barra lateral expandida entran 7, y a 1600 px, 10; las otras van al detalle de la fila. Colapsando la barra entran más. Todas entran desde unos 1910 px (1730 px con la barra colapsada). (Corregido el 14/10: antes decía 11 columnas, todas desde 1600 px.) **Reemplazado por D-161** (rediseño del 15/10): Posiciones es una grilla de 11 columnas, y a 1440 px entran todas.
 - **Exposición:** la composición va en barras horizontales hechas con CSS. ECharts (D-31) entra con los primeros gráficos de verdad, en la 1b.
 - **El chip de datos** ("5 de 5 fuentes") cuenta como al día las fuentes ✓ y las ○ (tipeadas, sin control posible, como el CCL).
 - **La traza** se abre con clic, toque o teclado. Con hover, todavía no.
@@ -771,6 +771,82 @@ El 15/10 pediste un diseño nuevo para toda la app: «nuevo diseño de app, impl
   - `next/font/google`: el build dependería de la red;
   - AG Grid Enterprise: la licencia es paga y Community alcanza.
 
+### D-158 · Exposición con el balance adentro: arriba la respuesta de hoy, abajo el detalle; el balance se imprime en tablas comunes — P (provisoria, a confirmar)
+- **Qué:** Exposición sigue la anatomía del diseño (handoff, capturas 05 y 06): la pregunta y la lectura, el gráfico de largo y corto en pesos de hoy, la exposición neta al peso de los últimos 12 meses, la apertura por clase y por geografía y el TOP 1 y el TOP 3. Abajo, en este orden:
+  1. **El detalle: tu exposición:** lo que la pantalla mostraba y el diseño no tiene arriba: la frase con la sensibilidad al CCL, la concentración con el neto sobre tus activos y la composición con lo que vale cada parte.
+  2. **El detalle: tu balance:** el Balance entero de la entrega 4 (D-131 a D-134), con sus controles.
+- **Lo de arriba es de hoy; el balance, de la fecha que elijas.** Si elegís otra fecha, el balance lo dice y ofrece "Ver el último".
+- **Una sola dirección para las dos partes:** `?vista=` (qué netea) y `?fecha=`, `?agrupar=` y `?comparar=` (el balance) viven juntas, y cambiar una conserva las otras. `/patrimonio` sigue redirigiendo a `/exposicion` con su búsqueda (D-156); la página vieja se borró.
+- **Las barras de largo y corto, partidas por activo,** como en el diseño:
+  - cada título por su ticker, y la liquidez de cada moneda junta ("LIQ": la suma de los saldos, con su traza);
+  - una sola escala para los cuatro renglones, con el cero en el 40% del ancho como en el diseño: lo más largo de la derecha llega al borde, y si la deuda es más grande, la izquierda se llena primero;
+  - no es un cálculo nuevo: las barras suman exactamente lo que dice el resumen de siempre (test);
+  - en la vista Total, los bienes van en su propio renglón mientras no tengan moneda de riesgo (D-73): no se suman ni a los pesos ni a los dólares.
+- **El neto en el tiempo, "12 meses":** la ventana del diseño. Con menos historia arranca en la primera carga, y el rótulo lo dice ("· desde el jue 01/10"). El eje no lleva montos, como en el diseño: están en el tooltip y en la tabla del gráfico, en pesos y en dólares al CCL de cada día. Un "sin dato" corta la línea; nunca es cero.
+- **El estado de situación y el comparativo pasan a la Grilla** (D-157) en la pantalla. **Al imprimir siguen siendo tablas comunes,** solo para la hoja: AG Grid dibuja las filas que entran en su contenedor y no sabe cortarse en hojas A4. Es la única excepción a "toda tabla pasa por la Grilla", y no se ve en pantalla.
+- **Imprimir saca solo el balance,** como antes: lo de arriba de Exposición no se imprime.
+- **El modo demo arma las dos partes con los mismos hechos** en cada estado (`?demo=…`), como en producción: el neto de arriba y el balance de abajo usan la misma deuda.
+- **Por qué:** el diseño pone arriba la pregunta del peso, y el balance es lo mismo, lo que tenés y lo que debés, con más detalle. Abajo no se pierde nada (D-156) y arriba queda la respuesta.
+- **Descartado:**
+  - pestañas Exposición | Balance dentro de la pantalla: esconden la mitad, y el diseño no las tiene;
+  - imprimir la Grilla: corta filas y columnas en A4;
+  - otra ventana para el neto en el tiempo (toda la historia, por ejemplo): el diseño dice 12 meses, y con menos historia es lo mismo.
+
+### D-159 · Evolución: el período en la pastilla 1M · 3M · YTD · 12M · INICIO; la semana y las fechas, en "Otro período" — P (provisoria, a confirmar)
+- **Qué:** la pastilla del diseño elige el período (`?periodo=`):
+  - **1M** (`mes`): el último mes;
+  - **3M** (`3m`): los últimos 3 meses;
+  - **YTD** (`ytd`): en lo que va del año, desde tu última carga hasta el 31/12 del año anterior; si tu historia empieza este año, desde el día cero;
+  - **12M** (`12m`): los últimos 12 meses;
+  - **INICIO** (`todo`): desde el día cero, el de siempre por defecto.
+
+  Como todos los períodos, cada uno arranca en la última fecha con carga en o antes del corte: el resultado se calcula con hechos de ese día.
+- **Lo que ya estaba no se va:** la última semana y "Elegir fechas" (dos fechas con carga) están en **Otro período**, al lado de la pastilla; en el teléfono, en una hoja desde abajo. Debajo de la pastilla se nombra lo elegido, con sus fechas.
+- **Los controles:** qué mirás (Financiero · Total) va al lado del período; la moneda (Pesos · Dólares · Ambas) pasa al encabezado del detalle, porque las cuatro cifras clave y los dos gráficos de arriba ya van en las dos monedas.
+- **Las cuatro cifras clave** son las del diseño: el resultado en pesos, el resultado en dólares, lo que pusieron tus activos y lo que puso el tipo de cambio. Sus notas (el resultado sobre lo que tenías al empezar, la parte de tus activos, cuánto se movió el CCL) salen de funciones puras, con su fórmula en la traza.
+- **Composición en dólares:** cada clase en cada carga del período, al CCL de ese día; en Total suma los bienes. Las deudas no se apilan: la línea del patrimonio ya las resta. Si a una clase le falta el dólar, ese punto es "sin dato", no cero; una clase que ese día no tenías vale 0.
+- **Activo vs. TC:** las ocho partidas con más resultado, con un solo cero; las demás están en "Resultados por activo y cuenta".
+- **La lectura** dice primero si ganaste en pesos y perdiste en dólares (o al revés). Si no, quién puso "la mayor parte" (la más grande de las tres partes, aunque no llegue a la mitad): el dólar, tus activos o lo que todavía no se puede atribuir.
+- **Por qué:** el diseño pone el período arriba, en una sola fila, y 1M, 3M, YTD y 12M son los cortes con que se compara un resultado. Ninguna función se pierde.
+- **Descartado:**
+  - sacar la semana: sirve para la rutina de todos los días;
+  - un YTD desde el 1/1 exacto: no hay hechos ese día si no cargaste; se arranca en la carga anterior, como en los otros períodos.
+
+### D-160 · Hoy: el patrimonio neto partido en financiero, bienes y pasivos, y las cuatro filas del diseño — P (provisoria, a confirmar)
+- **Qué:** Hoy sigue la anatomía de D-157 con las cuatro filas del handoff:
+  1. la pregunta con la fecha ("Jueves 15 de octubre · ¿Cómo estoy hoy?"), la lectura y, a la derecha, el patrimonio neto;
+  2. Variación del día · de dónde vino, Exposición neta al peso y Excedente invertible del mes;
+  3. Patrimonio neto · 12 meses y Próximos 30 días, con Atención debajo;
+  4. Qué tenés y qué debés.
+
+  Debajo, el detalle: la frase del día completa, quién movió lo invertible y el cuadre.
+- **La lectura habla de lo invertible:** qué le pasó al patrimonio financiero desde la carga anterior, en pesos y en dólares, y de dónde vino (sus activos o el CCL), como la frase del día. Es lo que se mide (D-03). La arma una función pura con test (`src/components/hoy/lectura-hoy.ts`) con las cifras que muestra la pantalla, y cada cifra abre su traza. Si a la variación le falta una partida, la lectura dice cuál, sin cifras.
+- **El patrimonio neto, partido en tres:** el handoff dice "Activos · Pasivos". La tarjeta dice **Financiero · Bienes · Pasivos**, y las tres partes suman el neto, cada una con su traza. Con "Activos" a secas, la casa (alrededor del 70% de los activos en el ejemplo) tapa lo invertible, que es justo lo que D-03 separa. "Qué tenés y qué debés" (la cuarta fila) sí muestra los activos juntos, cada uno en su tramo.
+- **El patrimonio neto en el tiempo:** un punto por fecha de carga de los últimos 12 meses (la misma cuenta que la tarjeta: financiero + bienes − deudas), en dos gráficos chicos con las mismas fechas, en dólares y en pesos. Entre dos cargas no se inventa nada, y un día sin dato es un hueco. Mientras no haya 12 meses de historia, el rótulo dice desde cuándo hay. Sin bienes o sin leasing cargados no hay patrimonio neto, y la tarjeta dice qué falta. El cambio del período incluye lo que pusiste o sacaste: no es un resultado, y la tarjeta lleva a Evolución y PnL.
+- **Próximos 30 días:** sale de la misma base que proyecta Flujo, sin guardar nada. Trae la carga de hoy que falta (después del cierre de BYMA, D-127), las cuotas del leasing sin pagar (y la más vieja que ya venció y tu planilla no marca pagada), lo que cobrás de tus bonos y letras y el cierre del mes. Cada monto va en pesos y en dólares, al CCL de tu última carga. Lo que ya está acá no se repite en Atención.
+- **Nada se pierde:** el desglose del financiero pasa a Variación del día; Atención, a Próximos 30 días (en el teléfono, a su renglón); Cargar ingreso y Cargar gasto, al cierre del mes; "Ver la evolución y el PnL" y "Ver el balance", a "Ver resultados", "Ver exposición" y "Ver posiciones".
+- **En el teléfono** (el handoff no lo dibuja): arriba del pliegue, la lectura, el patrimonio neto y el financiero (una tarjeta de cuatro renglones de 44 px), la exposición en un renglón, Atención y "Todavía no cargaste hoy", como pide la visión (§4.1). Lo demás, una tarjeta debajo de otra.
+- **Lo que el diseño pide y la app todavía no tiene:** "sin destino decidido" en un vencimiento cercano. La app no guarda qué vas a hacer con lo que cobrás, así que un vencimiento a menos de 15 días va en sangría, sin esa frase.
+- **Por qué:** con las cuatro filas, Hoy contesta "¿cómo estoy?" arriba y deja el detalle abajo, sin perder nada de lo que mostraba.
+- **Descartado:**
+  - "Activos · Pasivos" al pie de la tarjeta, tal cual el handoff: esconde lo invertible detrás de la casa;
+  - un solo gráfico con dos ejes, uno por moneda: el diseño lo prohíbe y se lee mal;
+  - unir con una línea los días sin carga: sería un dato inventado.
+
+### D-161 · Posiciones: la tabla densa en la Grilla, con la liquidez en sus filas y la barra Activo · TC — P (provisoria, a confirmar)
+- **Qué:** Posiciones sigue la anatomía de D-157: la pregunta, la lectura (cuántas posiciones tenés y cuál explica más de lo que ganaste o perdiste en pesos), cuatro cifras clave (el valor de la cartera, el resultado total, la mejor por su resultado en pesos y la peor en dólares) y la tabla.
+- **La tabla es la Grilla común** (AG Grid, D-157), con las columnas del handoff en su orden: Activo · Cantidad · PPC ARS · PPC USD · Precio · Valor · Result. ARS · Result. USD · Activo · TC · % cartera · Días. Las que no entran se ocultan por prioridad y van a "⋯": a 1440 px entran todas; a 1280 px, con la barra lateral abierta, Cantidad, PPC ARS y Días van a "⋯". Reemplaza la prioridad de columnas de D-113.
+- **Activo · TC es una barra:** el resultado en pesos partido en lo que hizo el activo y lo que hizo el tipo de cambio, cada tramo proporcional a su tamaño. Su traza tiene el desglose en las dos monedas (D-68), así que reemplaza a las dos columnas de desglose de antes.
+- **La liquidez va en la misma grilla, al pie,** con su cuenta. No tiene costo ni resultado: esas celdas dicen "—" (no aplica), que no es "sin dato". Así el % cartera suma 100% en la misma tabla.
+- **Totales de lo que está a la vista,** fijos abajo. A una columna que le falta una fila le corresponde "sin dato", y debajo va la suma parcial con ¹ (D-65): la leyenda dice qué filas faltan.
+- **Un precio viejo** se dice en la fila: debajo del ticker, "precio de hace 7 días" (D-16), y el precio va en gris.
+- **Lo pendiente de cada fila** (una apertura sin CCL de compra, una compra con precio pendiente, una tenencia que la fuente ya no lista) y lo que quedó sin atribuir hoy, que antes estaban en el detalle de la fila, van debajo de la tabla, agrupados ("YPFD, FIMA y TXMJ0: Falta el CCL de compra de la apertura…"). En el teléfono, lo pendiente está en "Más datos" de cada tarjeta, como antes.
+- **Por qué:** la Grilla resuelve el orden exacto, los totales fijos y el "sin scroll horizontal". Con la barra en lugar de las dos columnas de desglose, a 1280 px entran 8 columnas, y a 1440 px las 11.
+- **Descartado:**
+  - las dos columnas de desglose (activo / TC en pesos y en dólares): no entran con el resto sin scroll horizontal, y la barra con su traza dice lo mismo;
+  - la liquidez en un bloque aparte: era una segunda tabla para tres filas.
+- **Falta:** la densidad compacta del handoff (25 filas sin scroll), como preferencia en Ajustes. Hoy son 9 filas y entran enteras.
+
 ## Propuestas que la 1a implementa en forma provisoria
 
 Estas propuestas de `docs/investigacion-mercado.md` (D-35 a D-53) y de `docs/vision.md` §6 (D-54 a D-103) siguen esperando tu aprobación. La 1a ya las usa porque el código las necesitaba. Estado de todas: **P (provisoria, a confirmar)**. Si rechazás una, se cambia el código y se anota acá.
@@ -783,17 +859,17 @@ Estas propuestas de `docs/investigacion-mercado.md` (D-35 a D-53) y de `docs/vis
 | D-38 | B2, los Subtotales de IEB y el total de Galicia son controles | Se calculan en cada lectura y la bandeja los muestra: ✓, ≠ o no verificable | Guardarlos y volver a evaluarlos cuando cambia un hecho anterior |
 | D-46 | FIMA es un FCI: cuotapartes × valor de cuotaparte | La captura lee cuotapartes y valor de cuotaparte (precio cada 1.000 si así cierra) y sugiere el tipo `fci` | Validarlo con una captura real |
 | D-47 | Filas diferidas: lo pendiente no se graba ni cuenta como venta | Ver D-106. Una tenencia que la fuente ya no lista y queda pendiente vale "sin dato" (D-117), y una carga con algo pendiente deja su cuenta en ≠ "parcial" (D-118) | Pendientes como pantalla (1b); en la 1a viven en Atención |
-| D-53 | Jerarquía de Hoy | Arriba, el estado de los datos; Atención a la derecha desde 1280 px y en un renglón en el teléfono (con la cuota del leasing que vence y lo que vence de tus bonos y letras); el excedente del mes, con Cargar ingreso y Cargar gasto (entrega 4) | La línea de veredicto (fase 4) |
+| D-53 | Jerarquía de Hoy | Las cuatro filas del rediseño (D-160): la lectura y el patrimonio neto; la variación del día, la exposición y el excedente del mes; el patrimonio neto en el tiempo y Próximos 30 días (la cuota del leasing, lo que vence de tus bonos y letras, el cierre del mes con Cargar ingreso y Cargar gasto), con Atención debajo; y qué tenés y qué debés. En el teléfono, Atención en un renglón | La línea de veredicto (fase 4) |
 | D-54 | Clave `sb_secret_…` de Supabase | La app lee `SUPABASE_SECRET_KEY`, y `SUPABASE_SERVICE_ROLE_KEY` como alternativa | — |
 | D-57 | `proxy` de Next 16 y sesión verificada en cada acción | Ver D-112. Dependencias en versiones exactas | Lint y CI |
 | D-61 | La fecha de los datos la da la fuente | La carga toma la fecha del B1 del Excel; sin Excel, la que muestra una captura; sin ninguna, hoy en Córdoba. Si una fuente es de otro día, la bandeja avisa. La fecha se puede cambiar a mano | — |
 | D-62 | Tiempo activo por tramos | Se mide en Cargar (un tramo se corta después de 60 s sin gestos), se guarda con el lote y el Registro lo muestra | El tiempo de punta a punta y el dispositivo de cada archivo |
 | D-63 | Borrador de carga en el servidor | Sin tabla de borradores: la lectura grabada es la del servidor gracias a la firma (D-105), y cada archivo va a su ruta definitiva, nombrado por su sha256, desde que se lee | El borrador (si cerrás la pestaña antes del Enter, hay que volver a soltar los archivos) y el trabajo que borra archivos huérfanos |
 | D-64 | Tres cargas válidas: express, media y completa | Las tres se guardan con el mismo Enter; en una express, todo el cambio del día queda "sin atribuir" | — |
-| D-65 | Un total al que le falta una parte es "sin dato", con la suma parcial a la vista | En Hoy (las dos tarjetas, con la suma parcial en pesos y en dólares y su traza), Cartera y Exposición. Si no se conoce ninguna parte, no hay suma parcial: es "sin dato" con el motivo de lo que falta, nunca "suma parcial (0 de 1): $ 0,00" (D-126) | — |
+| D-65 | Un total al que le falta una parte es "sin dato", con la suma parcial a la vista | En Hoy (la tarjeta del patrimonio neto, con la suma parcial en pesos y en dólares y su traza), Posiciones (las cifras clave y los totales de la tabla, con la marca ¹) y Exposición. Si no se conoce ninguna parte, no hay suma parcial: es "sin dato" con el motivo de lo que falta, nunca "suma parcial (0 de 1): $ 0,00" (D-126) | — |
 | D-66 | Cuadre visible y diferencias de criterio con nombre | Hoy muestra el cuadre del día (✓, ≠ o no verificable), recalculado desde los hechos, con la diferencia en pesos y en dólares y su traza: "cierra (diferencia $ 0,00 · US$ 0,00)" o "no cierra por …". "No verificable" dice qué partida falta. La plata de una cuenta sin saldo cargado cuenta como flujo externo (D-125). La bandeja nombra la diferencia de criterio de IEB: "DOLARUSA al dólar de IEB contra tu CCL", con su monto | Revisarlo contra tus archivos reales |
 | D-67 | Toda cifra trae `{valor, formula, insumos, explicacion, etiquetas}` | Así está el contrato del motor; los tests verifican que las etiquetas se propaguen | El Historial de correcciones en la traza |
-| D-68 | Pares ARS/USD y tablas anchas | El USD va en una pastilla tintada y el ARS a la izquierda o arriba; en las tarjetas, la moneda de riesgo va grande; Cartera tiene dos columnas de desglose y prioridad de columnas (D-113) | Las columnas de tu tesis (1b) |
+| D-68 | Pares ARS/USD y tablas anchas | El USD va en una pastilla tintada y el ARS a la izquierda o arriba; en las tarjetas, la moneda de riesgo va grande; en Posiciones, la barra Activo · TC lleva el desglose en las dos monedas en su traza, y las columnas que no entran van a "⋯" (D-161) | Las columnas de tu tesis (1b) |
 | D-69 | Lo no desplegado no aparece | La navegación tiene solo las siete secciones de la 1a. Una cifra de una fase futura dice "sin dato · llega en la fase N" | — |
 | D-70 | Día cero guiado, en un orden fijo | El orden está en `docs/manual.md` y en `docs/carga-diaria.md`. Hoy sin datos muestra el Día cero en ese orden, con la acción principal en Datos › Leasing y la segunda en Cargar (D-128) | La lista de pasos en Datos (1b) |
 | D-73 | La moneda de riesgo la elegís vos | El alta de un activo no trae moneda de riesgo por defecto. Los bienes todavía no tienen ese dato: en la vista Total de Exposición el neto es "sin dato", con la suma parcial, y los bienes van a "Sin elegir" (no suman ni a pesos ni a dólares) | Elegir la moneda de riesgo de cada bien (1b) |

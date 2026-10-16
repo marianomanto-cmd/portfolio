@@ -5,7 +5,8 @@
 import { describe, expect, it } from 'vitest'
 import type { CalcVista } from '@/lib/domain/calc'
 import { hechosEjemplo, HOY_EJEMPLO } from './ejemplo'
-import { armarEvolucion, futuroVista, resolverPeriodo, SIN_ENTRADAS } from './armar-evolucion'
+import { Decimal } from '@/lib/domain/dinero'
+import { armarEvolucion, composicionUsd, futuroVista, resolverPeriodo, SIN_ENTRADAS } from './armar-evolucion'
 import { ejemploEvolucion } from './ejemplo-evolucion'
 import { destinoRecordado, hayEleccionEnLaUrl, hrefEvolucion, leerParametros, leerRecordado, paraRecordar, POR_DEFECTO } from '@/app/(app)/evolucion/_lib/parametros'
 
@@ -121,5 +122,64 @@ describe('armarEvolucion', () => {
     const v = ejemploEvolucion({ ...POR_DEFECTO, s: 'eyJ2IjoxfQ' }, 'mes')
     expect(v.futuro?.ajustar).toBe('/flujo?s=eyJ2IjoxfQ&e=1')
     for (const m of v.futuro!.meses) for (const c of [m.financiero.ars, m.aportes.usd, m.activo.ars, m.tc.usd]) expect(c.etiquetas).toContain('supuesto')
+  })
+})
+
+describe('el rediseño de Evolución (15/10, D-159)', () => {
+  it('12M y YTD arrancan en la última carga en o antes del corte; si la historia empieza después, en el día cero', () => {
+    const fechas = ['2025-09-30', '2025-10-14', '2025-12-30', '2026-01-05', '2026-10-14']
+    const p = POR_DEFECTO
+    expect(resolverPeriodo(fechas, { ...p, periodo: '12m' })).toMatchObject({ desde: '2025-10-14', hasta: '2026-10-14', aviso: null })
+    // En lo que va del año: desde el cierre del año anterior (la última carga hasta el 31/12).
+    expect(resolverPeriodo(fechas, { ...p, periodo: 'ytd' })).toMatchObject({ desde: '2025-12-30', hasta: '2026-10-14', aviso: null })
+    const recientes = ['2026-10-01', '2026-10-07', '2026-10-14']
+    expect(resolverPeriodo(recientes, { ...p, periodo: '12m' }).desde).toBe('2026-10-01')
+    expect(resolverPeriodo(recientes, { ...p, periodo: 'ytd' }).desde).toBe('2026-10-01')
+    expect(leerParametros({ periodo: '12m' }).periodo).toBe('12m')
+    expect(leerParametros({ periodo: 'ytd' }).periodo).toBe('ytd')
+  })
+
+  it('la composición en dólares: en cada carga del período, sus clases suman tu financiero en dólares de ese día', () => {
+    const v = armarEvolucion(hechosEjemplo(), HOY_EJEMPLO, POR_DEFECTO)
+    expect(v.composicion.puntos.map((p) => p.fecha)).toEqual(v.fechas.filter((f) => f >= v.desde! && f <= v.hasta!))
+    // La liquidez abajo; cada clase con su nombre y su color, los de todas las pantallas.
+    expect(v.composicion.clases[0].clave).toBe('liquidez')
+    for (const c of v.composicion.clases) {
+      expect(c.nombre).not.toBe(c.clave)
+      expect(c.color).toMatch(/^#/)
+    }
+    for (const p of v.composicion.puntos) {
+      expect(Object.keys(p.usd).sort()).toEqual(v.composicion.clases.map((c) => c.clave).sort())
+      const s = v.serie.find((x) => x.fecha === p.fecha)!
+      const total = Object.values(p.usd).reduce((a, x) => a.plus(x as string), new Decimal(0))
+      expect(total.toFixed(2), p.fecha).toBe(new Decimal(s.usd as string).toFixed(2))
+    }
+  })
+
+  it('la composición en la vista Total suma los bienes; las deudas no entran (las resta la línea del patrimonio)', () => {
+    const v = armarEvolucion(hechosEjemplo(), HOY_EJEMPLO, { ...POR_DEFECTO, vista: 'total' })
+    const claves = v.composicion.clases.map((c) => c.clave)
+    expect(claves).toContain('inmueble')
+    expect(claves).not.toContain('deuda')
+    expect(claves.indexOf('inmueble')).toBeGreaterThan(claves.indexOf('liquidez'))
+  })
+
+  it('la composición sin CCL es "sin dato", nunca cero; una clase que ese día no tenías vale 0', () => {
+    const h = hechosEjemplo()
+    const fechas = armarEvolucion(h, HOY_EJEMPLO, POR_DEFECTO).fechas
+    const sinCcl = composicionUsd({ ...h, tipos_cambio: [] }, fechas, HOY_EJEMPLO, 'financiero')
+    for (const p of sinCcl.puntos) for (const x of Object.values(p.usd)) expect(x === null || x === '0').toBe(true)
+    expect(sinCcl.puntos.some((p) => Object.values(p.usd).some((x) => x === null))).toBe(true)
+    // Sin ninguna carga en el período, nada que dibujar.
+    expect(composicionUsd(h, [], HOY_EJEMPLO, 'financiero')).toEqual({ clases: [], puntos: [] })
+  })
+
+  it('el CCL al inicio del período, con su traza; sin cargas, no hay', () => {
+    const v = armarEvolucion(hechosEjemplo(), HOY_EJEMPLO, POR_DEFECTO)
+    expect(v.ccl_desde?.valor).not.toBeNull()
+    expect(v.ccl_desde?.formula.trim()).not.toBe('')
+    const vacia = ejemploEvolucion(POR_DEFECTO, 'vacio')
+    expect(vacia.ccl_desde).toBeNull()
+    expect(vacia.composicion).toEqual({ clases: [], puntos: [] })
   })
 })

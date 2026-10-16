@@ -8,7 +8,12 @@ import type { FraseDelDia, Par } from './contratos'
 
 export type VistaPnl = 'financiero' | 'total'
 export type MonedaElegida = 'ars' | 'usd' | 'ambas'
-export type PeriodoElegido = 'semana' | 'mes' | '3m' | 'todo' | 'elegir'
+/**
+ * El período (rediseño 15/10, D-159): la pastilla de arriba es 1M · 3M · YTD ·
+ * 12M · INICIO ('mes', '3m', 'ytd', '12m', 'todo'); la semana y "elegir
+ * fechas" siguen, en "Otro período".
+ */
+export type PeriodoElegido = 'semana' | 'mes' | '3m' | 'ytd' | '12m' | 'todo' | 'elegir'
 export type EstadoEvolucion = 'sin_cargas' | 'un_dia' | 'periodo'
 
 /** Lo que vive en la URL (?vista=&moneda=&periodo=&desde=&hasta=&s=). */
@@ -198,6 +203,19 @@ export interface FuturoVista {
   otros: { id: number; nombre: string }[]
 }
 
+/** Una clase de la composición en dólares (rediseño 15/10): su nombre y su color, los de todas las pantallas. */
+export interface ClaseComposicion {
+  clave: string
+  nombre: string
+  color: string
+}
+
+/** La composición en dólares de cada fecha de carga del período: lo que vale cada clase (texto decimal; null = sin dato). */
+export interface PuntoComposicion {
+  fecha: Fecha
+  usd: Record<string, string | null>
+}
+
 export interface VistaEvolucion {
   hoy: Fecha
   parametros: ParametrosEvolucion
@@ -212,6 +230,15 @@ export interface VistaEvolucion {
   aviso_periodo: string | null
   ccl: CalcVista
   fecha_ccl: Fecha | null
+  /** El CCL al inicio del período (el de la carga de `desde`), con su traza; null sin cargas. */
+  ccl_desde: CalcVista | null
+  /**
+   * La composición en dólares en cada fecha de carga del período, por clase
+   * (el gráfico de área apilada del rediseño). En la vista Financiero, títulos
+   * y liquidez; en la Total, también los bienes. Sin deudas: la línea del
+   * patrimonio de la vista (serie) es la que las resta.
+   */
+  composicion: { clases: ClaseComposicion[]; puntos: PuntoComposicion[] }
   /** El patrimonio de la vista el día cero. */
   inicio: Par | null
   /** El patrimonio de la vista al final del período (o el de la única carga). */

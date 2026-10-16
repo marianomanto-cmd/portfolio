@@ -23,10 +23,11 @@ import type {
 import { MOTIVO_SEGUNDA_CARGA } from '@/lib/domain/resultados'
 import { textoPeriodo } from '@/lib/vistas/armar-evolucion'
 import { Traza } from '@/components/traza'
-import { Aviso, Chip, Rotulo, Tarjeta } from '@/components/ui'
+import { Aviso, Boton, Chip, Rotulo, Tarjeta } from '@/components/ui'
 import { Cifra, CifraPar, CifraPct, ChipEtiquetas, ChipPar, FraseVista, MotivoPar, monedasDe } from './cifras'
 import { hrefEvolucion } from '../_lib/parametros'
 import { GraficoContribuyentes, GraficoMeses, GraficoPuente, GraficosPatrimonio } from './graficos'
+import { GrillaDiaCero, GrillaFuturo, GrillaMeses } from './grillas'
 import { TablaResultados } from './tabla-resultados'
 
 const enLaMoneda = (m: MonedaElegida): Moneda => (m === 'usd' ? 'USD' : 'ARS')
@@ -35,7 +36,7 @@ const nombreVista = (v: VistaEvolucion) => (v.parametros.vista === 'total' ? 'to
 function Titulo({ id, children, extra }: { id: string; children: React.ReactNode; extra?: React.ReactNode }) {
   return (
     <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-      <Rotulo as="h2">
+      <Rotulo as="h3">
         <span id={id}>{children}</span>
       </Rotulo>
       {extra ? <span className="text-[13px] text-muted">{extra}</span> : null}
@@ -43,9 +44,9 @@ function Titulo({ id, children, extra }: { id: string; children: React.ReactNode
   )
 }
 
-// ───────────── Encabezado ─────────────
+// ───────────── El período en una frase (primera tarjeta del detalle) ─────────────
 
-export function Encabezado({ v }: { v: VistaEvolucion }) {
+export function ResumenPeriodo({ v }: { v: VistaEvolucion }) {
   if (v.estado === 'un_dia' && v.primera) {
     return (
       <Tarjeta className="p-4 md:p-6" aria-label="Tu punto de partida">
@@ -241,13 +242,21 @@ export function BloquePatrimonio({ v }: { v: VistaEvolucion }) {
 // ───────────── PnL por mes ─────────────
 
 const LINEAS_MES = ['aportes', 'cuotas', 'amortizacion', 'activo', 'tc', 'sin_atribuir'] as const
+/** El encabezado de cada columna del PnL por mes: corto, para que entre en la grilla (el nombre entero está en la traza de cada cifra). */
+const NOMBRE_COLUMNA_MES: Record<string, string> = {
+  aportes: 'Aportes y retiros',
+  cuotas: 'Cuotas del leasing',
+  amortizacion: 'Amortización',
+  activo: 'Por tus activos',
+  tc: 'Por el dólar',
+  sin_atribuir: 'Sin atribuir',
+}
 
 export function BloqueMeses({ v }: { v: VistaEvolucion }) {
   if (!v.meses.length) return null
   const moneda = v.parametros.moneda
   const ms = monedasDe(moneda)
   const claves = LINEAS_MES.filter((c) => v.meses.some((x) => x.lineas.some((l) => l.clave === c)))
-  const linea = (x: MesVista, c: string) => x.lineas.find((l) => l.clave === c)
   const nombre = (c: string) => v.meses[0].lineas.find((l) => l.clave === c)?.nombre ?? c
   return (
     <Tarjeta className="@container p-4 md:p-5" aria-labelledby="meses">
@@ -259,59 +268,7 @@ export function BloqueMeses({ v }: { v: VistaEvolucion }) {
           <GraficoMeses key={m} meses={v.meses} moneda={m} />
         ))}
       </div>
-      <table className="hidden w-full table-fixed text-[13px] md:@min-[880px]:table">
-        <caption className="sr-only">PnL por mes, una columna por línea del puente</caption>
-        <thead>
-          <tr className="border-b border-border text-[12px] text-muted">
-            <th scope="col" className="w-[12%] py-2 pr-2 text-left font-medium">
-              Mes
-            </th>
-            {claves.map((c) => (
-              <th key={c} scope="col" className="px-1 py-2 text-right font-medium">
-                {nombre(c)}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border">
-          {v.meses.map((x) => (
-            <tr key={x.mes} className="align-top">
-              <th scope="row" className="py-2 pr-2 text-left font-normal">
-                {x.nombre}
-                {x.parcial ? <span className="block text-[12px] text-muted">{x.parcial}</span> : null}
-              </th>
-              {claves.map((c) => {
-                const l = linea(x, c)
-                return (
-                  <td key={c} className="px-1 py-2 text-right">
-                    {l ? <CifraPar par={l.valor} moneda={moneda} titulo={`${x.nombre} · ${l.nombre}`} signo color={['activo', 'tc', 'sin_atribuir'].includes(c)} vertical /> : <NoAplica />}
-                  </td>
-                )
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <ul className="grid gap-2 @min-[560px]:grid-cols-2 md:@min-[880px]:hidden">
-        {v.meses.map((x) => (
-          <li key={x.mes} className="rounded-lg border border-border p-3">
-            <p className="font-medium">
-              {x.nombre} {x.parcial ? <span className="text-[13px] font-normal text-muted">· {x.parcial}</span> : null}
-            </p>
-            <dl className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 text-[13px]">
-              {claves.map((c) => {
-                const l = linea(x, c)
-                return (
-                  <div key={c} className="contents">
-                    <dt className="text-muted">{nombre(c)}</dt>
-                    <dd className="text-right">{l ? <CifraPar par={l.valor} moneda={moneda} titulo={`${x.nombre} · ${l.nombre}`} signo /> : <NoAplica />}</dd>
-                  </div>
-                )
-              })}
-            </dl>
-          </li>
-        ))}
-      </ul>
+      <GrillaMeses meses={v.meses} claves={claves} nombres={Object.fromEntries(claves.map((c) => [c, NOMBRE_COLUMNA_MES[c] ?? nombre(c)]))} moneda={moneda} />
     </Tarjeta>
   )
 }
@@ -375,86 +332,8 @@ export function BloqueEstadoResultados({ v, r }: { v: VistaEvolucion; r: Resulta
 export function BloqueDiaCero({ v, d, abierto }: { v: VistaEvolucion; d: DiaCeroVista; abierto: boolean }) {
   const moneda = v.parametros.moneda
   const contenido = (
-    <div className="@container">
-      <table className="hidden w-full table-fixed text-[13px] md:@min-[500px]:table">
-        <caption className="sr-only">Lo que ya traías al día cero, por posición</caption>
-        <thead>
-          <tr className="border-b border-border text-[12px] text-muted">
-            <th scope="col" className="w-[30%] py-2 pr-2 text-left font-medium">
-              Posición
-            </th>
-            <th scope="col" className="px-1 py-2 text-right font-medium">
-              Valor el día cero
-            </th>
-            <th scope="col" className="px-1 py-2 text-right font-medium">
-              Costo (PPP del bróker)
-            </th>
-            <th scope="col" className="py-2 pl-1 text-right font-medium">
-              Lo que ya traías
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border">
-          {d.filas.map((f) => (
-            <tr key={f.clave} className="align-top">
-              <th scope="row" className="py-2 pr-2 text-left font-normal">
-                <span className="flex min-w-0 items-center gap-2">
-                  <span aria-hidden className="size-2.5 shrink-0 rounded-sm" style={{ background: f.color }} />
-                  <span className="min-w-0 break-words">{f.cuenta ? `${f.ticker} · ${f.cuenta}` : f.ticker}</span>
-                </span>
-                {f.pendiente ? <span className="mt-0.5 block text-[12px] leading-4 text-muted">{f.pendiente}</span> : null}
-              </th>
-              <td className="px-1 py-2 text-right">
-                <CifraPar par={f.valor} moneda={moneda} titulo={`${f.ticker} · valor el día cero`} vertical />
-              </td>
-              <td className="px-1 py-2 text-right">
-                <CifraPar par={f.costo} moneda={moneda} titulo={`${f.ticker} · costo`} vertical />
-              </td>
-              <td className="py-2 pl-1 text-right">
-                <CifraPar par={f.resultado} moneda={moneda} titulo={`${f.ticker} · lo que ya traías`} signo color vertical />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot>
-          <tr className="border-t-2 border-border font-semibold">
-            <th scope="row" colSpan={3} className="py-2 pr-2 text-left">
-              Total
-            </th>
-            <td className="py-2 pl-1 text-right">
-              <CifraPar par={d.total} moneda={moneda} titulo="Lo que ya traías al día cero · total" signo color vertical />
-            </td>
-          </tr>
-        </tfoot>
-      </table>
-      <ul className="flex flex-col gap-2 md:@min-[500px]:hidden">
-        {d.filas.map((f) => (
-          <li key={f.clave} className="rounded-lg border border-border p-3">
-            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-              <span className="flex min-w-0 items-center gap-2 font-medium">
-                <span aria-hidden className="size-2.5 shrink-0 rounded-sm" style={{ background: f.color }} />
-                {f.cuenta ? `${f.ticker} · ${f.cuenta}` : f.ticker}
-              </span>
-              <CifraPar par={f.resultado} moneda={moneda} titulo={`${f.ticker} · lo que ya traías`} signo color />
-            </div>
-            <dl className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 text-[13px]">
-              <dt className="text-muted">Valor el día cero</dt>
-              <dd className="text-right">
-                <CifraPar par={f.valor} moneda={moneda} titulo={`${f.ticker} · valor el día cero`} />
-              </dd>
-              <dt className="text-muted">Costo (PPP)</dt>
-              <dd className="text-right">
-                <CifraPar par={f.costo} moneda={moneda} titulo={`${f.ticker} · costo`} />
-              </dd>
-            </dl>
-            {f.pendiente ? <p className="mt-1 text-[12px] leading-4 text-muted">{f.pendiente}</p> : null}
-          </li>
-        ))}
-        <li className="flex flex-wrap items-baseline justify-between gap-x-3 rounded-lg border border-border bg-surface-2 p-3 font-semibold">
-          <span>Total</span>
-          <CifraPar par={d.total} moneda={moneda} titulo="Lo que ya traías al día cero · total" signo color />
-        </li>
-      </ul>
+    <div>
+      <GrillaDiaCero d={d} moneda={moneda} />
       <MotivoPar par={d.total} className="mt-2 block" />
     </div>
   )
@@ -470,8 +349,8 @@ export function BloqueDiaCero({ v, d, abierto }: { v: VistaEvolucion; d: DiaCero
       </Tarjeta>
     )
   return (
-    <details className="group rounded-xl border border-border bg-surface shadow-[var(--shadow)]">
-      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-4 text-sm md:px-5">
+    <details className="group rounded-tarjeta border border-border bg-surface">
+      <summary className="tocable flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-4 text-sm md:px-5">
         <span className="font-medium">{titulo}</span>
         <span aria-hidden className="text-muted transition-transform group-open:rotate-90">
           ▸
@@ -556,114 +435,24 @@ export function BloqueFuturo({ v, demo = null }: { v: VistaEvolucion; demo?: str
           ))}
         </ul>
       ) : (
-        <>
-          <table className="hidden w-full table-fixed text-sm md:@min-[600px]:table">
-            <caption className="sr-only">PnL proyectado por mes en el escenario {f.escenario.nombre}</caption>
-            <thead>
-              <tr className="border-b border-border text-[12px] text-muted">
-                <th scope="col" className="w-[14%] py-2 pr-2 text-left font-medium">
-                  Mes
-                </th>
-                <th scope="col" className="px-1 py-2 text-right font-medium">
-                  Patrimonio financiero
-                </th>
-                <th scope="col" className="px-1 py-2 text-right font-medium">
-                  Aportes del excedente
-                </th>
-                <th scope="col" className="px-1 py-2 text-right font-medium">
-                  Por el precio (supuesto)
-                </th>
-                <th scope="col" className="py-2 pl-1 text-right font-medium">
-                  Por el dólar (supuesto)
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {f.meses.map((x) => (
-                <tr key={x.mes} className="align-top">
-                  <th scope="row" className="py-2 pr-2 text-left font-normal">
-                    <span className="flex flex-wrap items-center gap-1">
-                      {x.nombre} <ChipEtiquetas etiquetas={['supuesto', ...x.etiquetas]} />
-                    </span>
-                  </th>
-                  <td className="px-1 py-2 text-right">
-                    <CifraPar par={x.financiero} moneda={moneda} titulo={`${x.nombre} · patrimonio financiero (supuesto)`} vertical />
-                  </td>
-                  <td className="px-1 py-2 text-right">
-                    <CifraPar par={x.aportes} moneda={moneda} titulo={`${x.nombre} · aportes (supuesto)`} signo vertical />
-                  </td>
-                  <td className="px-1 py-2 text-right">
-                    <CifraPar par={x.activo} moneda={moneda} titulo={`${x.nombre} · por el precio (supuesto)`} signo vertical />
-                  </td>
-                  <td className="py-2 pl-1 text-right">
-                    <CifraPar par={x.tc} moneda={moneda} titulo={`${x.nombre} · por el dólar (supuesto)`} signo vertical />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <ul className="flex flex-col gap-2 md:@min-[600px]:hidden">
-            {f.meses.slice(0, 6).map((x) => (
-              <MesFuturo key={x.mes} x={x} moneda={moneda} />
-            ))}
-          </ul>
-          {f.meses.length > 6 ? (
-            <details className="group mt-2 md:@min-[600px]:hidden">
-              <summary className="tocable flex min-h-11 cursor-pointer list-none items-center gap-1 text-sm font-medium text-accent">
-                Ver los {f.meses.length} meses <span className="transition-transform group-open:rotate-90">▸</span>
-              </summary>
-              <ul className="mt-2 flex flex-col gap-2">
-                {f.meses.slice(6).map((x) => (
-                  <MesFuturo key={x.mes} x={x} moneda={moneda} />
-                ))}
-              </ul>
-            </details>
-          ) : null}
-        </>
+        <GrillaFuturo meses={f.meses} escenario={f.escenario.nombre} moneda={moneda} />
       )}
     </Tarjeta>
-  )
-}
-
-function MesFuturo({ x, moneda }: { x: FuturoVista['meses'][number]; moneda: MonedaElegida }) {
-  return (
-    <li className="rounded-lg border border-border p-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-        <span className="flex items-center gap-1.5 font-medium">
-          {x.nombre} <ChipEtiquetas etiquetas={['supuesto', ...x.etiquetas]} />
-        </span>
-        <CifraPar par={x.financiero} moneda={moneda} titulo={`${x.nombre} · patrimonio financiero (supuesto)`} />
-      </div>
-      <dl className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 text-[13px]">
-        <dt className="text-muted">Aportes</dt>
-        <dd className="text-right">
-          <CifraPar par={x.aportes} moneda={moneda} titulo={`${x.nombre} · aportes (supuesto)`} signo />
-        </dd>
-        <dt className="text-muted">Por el precio</dt>
-        <dd className="text-right">
-          <CifraPar par={x.activo} moneda={moneda} titulo={`${x.nombre} · por el precio (supuesto)`} signo />
-        </dd>
-        <dt className="text-muted">Por el dólar</dt>
-        <dd className="text-right">
-          <CifraPar par={x.tc} moneda={moneda} titulo={`${x.nombre} · por el dólar (supuesto)`} signo />
-        </dd>
-      </dl>
-    </li>
   )
 }
 
 export function SinCargas() {
   return (
     <Tarjeta className="p-5 md:p-8">
-      <Rotulo as="p">Evolución y PnL</Rotulo>
+      <Rotulo as="h2">Evolución y PnL</Rotulo>
       <p className="mt-3 max-w-[60ch] text-xl font-semibold leading-snug">Todavía no hay cargas: tu evolución arranca con la primera.</p>
       <p className="mt-2 max-w-[70ch] text-[15px] leading-6 text-muted">
         Con una carga ves tu punto de partida y lo que ya traías desde la compra; con dos, el puente de qué cambió y por qué. Ningún número aparece en cero mientras falte: dice
         &quot;sin dato&quot; y qué hace falta.
       </p>
-      <Link href="/carga" className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-[15px] font-medium text-on-accent hover:bg-accent-strong">
-        Hacer la primera carga <ArrowRight aria-hidden className="size-4" />
-      </Link>
+      <Boton href="/carga" className="mt-4">
+        Hacer la primera carga
+      </Boton>
     </Tarjeta>
   )
 }
