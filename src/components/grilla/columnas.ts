@@ -1,6 +1,7 @@
 // Cuentas de la grilla (components/grilla), puras y con test: qué columnas
-// entran en un ancho (nunca scroll horizontal, D-30), qué alto tiene (alto
-// automático hasta ~25 filas, spec §UI) y dónde empieza cada grupo de filas.
+// entran en un ancho (nunca scroll horizontal, D-30), si lo imprescindible
+// entra o la grilla pasa a tarjetas (D-167), qué alto tiene (alto automático
+// hasta ~25 filas, spec §UI) y dónde empieza cada grupo de filas.
 
 export interface MedidaColumna {
   id: string
@@ -19,8 +20,10 @@ export const ANCHO_FICHA = 48
  * orden de las columnas), mientras sumen. Si alguna queda afuera, se reserva el
  * lugar de la columna de la ficha, donde se ven las que no entraron.
  *
- * Las de prioridad 0 entran siempre (aunque no sumen): es responsabilidad de
- * la pantalla que lo imprescindible quepa en 768 px.
+ * Las de prioridad 0 se eligen siempre, aunque no sumen. Si no entran (con la
+ * ficha, si alguna queda afuera), la grilla no se dibuja: pasa a tarjetas
+ * (entraLoImprescindible, D-167). Ya no depende de que cada pantalla calcule
+ * su ancho: la barra lateral abierta le saca 164 px a cualquier pantalla.
  */
 export function columnasVisibles(cols: readonly MedidaColumna[], disponible: number): { visibles: Set<string>; ocultas: string[] } {
   const elegir = (lugar: number) => {
@@ -38,6 +41,20 @@ export function columnasVisibles(cols: readonly MedidaColumna[], disponible: num
   let visibles = elegir(disponible)
   if (visibles.size < cols.length) visibles = elegir(disponible - ANCHO_FICHA)
   return { visibles, ocultas: cols.filter((c) => !visibles.has(c.id)).map((c) => c.id) }
+}
+
+/**
+ * Si lo imprescindible entra en `disponible` px: las columnas de prioridad 0
+ * y, si alguna columna queda afuera, la de la ficha (ANCHO_FICHA). Si entran
+ * todas, no hace falta la ficha. Es justo la condición para que lo que elige
+ * columnasVisibles, con su ficha, no pase el ancho. Si no entra, la grilla pasa
+ * a tarjetas, las mismas que debajo de 768 px (D-167).
+ */
+export function entraLoImprescindible(cols: readonly MedidaColumna[], disponible: number): boolean {
+  if (cols.reduce((s, c) => s + c.ancho, 0) <= disponible) return true
+  // Alguna queda afuera (si son todas imprescindibles, ya no entran): lo de prioridad 0, más la ficha.
+  const imprescindible = cols.filter((c) => c.prioridad === 0).reduce((s, c) => s + c.ancho, 0)
+  return imprescindible + ANCHO_FICHA <= disponible
 }
 
 /**

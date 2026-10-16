@@ -25,7 +25,7 @@
  *     titulo="Posiciones, en pesos y en dólares"
  *     filas={v.filas} columnas={COLUMNAS} idFila={(f) => f.clave} nombreFila={(f) => f.ticker}
  *     ordenInicial={{ columna: 'valor', direccion: 'desc' }}
- *     tarjeta={(f) => <TarjetaPosicion f={f} />}   // debajo de 768 px; sin esto, una tarjeta armada con las columnas
+ *     tarjeta={(f) => <TarjetaPosicion f={f} />}   // donde no va la grilla; sin esto, una tarjeta armada con las columnas
  *   />
  *
  * Qué resuelve:
@@ -44,6 +44,12 @@
  *   fila suma un botón ⋯ que abre la ficha con lo que no se ve.
  * - Debajo de 768 px no hay grilla: tarjetas (D-30), una por fila, en el mismo
  *   orden, y una al final con los totales.
+ * - Desde 768 px, si lo imprescindible (las columnas de prioridad 0, más la
+ *   ficha si alguna queda afuera) no entra en el ancho medido, tampoco: las
+ *   mismas tarjetas, adentro del contenedor (data-modo="tarjetas"). Pasa con la
+ *   barra lateral abierta entre 768 y ~1000 px. El contenedor sigue midiendo:
+ *   si vuelve a entrar, vuelve la grilla (entraLoImprescindible, D-167). Una
+ *   sola lista a la vez, con el nombre de la tabla.
  * - Accesibilidad: la grilla de AG Grid (roles, aria-sort, flechas para
  *   moverse), con nombre (`titulo`). Enter en una celda pasa el foco a lo que
  *   tiene adentro (la cifra: Enter otra vez abre su traza); Tab recorre lo de
@@ -60,7 +66,7 @@ import type { CellKeyDownEvent, ColDef, GetRowIdParams, GridApi, GridReadyEvent,
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useMedia } from '@/components/preferencias'
 import { Aviso } from '@/components/ui'
-import { altoGrilla, columnasVisibles, iniciosDeGrupo, medidas } from './columnas'
+import { altoGrilla, columnasVisibles, entraLoImprescindible, iniciosDeGrupo, medidas } from './columnas'
 import { registrarModulos } from './modulos'
 import { compararOrden, ordenarFilas, type ValorOrden } from './orden'
 import { ALTO_ENCABEZADO, ALTO_FILA, ALTO_TOCABLE, temaGrilla } from './tema'
@@ -102,8 +108,14 @@ export interface PropsGrilla<T> {
   nombreFila?: (fila: T) => string
   /** El orden con que arranca. Sin esto, el de `filas`. */
   ordenInicial?: { columna: string; direccion: 'asc' | 'desc' }
-  /** La tarjeta de cada fila debajo de 768 px. Sin esto, una armada con las columnas. */
+  /** La tarjeta de cada fila donde no va la grilla: debajo de 768 px, o si lo imprescindible no entra (D-167). Sin esto, una armada con las columnas. */
   tarjeta?: (fila: T) => ReactNode
+  /**
+   * En lugar de una tarjeta por fila, las tarjetas que arma la pantalla (el
+   * estado de situación: tarjetas que se pliegan). Van donde iría la lista de
+   * tarjetas: debajo de 768 px, o si lo imprescindible no entra (D-167).
+   */
+  tarjetas?: ReactNode
   /** Filas con alto automático; con más, scroll vertical adentro. Por defecto 25. */
   maxFilas?: number
   /** Alto de cada fila en px. Por defecto 44 (un renglón); 52 con dos. */
@@ -199,10 +211,10 @@ export function Grilla<T>(p: PropsGrilla<T>) {
     return () => ro.disconnect()
   }, [escritorio])
 
-  const { visibles, ocultas } = useMemo(
-    () => columnasVisibles(p.columnas.map((c) => ({ id: c.id, ancho: c.ancho ?? 110, prioridad: c.prioridad ?? 1 })), ancho),
-    [p.columnas, ancho],
-  )
+  const medidasColumnas = useMemo(() => p.columnas.map((c) => ({ id: c.id, ancho: c.ancho ?? 110, prioridad: c.prioridad ?? 1 })), [p.columnas])
+  const { visibles, ocultas } = useMemo(() => columnasVisibles(medidasColumnas, ancho), [medidasColumnas, ancho])
+  // Medido el lugar, si lo imprescindible no entra, tarjetas en lugar de la grilla (D-167). Sin medida, el esqueleto.
+  const enTarjetas = escritorio && ancho > 0 && !entraLoImprescindible(medidasColumnas, ancho)
 
   // Dónde empieza cada grupo, en el orden en que se ve: con filas nuevas, el de
   // `filas`; después de ordenar, el que deja AG Grid (postSortRows).
@@ -317,6 +329,10 @@ export function Grilla<T>(p: PropsGrilla<T>) {
     },
     [titulo],
   )
+  // Si pasa a tarjetas, AG Grid se desarma: su API ya no sirve (vuelve con onGridReady).
+  const desarmada = useCallback(() => {
+    api.current = null
+  }, [])
 
   const pinned = useMemo(() => (hayTotales ? [{ __total: true } as FilaTotal] : undefined), [hayTotales])
   const getRowId = useCallback((r: GetRowIdParams) => (esTotal(r.data) ? ID_TOTAL : props.current.idFila(r.data as T)), [])
@@ -333,7 +349,7 @@ export function Grilla<T>(p: PropsGrilla<T>) {
     filas.forEach((f, i) => inicios.current.set(actual.idFila(f), ini[i]))
   }, [])
 
-  // Las tarjetas del teléfono, en el orden con que arranca la grilla.
+  // Las tarjetas del teléfono (y las de un ancho donde lo imprescindible no entra), en el orden con que arranca la grilla.
   const ordenadas = useMemo(() => {
     const col = p.ordenInicial ? p.columnas.find((c) => c.id === p.ordenInicial!.columna) : undefined
     return col?.orden ? ordenarFilas(p.filas, col.orden, p.ordenInicial!.direccion) : [...p.filas]
@@ -341,12 +357,33 @@ export function Grilla<T>(p: PropsGrilla<T>) {
 
   if (p.filas.length === 0) return <>{p.vacio ?? <Aviso>No hay nada para mostrar todavía.</Aviso>}</>
 
+  /** Las tarjetas: una por fila (y una con los totales), o las que arma la pantalla. Se dibujan en un solo lugar a la vez. */
+  const listaTarjetas = (clase?: string) =>
+    p.tarjetas !== undefined ? (
+      <div className={clase}>{p.tarjetas}</div>
+    ) : (
+      <ul aria-label={p.titulo} className={`flex flex-col gap-3 ${clase ?? ''}`}>
+        {ordenadas.map((f) => (
+          <li key={p.idFila(f)} className="min-w-0">
+            {p.tarjeta ? p.tarjeta(f) : <TarjetaAuto fila={f} columnas={p.columnas} />}
+          </li>
+        ))}
+        {hayTotales ? (
+          <li className="min-w-0">
+            <TarjetaTotales columnas={p.columnas} />
+          </li>
+        ) : null}
+      </ul>
+    )
+
   const altoEsqueleto = alto ?? altoEncabezado + Math.min(p.filas.length, maxFilas) * altoFila + (hayTotales ? altoFila : 0) + 2
   return (
     <div className={`min-w-0 ${p.className ?? ''}`}>
-      {/* ≥ 768 px: la grilla. */}
-      <div ref={contenedor} className="grilla hidden min-w-0 md:block" data-grilla={p.titulo}>
-        {escritorio && ancho > 0 ? (
+      {/* ≥ 768 px: la grilla; si lo imprescindible no entra, las tarjetas (D-167). */}
+      <div ref={contenedor} className="grilla hidden min-w-0 md:block" data-grilla={p.titulo} data-modo={enTarjetas ? 'tarjetas' : undefined}>
+        {enTarjetas ? (
+          listaTarjetas()
+        ) : escritorio && ancho > 0 ? (
           <AgGridReact
             theme={temaGrilla}
             loadThemeGoogleFonts={false}
@@ -364,6 +401,7 @@ export function Grilla<T>(p: PropsGrilla<T>) {
               if (props.current.grupo) e.api.redrawRows()
             }}
             onGridReady={listo}
+            onGridPreDestroyed={desarmada}
             onCellKeyDown={alApretarTecla}
             ensureDomOrder
             suppressColumnVirtualisation
@@ -378,19 +416,8 @@ export function Grilla<T>(p: PropsGrilla<T>) {
         )}
       </div>
 
-      {/* < 768 px: tarjetas (D-30). */}
-      <ul aria-label={p.titulo} className="flex flex-col gap-3 md:hidden">
-        {ordenadas.map((f) => (
-          <li key={p.idFila(f)} className="min-w-0">
-            {p.tarjeta ? p.tarjeta(f) : <TarjetaAuto fila={f} columnas={p.columnas} />}
-          </li>
-        ))}
-        {hayTotales ? (
-          <li className="min-w-0">
-            <TarjetaTotales columnas={p.columnas} />
-          </li>
-        ) : null}
-      </ul>
+      {/* < 768 px: tarjetas (D-30). Si ya están arriba, no van dos veces. */}
+      {enTarjetas ? null : listaTarjetas('md:hidden')}
 
       {ficha !== null ? <Ficha fila={ficha} nombre={nombreFila(ficha)} columnas={p.columnas.filter((c) => ocultas.includes(c.id))} alCerrar={() => setFicha(null)} /> : null}
     </div>

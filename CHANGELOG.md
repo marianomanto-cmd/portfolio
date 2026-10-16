@@ -4,6 +4,30 @@ Todo cambio de la app se registra acá, el más nuevo primero. Cada entrada dice
 
 ## [Sin publicar]
 
+### 2026-10-16 — Las tablas con la barra lateral abierta
+Si abrís la barra lateral a mano (su botón, o Ajustes › Barra lateral), queda abierta en todos los anchos. Entre 768 y unos 1.000 px de ventana le saca 164 px a la pantalla, y a varias tablas no les entraba lo imprescindible: tenían scroll hacia el costado adentro, con la última columna afuera (D-30). Ahora cada tabla se fija cuánto lugar tiene (D-167):
+
+- **Si lo imprescindible no entra, tarjetas:** las mismas del teléfono, una por fila y una con los totales, en el mismo orden y con sus trazas. Lo imprescindible son las columnas que se ven siempre, más el botón "⋯" si alguna queda afuera.
+- **Si entra, la tabla de siempre:** en los anchos que ya andaban no cambia nada. Si colapsás la barra o agrandás la ventana, vuelve la tabla; si la abrís, vuelven las tarjetas.
+- **Dónde pasaba**, a 768 px con la barra abierta (con los datos de ejemplo):
+  - Posiciones;
+  - Exposición: el estado de situación, que pasa a sus tarjetas que se pliegan (IEB ▸, Galicia ▸, Bienes ▸, como en el teléfono), y el comparativo;
+  - Registro;
+  - Evolución y PnL: el PnL por mes;
+  - Pasivos: lo pagado y lo que falta, abiertos en sus partes;
+  - Flujo y escenarios: proyectado contra real del mes.
+
+  A 1024 px con la barra abierta, todas entran.
+- **Fuera de las tablas, a 768 px con la barra abierta:**
+  - **Cargar:** el botón de Guardar se salía por el borde derecho. Ahora no se achica: el tiempo activo de la izquierda baja de renglón.
+  - **Datos › Catálogo:** la tabla se salía de su tarjeta y los botones "Editar" quedaban cortados. Con poco lugar van las tarjetas del teléfono, con "Editar" en cada una.
+- **Pruebas:**
+  - el test de layout recorre también 768 y 1024 px con la barra lateral abierta: todas las pantallas, con una captura de cada una;
+  - una grilla en tarjetas no cuenta como "no se dibujó": sus tarjetas se revisan como el resto de la pantalla. Una que sigue en esqueleto después de 10 s, sí;
+  - la cuenta de lo imprescindible es una función pura con test (`entraLoImprescindible`, en `src/components/grilla/columnas.ts`): los casos en el límite y 2.000 juegos de columnas y anchos al azar contra lo que elige la grilla;
+  - las de interacción: el Registro pasa a tarjetas con la barra abierta y vuelve a ser una tabla al colapsarla; en Exposición, el estado de situación y el comparativo van en tarjetas y sus cifras abren la traza.
+- **Por dentro:** la Grilla recibe `tarjetas` cuando las de la pantalla no son una por fila (el estado de situación). Sin migraciones.
+
 ### 2026-10-15 — Rediseño (15/10)
 El diseño nuevo que pediste el 15/10 («nuevo diseño de app, implementalo»), con «usa Apache ECharts y AG Grid Community para tablas». Cambia cómo se ve la app y dónde está cada cosa, no lo que hace. Las decisiones son D-156 (navegación) y D-157 (sistema visual). Cada pantalla con diseño propio suma lo suyo en su subtítulo.
 

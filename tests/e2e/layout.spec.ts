@@ -16,6 +16,11 @@ import { pantallas, type Pantalla } from './pantallas'
 // El puntero grueso no es solo el teléfono: una tablet, o el teléfono
 // acostado, pasa los 768 px con el dedo (D-100). Por eso 768 y 1024 px se
 // recorren también con puntero táctil.
+//
+// La barra lateral tampoco es siempre la misma: entre 768 y 1279 px arranca
+// colapsada (68 px), pero abierta a mano (su botón o Ajustes) queda guardada y
+// vale en todos los anchos, y mide 232. Por eso 768 y 1024 px se recorren
+// también con la barra abierta, con capturas para revisarlas (D-167).
 
 const PANTALLAS: Pantalla[] = pantallas()
 
@@ -41,7 +46,7 @@ async function abrir(page: Page, p: Pantalla): Promise<{ status: number; hidrato
 }
 
 /** Recorre todas las pantallas en un ancho y devuelve los problemas, con la ruta adelante. */
-async function recorrer(browser: Browser, ancho: number, tema: 'light' | 'dark', grueso: boolean): Promise<string[]> {
+async function recorrer(browser: Browser, ancho: number, tema: 'light' | 'dark', grueso: boolean, barraAbierta = false): Promise<string[]> {
   const ctx = await browser.newContext({
     viewport: { width: ancho, height: alto(ancho) },
     colorScheme: tema,
@@ -49,19 +54,26 @@ async function recorrer(browser: Browser, ancho: number, tema: 'light' | 'dark',
     hasTouch: grueso,
     deviceScaleFactor: 1,
   })
-  await ctx.addInitScript((t) => {
-    try {
-      window.localStorage.setItem('portfolio:tema', t)
-    } catch {
-      // Sin almacenamiento, el tema por defecto (oscuro).
-    }
-  }, tema === 'light' ? 'claro' : 'oscuro')
+  await ctx.addInitScript(
+    ({ t, barra }) => {
+      try {
+        window.localStorage.setItem('portfolio:tema', t)
+        // Como queda al abrirla con su botón o en Ajustes › Barra lateral.
+        if (barra) window.localStorage.setItem('portfolio:nav', 'expandida')
+      } catch {
+        // Sin almacenamiento, el tema por defecto (oscuro) y la barra en automático.
+      }
+    },
+    { t: tema === 'light' ? 'claro' : 'oscuro', barra: barraAbierta },
+  )
   const page = await ctx.newPage()
   const errores: string[] = []
   page.on('pageerror', (e) => errores.push(`error de JavaScript: ${e.message}`))
   const problemas: string[] = []
   // axe y capturas en los anchos de revisión, con el puntero de cada uno.
   const revision = CON_AXE.has(ancho) && grueso === ancho < 768
+  // Con la barra abierta, una captura de cada pantalla: el contenido más angosto del escritorio, donde las grillas pueden pasar a tarjetas.
+  const captura = (revision && CON_CAPTURA.has(ancho)) || barraAbierta
 
   for (const p of PANTALLAS) {
     errores.length = 0
@@ -76,6 +88,11 @@ async function recorrer(browser: Browser, ancho: number, tema: 'light' | 'dark',
       const r: string[] = []
       if (!hidrato) r.push('no hidrató (¿error de JavaScript?)')
       r.push(...errores)
+      if (barraAbierta) {
+        // Que se esté probando lo que dice el nombre del test: la barra abierta, de 232 px.
+        const nav = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--nav-w').trim())
+        if (nav !== '232px') r.push(`la barra lateral no está abierta (--nav-w: ${nav || 'sin valor'})`)
+      }
       r.push(...(await revisarLayout(page, grueso)))
       r.push(...(await revisarGrillas(page)))
       // Un h1 por pantalla (aunque sea solo para el lector de pantalla).
@@ -93,7 +110,7 @@ async function recorrer(browser: Browser, ancho: number, tema: 'light' | 'dark',
       await sinIndicadorDev(page)
       encontrados = await revisar()
     }
-    if (revision && CON_CAPTURA.has(ancho)) {
+    if (captura) {
       // Página entera agrandando el viewport: la captura fullPage de Chromium
       // apaga la emulación táctil mientras captura, y el teléfono saldría
       // con el layout de mouse.
@@ -101,7 +118,7 @@ async function recorrer(browser: Browser, ancho: number, tema: 'light' | 'dark',
       const total = await page.evaluate(() => document.documentElement.scrollHeight)
       await page.setViewportSize({ width: ancho, height: Math.max(alto0, total) })
       await page.waitForTimeout(150)
-      await page.screenshot({ path: path.join(carpetaCapturas(), `${p.nombre}-${ancho}-${tema === 'light' ? 'claro' : 'oscuro'}.png`) })
+      await page.screenshot({ path: path.join(carpetaCapturas(), `${p.nombre}-${ancho}${barraAbierta ? '-barra-abierta' : ''}-${tema === 'light' ? 'claro' : 'oscuro'}.png`) })
       await page.setViewportSize({ width: ancho, height: alto0 })
     }
     problemas.push(...encontrados.map((e) => `${p.ruta} · ${e}`))
@@ -127,6 +144,17 @@ for (const ancho of [768, 1024]) {
   test(`layout · ${ancho} px · táctil`, async ({ browser }) => {
     const problemas = await recorrer(browser, ancho, 'light', true)
     expect(problemas, `Problemas de layout a ${ancho} px con puntero táctil:\n${problemas.join('\n')}`).toEqual([])
+  })
+}
+
+// La barra lateral abierta a mano entre 768 y 1279 px: al contenido le quedan
+// 164 px menos (a 768 px, unos 480). En el tema de la app (el oscuro).
+for (const ancho of [768, 1024]) {
+  test(`layout · ${ancho} px · barra abierta`, async ({ browser }) => {
+    // Recorre todas las pantallas y captura cada una: el mismo margen que los anchos de arriba.
+    test.setTimeout(600_000)
+    const problemas = await recorrer(browser, ancho, 'dark', false, true)
+    expect(problemas, `Problemas de layout a ${ancho} px con la barra lateral abierta:\n${problemas.join('\n')}`).toEqual([])
   })
 }
 

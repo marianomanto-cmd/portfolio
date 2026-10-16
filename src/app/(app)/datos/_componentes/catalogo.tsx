@@ -225,7 +225,7 @@ export function Catalogo({ activos, ratios, hoy }: { activos: Activo[]; ratios: 
   }, [editando])
 
   return (
-    <div className="space-y-4">
+    <div className="@container space-y-4">
       <div ref={panel} className="scroll-mt-20">
         {editando !== null ? (
           <Panel titulo={activo ? `Editar ${activo.ticker}` : 'Nuevo activo'}>
@@ -249,9 +249,12 @@ export function Catalogo({ activos, ratios, hoy }: { activos: Activo[]; ratios: 
         </p>
       ) : null}
 
-      {/* Desktop: tabla densa. */}
+      {/*
+        Desktop: tabla densa, si tiene lugar. Entre 768 y 1023 px necesita unos 550 (con los datos de ejemplo); con
+        menos de 600 (la barra lateral abierta a 768 px le deja unos 480), las tarjetas del teléfono (D-30, D-167).
+      */}
       {activos.length ? (
-        <div className="hidden overflow-hidden rounded-2xl border border-border bg-surface md:block">
+        <div className="hidden overflow-hidden rounded-2xl border border-border bg-surface md:@min-[600px]:block">
           <table className="w-full text-left text-sm">
             <thead className="bg-surface-2 text-xs text-muted">
               <tr>
@@ -301,8 +304,8 @@ export function Catalogo({ activos, ratios, hoy }: { activos: Activo[]; ratios: 
         </div>
       ) : null}
 
-      {/* Teléfono: tarjetas. */}
-      <ul className="space-y-2 md:hidden">
+      {/* Teléfono, o poco lugar para la tabla: tarjetas. */}
+      <ul className="space-y-2 md:@min-[600px]:hidden">
         {activos.map((a) => {
           const t = etiquetas(a, ratios, hoy)
           return (

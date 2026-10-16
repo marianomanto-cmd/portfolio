@@ -52,7 +52,8 @@ export function BarraGuardar({
     >
       <div className="flex min-w-0 flex-col gap-2 md:flex-row md:items-center">
         <div className="min-w-0 text-sm text-muted max-md:hidden">{estado}</div>
-        <div className="flex min-w-0 flex-col gap-2 sm:flex-row md:ml-auto">
+        {/* Los botones no se achican: con poco lugar (la barra lateral abierta a 768 px), el estado de la izquierda baja de renglón (D-30). */}
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row md:ml-auto md:shrink-0">
           {secundario ? (
             <Boton variante="secundario" onClick={secundario.onClick} className="max-sm:w-full">
               {secundario.texto}
