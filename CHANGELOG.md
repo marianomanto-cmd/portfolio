@@ -4,6 +4,9 @@ Todo cambio de la app se registra acá, el más nuevo primero. Cada entrada dice
 
 ## [Sin publicar]
 
+### 2026-10-19 — El puente de Evolución, en horizontal
+Me avisaste que el gráfico «El puente: de dónde vino el cambio» estaba roto. Con pesos y dólares lado a lado, cada columna de la cascada tenía unos 45 px, y los rótulos ("Aportes", "Cuotas", "Sin atrib.") y los montos de arriba de cada barra se pisaban. Ahora la cascada es horizontal (D-169): un escalón por renglón, de arriba abajo, con su nombre a la izquierda y su monto a la derecha de la barra. Nada se pisa en ningún ancho. Los colores, el orden, tocar un escalón y la lista de abajo no cambian.
+
 ### 2026-10-16 — La plata que falta entre composiciones es un gasto
 Lo pediste el 16/10 (D-168): si entre dos composiciones una cuenta tiene menos plata de la que explican los movimientos y las operaciones, y no se sabe adónde fue, la diferencia se carga como gasto, un retiro de esa cuenta con la fecha de la composición que la muestra. Lo que una captura no muestra queda con su último valor conocido (D-16). La plata que se fue a una tenencia que la app todavía no sigue (un fondo suscripto desde otra cuenta) es un retiro de esa cuenta, y cuando la tenencia aparece entra como apertura ("Ya la tenía"): plata de afuera, no ganancia. Lo que sobra no es gasto: es rendimiento si lo explica la TNA del saldo y, si no, un aporte. No cambia el código: es cómo se cargan tus composiciones (`docs/carga-diaria.md`, el manual §9).
 

@@ -45,7 +45,7 @@ const etiquetaEje = (m: Moneda, privado: boolean) => ({
   formatter: (v: number) => (privado ? '' : compacto(String(v), m)),
 })
 
-/** Rótulos cortos del eje: siete u ocho barras tienen que entrar en el ancho de una tarjeta. */
+/** Rótulos cortos del eje de la cascada: van a la izquierda de cada escalón y no le quitan ancho a las barras. */
 const NOMBRE_CORTO: Record<string, string> = {
   inicial: 'Inicio',
   aportes: 'Aportes',
@@ -74,6 +74,10 @@ function etiquetaBarra(v: number | null, m: Moneda, privado: boolean): string {
  * abajo, no como barras (una barra de cien millones aplasta escalones de un
  * millón). Una línea "sin dato" no tiene barra y corta la cascada desde ahí
  * (no se inventa el escalón). Verde y rojo solo para resultados.
+ *
+ * Horizontal (D-169): un escalón por renglón, de arriba abajo, con su rótulo a
+ * la izquierda y su monto a la derecha. En vertical, con las dos monedas lado a
+ * lado, cada columna tenía unos 45 px y los rótulos y los montos se pisaban.
  */
 /** Las líneas que son escalones de la cascada, en su orden: el índice de una barra es su posición acá (la última barra es el cambio total). */
 export function deltasPuente(lineas: LineaPuenteVista[]): LineaPuenteVista[] {
@@ -119,9 +123,10 @@ export function opcionPuente(lineas: LineaPuenteVista[], m: Moneda, privado: boo
   tramo.push({ value: corrido === null ? null : Math.abs(corrido), itemStyle: { color: c.neutro } })
   conSigno.push(corrido)
   const opcion: Opcion = {
-    grid: { left: 8, right: 8, top: 24, bottom: 8, containLabel: true },
-    xAxis: { type: 'category', data: nombres, axisLabel: { interval: 0, hideOverlap: false, fontSize: 10 } },
-    yAxis: { type: 'value', axisLabel: etiquetaEje(m, privado) },
+    // A la derecha, lugar para el monto del escalón más largo ("+$ 12,3 M"): containLabel no cuenta las etiquetas de las barras.
+    grid: { left: 8, right: privado ? 8 : 64, top: 8, bottom: 8, containLabel: true },
+    yAxis: { type: 'category', inverse: true, data: nombres, axisLabel: { interval: 0, fontSize: 10 } },
+    xAxis: { type: 'value', splitNumber: 3, axisLabel: { ...etiquetaEje(m, privado), hideOverlap: true } },
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'shadow' },
@@ -138,9 +143,9 @@ export function opcionPuente(lineas: LineaPuenteVista[], m: Moneda, privado: boo
         name: m === 'ARS' ? 'En pesos' : 'En dólares',
         stack: 'puente',
         stackStrategy: 'all',
-        barMaxWidth: 48,
+        barMaxWidth: 24,
         // En la tinta del tema y sin contorno: el contorno por defecto de ECharts las volvía borrosas sobre el fondo oscuro.
-        label: { show: !privado, position: 'top', fontSize: 10, color: colorTema('texto'), textBorderWidth: 0, formatter: (p: { dataIndex: number }) => etiquetaBarra(conSigno[p.dataIndex] ?? null, m, privado) },
+        label: { show: !privado, position: 'right', fontSize: 10, color: colorTema('texto'), textBorderWidth: 0, formatter: (p: { dataIndex: number }) => etiquetaBarra(conSigno[p.dataIndex] ?? null, m, privado) },
         data: tramo,
       },
     ],
