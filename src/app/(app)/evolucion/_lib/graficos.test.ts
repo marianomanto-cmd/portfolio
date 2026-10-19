@@ -40,7 +40,7 @@ describe('gráficos de Evolución', () => {
     const deltas = v.puente!.lineas.filter((l) => !l.informativa && l.clave !== 'inicial' && l.clave !== 'final')
     const [base, tramo] = series(opcion)
     expect(base.data).toHaveLength(deltas.length + 1)
-    expect((opcion as { xAxis: { data: string[] } }).xAxis.data.at(-1)).toBe('Cambio')
+    expect((opcion as { yAxis: { data: string[] } }).yAxis.data.at(-1)).toBe('Cambio')
     const activo = deltas.findIndex((l) => l.clave === 'activo')
     expect(valores(tramo)[activo]).toBeCloseTo(Math.abs(Number(deltas[activo].valor.ars.valor)), 6)
     // El cambio total es final − inicial (el puente cuadra ✓).
@@ -59,7 +59,7 @@ describe('gráficos de Evolución', () => {
 
   it('tocar un escalón: el índice de la barra es su línea; en activos o dólar, los 3 que más sumaron y los 2 que más restaron', () => {
     const deltas = deltasPuente(v.puente!.lineas)
-    expect((opcionPuente(v.puente!.lineas, 'USD', false).opcion as { xAxis: { data: string[] } }).xAxis.data).toHaveLength(deltas.length + 1)
+    expect((opcionPuente(v.puente!.lineas, 'USD', false).opcion as { yAxis: { data: string[] } }).yAxis.data).toHaveLength(deltas.length + 1)
     for (const parte of ['activo', 'tc'] as const) {
       const q = quienesDe(v.contribuyentes, parte, 'USD')
       expect(q.suman.length).toBeLessThanOrEqual(3)
@@ -154,7 +154,9 @@ describe('gráficos de Evolución', () => {
   it('modo privado: ni la tabla ni los ejes muestran montos', () => {
     for (const { opcion, tabla } of [opcionPuente(v.puente!.lineas, 'ARS', true), opcionMeses(v.meses, 'USD', true), opcionPatrimonio(v.serie, v.aportado, v.futuro, 'ARS', true)]) {
       expect(tabla.filas.flat().join(' ')).not.toMatch(/\$\s?[−+-]?\d/)
-      const eje = (opcion.yAxis ?? opcion.xAxis) as { axisLabel?: { formatter?: (x: number) => string } }
+      // El eje de los montos: el vertical, salvo en la cascada horizontal del puente.
+      const ejes = [opcion.yAxis, opcion.xAxis] as { type?: string; axisLabel?: { formatter?: (x: number) => string } }[]
+      const eje = ejes.find((e) => e?.type === 'value') ?? ejes[0]
       expect(eje.axisLabel?.formatter?.(1234567)).toBe('')
     }
     expect(cifraTexto(null, 'ARS', true)).toBe('sin dato')
