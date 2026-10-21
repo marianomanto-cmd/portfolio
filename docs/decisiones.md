@@ -993,7 +993,7 @@ Lo pediste el 15/10: «en flujos y escenarios quiero ver graficos» y «seleccio
 ### D-169 · La cascada del puente de Evolución es horizontal — D
 - **Lo que dijiste (19/10):** «bug, este gráfico está roto», con una captura del puente donde los rótulos y los montos se pisaban.
 - **Qué:** la cascada del puente va acostada: un escalón por renglón (Aportes, Cuotas, Activos, Dólar, Sin atrib., Cambio), con el nombre a la izquierda y el monto a la derecha de la barra. A la derecha queda lugar para el monto más largo.
-- **Por qué:** en vertical, con las dos monedas lado a lado, cada columna tenía unos 45 px. "Sin atrib." mide unos 60 px y "+$ 5,2 M" unos 50: se pisaban con los de al lado. En horizontal, cada rótulo y cada monto tiene su renglón, a cualquier ancho.
+- **Por qué:** en vertical, con las dos monedas lado a lado, cada columna tenía unos 45 px. "Sin atrib." mide unos 60 px y un monto como "+$ 12,3 M", unos 55: se pisaban con los de al lado. En horizontal, cada rótulo y cada monto tiene su renglón, a cualquier ancho.
 - **Descartado:**
   - rotar los rótulos: los montos de arriba de las barras se seguían pisando;
   - esconder los que se pisan: se pierde el monto justo cuando la pantalla es chica;
