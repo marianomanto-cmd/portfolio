@@ -981,7 +981,7 @@ Lo pediste el 15/10: «en flujos y escenarios quiero ver graficos» y «seleccio
 ### D-168 · La plata que falta entre dos composiciones y no se sabe adónde fue es un gasto — D
 - **Lo que dijiste (16/10):** «yo te paso la composición de mi portafolio constantemente con capturas acá. Si hay plata que no sabés dónde se fue porque encontrás una diferencia en el neto, considerala un gasto».
 - **Qué:** al cargar una composición, si una cuenta tiene menos plata de la que explican la composición anterior, las operaciones y los movimientos ya cargados, la diferencia es un **gasto**. Se carga como un retiro de esa cuenta (Datos › Movimientos), con la fecha de la composición que la muestra y una nota con la cuenta que la arma (saldo anterior − movimientos conocidos − saldo nuevo).
-- **Lo que una captura no muestra no desaparece:** queda con su último valor conocido (D-16), como cualquier dato que no se carga. Una captura puede mostrar una parte de la cuenta: la del 16/10 mostró un fondo que la del 15/10 no tenía.
+- **La composición que mandás es completa (D-170):** lo que no aparece no lo tenés más.
 - **Plata que se fue a algo que la app no sigue:** si la plata salió hacia una tenencia que la app todavía no tiene (por ejemplo, un fondo suscripto con plata de otra cuenta), es un retiro de la cuenta de la que salió. Cuando esa tenencia aparece en una composición, entra como apertura ("Ya la tenía"): plata que entra de afuera a su valor de ese día, no una ganancia, con el costo sin dato si la captura no lo muestra.
 - **Lo que sobra no es gasto:** si una cuenta tiene más plata de la que se explica, no se inventa nada. Si lo explica la TNA del saldo, es rendimiento. Si no, es un **aporte** (plata tuya que vino de afuera), nunca rendimiento: así la ganancia de tus inversiones no se infla.
 - **Por qué:** sin la regla, la plata que gastaste se leía como pérdida de tus inversiones (el resultado de la cuenta), y Hoy, Exposición y Evolución decían que perdiste lo que en realidad gastaste.
@@ -993,11 +993,23 @@ Lo pediste el 15/10: «en flujos y escenarios quiero ver graficos» y «seleccio
 ### D-169 · La cascada del puente de Evolución es horizontal — D
 - **Lo que dijiste (19/10):** «bug, este gráfico está roto», con una captura del puente donde los rótulos y los montos se pisaban.
 - **Qué:** la cascada del puente va acostada: un escalón por renglón (Aportes, Cuotas, Activos, Dólar, Sin atrib., Cambio), con el nombre a la izquierda y el monto a la derecha de la barra. A la derecha queda lugar para el monto más largo.
-- **Por qué:** en vertical, con las dos monedas lado a lado, cada columna tenía unos 45 px. "Sin atrib." mide unos 60 px y "+$ 5,2 M" unos 50: se pisaban con los de al lado. En horizontal, cada rótulo y cada monto tiene su renglón, a cualquier ancho.
+- **Por qué:** en vertical, con las dos monedas lado a lado, cada columna tenía unos 45 px. "Sin atrib." mide unos 60 px y un monto como "+$ 12,3 M", unos 55: se pisaban con los de al lado. En horizontal, cada rótulo y cada monto tiene su renglón, a cualquier ancho.
 - **Descartado:**
   - rotar los rótulos: los montos de arriba de las barras se seguían pisando;
   - esconder los que se pisan: se pierde el monto justo cuando la pantalla es chica;
   - un gráfico debajo del otro: no arregla la tarjeta con la barra lateral abierta y deja el puente el doble de alto.
+
+### D-170 · La composición que mandás es todo lo que tenés: lo que deja de aparecer se rescató o se vendió — D
+- **Lo que dijiste (21/10):** «lo que hay es lo que te mando, siempre», y que el FIMA Premium lo sacaste de Galicia y lo pusiste en Mercado Pago.
+- **Qué:** una tenencia que estaba en una composición y no está en la siguiente se vendió o se rescató, con la fecha de la primera composición que ya no la trae. Si no se sabe cuánto se cobró, el importe es su último valor informado por la fuente (la captura o el Excel), no un precio inventado. Si la plata fue a otra cuenta que la app sigue, entra ahí como aporte del rescate. Lo que falta después de eso es gasto (D-168).
+- **El caso que la motivó:** un fondo estaba en la captura de Galicia del 16/10 y no en la del 19/10. Se registra rescatado el 19/10 por su valor de esa captura. La plata llegó a Mercado Pago en dos partes, una hasta el 19/10 y el resto hasta el 21/10, y entra ahí como aporte del rescate. El gasto del período se recalcula con esa plata adentro.
+- **Ejemplo con números inventados:** un fondo valía $ 1.000.000 en la última captura que lo trae. En la siguiente no está, y Mercado Pago pasó de $ 500.000 a $ 1.200.000. El rescate es de $ 1.000.000; a Mercado Pago llegó como aporte, y el gasto es 500.000 + 1.000.000 − 1.200.000 = $ 300.000.
+- **Por qué:** sin la regla, el fondo seguía valiendo su último precio en el patrimonio y la plata que llegó a Mercado Pago se contaba dos veces.
+- **Corrige a D-168:** una versión anterior decía que lo que una captura no muestra queda con su último valor conocido (D-16). Eso vale para un dato que no se carga, no para una composición, que es completa.
+- **Pendiente:** la bandeja todavía cuenta una captura de Galicia solo para las secciones que trae (D-117). Mientras tanto, estas bajas se registran a mano con el importe de esta regla.
+- **Descartado:**
+  - dejar el fondo "pendiente" (sin dato) hasta saber el importe: no lo vas a mandar, y el patrimonio quedaría parcial para siempre;
+  - estimar el importe con el rendimiento de esos días: sería un precio inventado.
 
 ## Propuestas que la 1a implementa en forma provisoria
 
