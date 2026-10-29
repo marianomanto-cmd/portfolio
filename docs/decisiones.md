@@ -1011,6 +1011,14 @@ Lo pediste el 15/10: «en flujos y escenarios quiero ver graficos» y «seleccio
   - dejar el fondo "pendiente" (sin dato) hasta saber el importe: no lo vas a mandar, y el patrimonio quedaría parcial para siempre;
   - estimar el importe con el rendimiento de esos días: sería un precio inventado.
 
+### D-171 · El dólar de un día es la captura que mandás ese día — D
+- **Lo que dijiste (29/10):** «eso que te pasé es el dólar al 29/10» y «ya te pasé 28/10 ayer», sobre dos capturas de dolarhoy que decían «actualizado» la tarde anterior.
+- **Qué:** la captura del dólar que mandás un día es el tipo de cambio de ese día, aunque la página diga que se actualizó el día anterior. La referencia guarda lo que dice la captura (por ejemplo, «dice actualizado 28/10 17:28»), así queda a la vista.
+- **Por qué:** la composición de cada día la armás a la mañana: el dólar que tenés a mano en ese momento es el último que publicó la página. Así cada composición se valúa con el dólar que viste junto con ella, y la variación del día se separa entre precios y dólar.
+- **Ejemplo con números inventados:** el martes mandás una captura que dice «actualizado lunes 18:00» con CCL $ 1.000: es el CCL del martes. El miércoles mandás otra que dice «actualizado martes 18:00» con CCL $ 1.010: es el del miércoles.
+- **Corrige:** el 28/10 una captura así se cargó como cierre del 27/10, y el 29/10 otra como cierre del 28/10. Ya está corregido: cada captura quedó en el día en que la mandaste, y el 27/10 volvió a la captura que mandaste ese día.
+- **Descartado:** fechar el dólar con el «actualizado» de la página: el día de la composición queda sin dólar propio y su variación, sin atribuir.
+
 ## Propuestas que la 1a implementa en forma provisoria
 
 Estas propuestas de `docs/investigacion-mercado.md` (D-35 a D-53) y de `docs/vision.md` §6 (D-54 a D-103) siguen esperando tu aprobación. La 1a ya las usa porque el código las necesitaba. Estado de todas: **P (provisoria, a confirmar)**. Si rechazás una, se cambia el código y se anota acá.

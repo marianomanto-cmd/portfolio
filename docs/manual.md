@@ -680,6 +680,8 @@ Debajo, "Últimos movimientos": cada uno con lo que salió y lo que entró, en l
 
 Si la plata se fue a algo que la app todavía no sigue (por ejemplo, un fondo que suscribiste desde otra cuenta), es un retiro de esa cuenta. Cuando el fondo aparece en una captura, en la bandeja elegís **Ya la tenía**: entra como apertura, plata que entra de afuera a su valor de ese día, no como ganancia. La composición que mandás es completa (D-170): si un fondo deja de aparecer, se registra rescatado por su último valor informado, y la plata que llegó a otra cuenta tuya entra ahí.
 
+**El dólar de cada día** (D-171): la captura del dólar que mandás un día es el dólar de ese día, aunque la página diga «actualizado» la tarde anterior. La referencia del tipo de cambio anota lo que dice la captura.
+
 ## 10. Modo privado, tema y paleta
 
 - **Modo privado:** el ojo de la barra de arriba, o `h`. Desenfoca los montos y deja los porcentajes, para mirar la app con gente al lado. Vale en todas las pantallas, Cargar y Datos incluidas, y también para los montos dentro de un texto (por ejemplo, el motivo de un "sin dato"). Las trazas que abrís a propósito muestran la cuenta entera.

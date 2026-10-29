@@ -6,7 +6,7 @@ La pantalla que decide si la app vive o muere: **menos de 60 segundos** de tiemp
 
 Una sola pantalla, sin wizard:
 
-1. **CCL** y **dólar cripto** del día: dos campos, vacíos al abrir (el valor de ayer aparece solo como ayuda). Tab entre campos. El eco confirma lo entendido: "= 1.548,20". Al lado, la **referencia del CCL** (de dónde lo sacaste), que se recuerda en el dispositivo y se guarda con el tipo de cambio.
+1. **CCL** y **dólar cripto** del día: dos campos, vacíos al abrir (el valor de ayer aparece solo como ayuda). Tab entre campos. El eco confirma lo entendido: "= 1.548,20". Al lado, la **referencia del CCL** (de dónde lo sacaste), que se recuerda en el dispositivo y se guarda con el tipo de cambio. El dólar de un día es el de la captura que mandás ese día, aunque la página diga que se actualizó la tarde anterior; la referencia lo anota (D-171).
 2. **Archivos**, en cualquier orden, en una sola zona: soltar o pegar (Ctrl+V) en la compu, "Elegir archivos" en el teléfono.
    - **IEB:** el Excel "Portafolio".
    - **Galicia:** la captura de la tenencia.

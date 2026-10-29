@@ -4,6 +4,9 @@ Todo cambio de la app se registra acá, el más nuevo primero. Cada entrada dice
 
 ## [Sin publicar]
 
+### 2026-10-29 — El dólar de cada día es la captura que mandás ese día
+Lo aclaraste el 29/10 (D-171): la captura de dolarhoy que mandás un día es el dólar de ese día, aunque la página diga que se actualizó la tarde anterior. Dos capturas así se habían cargado como cierre del día anterior; ahora cada una está en el día en que la mandaste, y el 27/10 volvió a la captura que mandaste ese día. La referencia de cada tipo de cambio anota lo que dice la captura. No cambia el código: es cómo se cargan tus dólares (`docs/carga-diaria.md`, el manual §9).
+
 ### 2026-10-21 — Lo que mandás es todo lo que tenés
 Lo dijiste el 21/10 (D-170): «lo que hay es lo que te mando, siempre». Una tenencia que deja de aparecer en tu composición se vendió o se rescató, con la fecha de la primera composición que ya no la trae. Si no se sabe cuánto se cobró, el importe es su último valor informado. El fondo de Galicia que no apareció más desde el 19/10 figura rescatado ese día por su valor de la última captura que lo traía, y esa plata llegó a Mercado Pago. Antes seguía valiendo en el patrimonio y la plata se contaba dos veces. Corrige la versión anterior de D-168, que decía que lo que una captura no muestra queda con su último valor. No cambia el código: la bandeja todavía cuenta una captura de Galicia solo para las secciones que trae (pendiente en D-170).
 
